@@ -1,0 +1,38 @@
+# Dependências
+node_modules/
+
+# Build de produção (gerado)
+dist/
+dist-locked-*
+
+# Segredos / environment (NUNCA comitar)
+.env
+.env.local
+.env.*.local
+server/.env
+server/.store-config.json
+
+# Android / Capacitor (gerado pelo cap add android; pode conter handles travados)
+android/
+android_old/
+
+# Netlify / Render (não versionar build artifacts, mas os .toml/.yaml ficam)
+.netlify/
+
+# Logs e lixo
+*.log
+npm-debug.log*
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Testes manuais descartáveis
+test_*.mjs
+login_resp.json
+relatorio.json
+
+# Backup/pendrive de outro projeto (contem segredos reais)
+LOJA-DGRiffe-PENDRIVE/

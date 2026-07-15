@@ -1,0 +1,22 @@
+# Netlify — build do FRONT (single-file) e SPA fallback.
+[build]
+  command = "npm install && npm run build"
+  publish = "dist"
+
+# Em produção, o front precisa saber a URL do proxy.
+# Defina no painel da Netlify (Site settings > Environment variables):
+#   VITE_LOJA_INTEGRADA_PROXY_URL = https://dgriffe-proxy.onrender.com/api/loja-integrada
+[build.environment]
+  NODE_VERSION = "22"
+
+# SPA: redireciona tudo para o index.html (exceto assets e API).
+[[redirects]]
+  from = "/api/*"
+  to = "https://dgriffe-proxy.onrender.com/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

@@ -1,0 +1,135 @@
+import { useState } from "react";
+import { formatPrice } from "../utils";
+import { iniciarCheckout } from "../services/apiConfig";
+
+interface CartItem {
+  product: { id: number; name: string; brand: string; price: number; image: string; colors: string[]; colorNames: string[] };
+  colorIndex: number;
+  quantity: number;
+}
+
+interface CheckoutDrawerProps {
+  items: CartItem[];
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess?: (info: unknown) => void;
+}
+
+type Passo = "escolher" | "processando" | "pix" | "cartao" | "erro";
+
+export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: CheckoutDrawerProps) {
+  const [passo, setPasso] = useState<Passo>("escolher");
+  const [erro, setErro] = useState<string | null>(null);
+  const [pix, setPix] = useState<{ qr: string; copia: string } | null>(null);
+  const [email, setEmail] = useState("");
+
+  if (!isOpen) return null;
+
+  const total = items.reduce((s, it) => s + it.product.price * it.quantity, 0);
+
+  const iniciar = async (meio: "pix" | "cartao") => {
+    setPasso("processando");
+    setErro(null);
+    try {
+      const resultado = await iniciarCheckout({
+        items: items.map((it) => ({ price: it.product.price, qty: it.quantity, sku: String(it.product.id) })),
+        meio,
+        email: email || undefined,
+      });
+      if (meio === "pix") {
+        setPix({ qr: resultado.pix_qr_base64 || "", copia: resultado.pix_copia_cola || "" });
+        setPasso("pix");
+      } else {
+        setPasso("cartao");
+      }
+      onSuccess?.(resultado);
+    } catch (e: any) {
+      setErro(e.message || "Falha ao iniciar o pagamento.");
+      setPasso("erro");
+    }
+  };
+
+  const copiar = () => { if (pix?.copia) navigator.clipboard?.writeText(pix.copia); };
+
+  return (
+    <>
+      <div className="fixed inset-0 z-[60] bg-black/60 animate-fade-in" onClick={onClose} />
+      <div className="fixed bottom-0 left-0 right-0 z-[70] animate-slide-up">
+        <div className="bg-white rounded-t-3xl max-h-[90vh] overflow-y-auto no-scrollbar">
+          <div className="flex justify-center pt-3 pb-1">
+            <div className="w-10 h-1 bg-gray-300 rounded-full" />
+          </div>
+          <div className="px-5 pb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold text-luxury-black">Finalizar Compra</h3>
+              <button onClick={onClose} className="w-8 h-8 bg-ice rounded-full flex items-center justify-center text-gray-400">×</button>
+            </div>
+
+            <div className="bg-ice rounded-2xl p-3 mb-4 flex justify-between">
+              <span className="text-xs text-gray-500">Total</span>
+              <span className="text-lg font-bold text-luxury-black">{formatPrice(total)}</span>
+            </div>
+
+            {passo === "escolher" && (
+              <div className="space-y-3">
+                <input
+                  type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Seu e-mail" className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+                />
+                <button onClick={() => iniciar("pix")} className="w-full h-14 bg-luxury-black text-white font-bold rounded-2xl active:scale-[0.98] transition-all">
+                  Pagar com PIX
+                </button>
+                <button onClick={() => iniciar("cartao")} className="w-full h-14 border border-luxury-black text-luxury-black font-bold rounded-2xl active:scale-[0.98] transition-all">
+                  Cartão de Crédito
+                </button>
+                <p className="text-[10px] text-gray-400 text-center">
+                  Pagamento processado dentro do app (Mercado Pago).
+                </p>
+              </div>
+            )}
+
+            {passo === "processando" && (
+              <div className="flex flex-col items-center py-10">
+                <div className="w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+                <p className="text-xs text-gray-400 mt-3">Processando...</p>
+              </div>
+            )}
+
+            {passo === "pix" && pix && (
+              <div className="space-y-4">
+                <p className="text-sm font-semibold text-luxury-black text-center">Pague com PIX</p>
+                {pix.qr
+                  ? <img src={`data:image/png;base64,${pix.qr}`} alt="PIX QR" className="w-48 h-48 mx-auto" />
+                  : <div className="w-48 h-48 mx-auto bg-ice rounded-2xl flex items-center justify-center text-xs text-gray-400">QR indisponível</div>}
+                <div className="bg-ice rounded-2xl p-3">
+                  <p className="text-[10px] text-gray-500 mb-1">Copia e cola:</p>
+                  <p className="text-[11px] text-luxury-black break-all">{pix.copia}</p>
+                </div>
+                <button onClick={copiar} className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl">Copiar código PIX</button>
+                <p className="text-[10px] text-gray-400 text-center">Após o pagamento, o pedido é confirmado automaticamente.</p>
+              </div>
+            )}
+
+            {passo === "cartao" && (
+              <div className="space-y-3">
+                <p className="text-sm text-gray-500 text-center">
+                  O pagamento por cartão utiliza o SDK do Mercado Pago (tokenização segura no app).
+                </p>
+                <div className="bg-ice rounded-2xl p-3 text-[11px] text-gray-500">
+                  Em produção: aqui entra o formulário de cartão (MP Checkout Transparente).
+                </div>
+              </div>
+            )}
+
+            {passo === "erro" && (
+              <div className="space-y-3">
+                <div className="bg-red-50 border border-red-100 rounded-2xl p-4 text-center text-xs text-red-500">{erro}</div>
+                <button onClick={() => setPasso("escolher")} className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl">Tentar novamente</button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}

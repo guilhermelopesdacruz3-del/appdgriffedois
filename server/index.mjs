@@ -1,0 +1,730 @@
+// Proxy para a API da Loja Integrada + Painel Admin (HARDENED).
+//
+// Melhorias de segurança aplicadas (vs. versão anterior):
+//   - Rate-limit + bloqueio temporário de força bruta no login (/api/admin/login)
+//   - Token de admin revogável (jti registrado no servidor) + logout
+//   - Cabeçalhos de segurança (CSP, HSTS, X-Content-Type-Options, X-Frame-Options, Referrer-Policy)
+//   - Body size limit e validação de entrada no login
+//   - Erros internos nunca vazam para o cliente (logs apenas no servidor)
+//   - Auditoria de acessos (login ok / falha / ações) no log do servidor
+//   - Verificação de origem (FRONTEND_ORIGIN) no CORS
+//
+// Como rodar localmente:
+//   1) cp server/.env.example server/.env  (e preencha com as chaves + ADMIN_PASSWORD)
+//   2) npm install
+//   3) npm run server
+//
+// Como hospedar: qualquer serviço que rode Node (Render, Railway, Fly.io, VPS).
+// Para Vercel/Netlify, use api/loja-integrada/[...path].js e api/admin/[...path].js.
+
+import "dotenv/config";
+import express from "express";
+import cors from "cors";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { config as dotenvConfig } from "dotenv";
+dotenvConfig({ path: path.join(path.dirname(fileURLToPath(import.meta.url)), ".env") });
+import {
+  demoResponder,
+  demoCriarCliente,
+  demoAdminPedidos,
+  demoAdminPedido,
+  demoAdminSituacoes,
+} from "./demo.mjs";
+import * as segredos from "./db.ts";
+import { processarCheckout } from "./pagamento.ts";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const {
+  LOJA_INTEGRADA_APP_KEY,
+  LOJA_INTEGRADA_API_KEY,
+  LOJA_INTEGRADA_API_BASE_URL = "https://api.awsli.com.br/api/v1",
+  FRONTEND_ORIGIN = "*",
+  PORT = 8787,
+  ADMIN_PASSWORD,
+  ADMIN_SECRET = "altere-este-segredo-admin-num-environment",
+  // Quando "true", o proxy devolve dados fictícios (modo demo) em vez de
+  // chamar a Loja Integrada real.
+  DEMO_MODE = "false",
+  ADMIN_MOCK = "false",
+  // Novos: proteção de login
+  ADMIN_MAX_TENTATIVAS = "5",
+  ADMIN_LOCKOUT_MS = "900000", // 15 minutos
+  ADMIN_SENHA_MIN = "6",
+} = process.env;
+
+const DEMO = DEMO_MODE === "true" || DEMO_MODE === "1" || ADMIN_MOCK === "1" || ADMIN_MOCK === "true";
+const MOCK = ADMIN_MOCK === "1" || ADMIN_MOCK === "true";
+
+// Em PRODUÇÃO (DEMO_MODE != true), exige senha de admin forte. Nunca aceita a
+// senha de demo nem senha curta — falha visivelmente no log se estiver errado.
+const SENHA_MIN_PROD = 8;
+let senhaProducaoFraca = false;
+if (!DEMO) {
+  if (!ADMIN_PASSWORD || ADMIN_PASSWORD === "demo123" || ADMIN_PASSWORD.length < SENHA_MIN_PROD) {
+    senhaProducaoFraca = true;
+    console.error(
+      "=========================================================================\n" +
+      "[SEGURANÇA] ADMIN_PASSWORD ausente ou fraca em PRODUÇÃO (DEMO_MODE!=true).\n" +
+      "Defina ADMIN_PASSWORD com >= 8 caracteres (e nunca 'demo123') no ambiente.\n" +
+      "O login de admin ficará BLOQUEADO até corrigir.\n" +
+      "========================================================================="
+    );
+  }
+}
+
+if (!LOJA_INTEGRADA_APP_KEY || !LOJA_INTEGRADA_API_KEY) {
+  console.warn(
+    "[loja-integrada-proxy] AVISO: LOJA_INTEGRADA_APP_KEY e/ou LOJA_INTEGRADA_API_KEY não configuradas."
+  );
+}
+if (!ADMIN_PASSWORD) {
+  console.warn(
+    "[loja-integrada-proxy] AVISO: ADMIN_PASSWORD não configurado. A área de admin estará indisponível."
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Rate-limit / bloqueio de força bruta (por IP) — apenas no login
+// ---------------------------------------------------------------------------
+const MAX_TENTATIVAS = parseInt(ADMIN_MAX_TENTATIVAS, 10) || 5;
+const LOCKOUT_MS = parseInt(ADMIN_LOCKOUT_MS, 10) || 900000;
+const SENHA_MIN = parseInt(ADMIN_SENHA_MIN, 10) || 6;
+const tentativas = new Map(); // ip -> { count, primeiro, bloqueadoAte }
+
+function checarBloqueio(ip) {
+  const t = tentativas.get(ip);
+  if (!t) return { bloqueado: false };
+  if (t.bloqueadoAte && Date.now() < t.bloqueadoAte) {
+    const resta = Math.ceil((t.bloqueadoAte - Date.now()) / 1000);
+    return { bloqueado: true, resta };
+  }
+  if (t.bloqueadoAte && Date.now() >= t.bloqueadoAte) {
+    tentativas.delete(ip); // libera após o período
+  }
+  return { bloqueado: false };
+}
+
+function registrarTentativaFalha(ip) {
+  const t = tentativas.get(ip) || { count: 0, primeiro: Date.now(), bloqueadoAte: 0 };
+  t.count += 1;
+  if (t.count >= MAX_TENTATIVAS) {
+    t.bloqueadoAte = Date.now() + LOCKOUT_MS;
+    console.warn(`[seguranca] IP ${ip} bloqueado por ${LOCKOUT_MS / 1000}s após ${t.count} tentativas de login.`);
+  }
+  tentativas.set(ip, t);
+}
+
+function registrarTentativaSucesso(ip) {
+  tentativas.delete(ip);
+}
+
+function ipDo(req) {
+  return (req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket.remoteAddress || "desconhecido");
+}
+
+// ---------------------------------------------------------------------------
+// Tokens de admin (HMAC via Web Crypto) + revogação server-side
+// ---------------------------------------------------------------------------
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+
+function b64urlEncodeBytes(bytes) {
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+function b64urlDecodeToBytes(s) {
+  const norm = s.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = norm.padEnd(Math.ceil(norm.length / 4) * 4, "=");
+  const bin = atob(padded);
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return arr;
+}
+function b64urlEncodeStr(s) {
+  return b64urlEncodeBytes(encoder.encode(s));
+}
+function b64urlDecodeStr(s) {
+  return decoder.decode(b64urlDecodeToBytes(s));
+}
+
+let _adminKeyPromise = null;
+function adminKey() {
+  if (!_adminKeyPromise) {
+    _adminKeyPromise = crypto.subtle.importKey(
+      "raw",
+      encoder.encode(ADMIN_SECRET),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign", "verify"]
+    );
+  }
+  return _adminKeyPromise;
+}
+
+// Set de tokens revogados (jti). Em memória; em produção multi-instância use Redis.
+const revokedTokens = new Set();
+
+function gerarJti() {
+  return b64urlEncodeStr(`${Date.now()}.${Math.random().toString(36).slice(2)}`);
+}
+
+async function signAdminToken() {
+  const jti = gerarJti();
+  const payload = b64urlEncodeStr(
+    JSON.stringify({ sub: "admin", jti, exp: Date.now() + 60 * 60 * 1000 })
+  );
+  const key = await adminKey();
+  const sig = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
+  return `${payload}.${b64urlEncodeBytes(new Uint8Array(sig))}`;
+}
+
+async function verifyAdminToken(token) {
+  if (!token || !token.includes(".")) return false;
+  const [payload, sig] = token.split(".");
+  try {
+    const key = await adminKey();
+    const ok = await crypto.subtle.verify("HMAC", key, b64urlDecodeToBytes(sig), encoder.encode(payload));
+    if (!ok) return false;
+    const data = JSON.parse(b64urlDecodeStr(payload));
+    if (typeof data.exp !== "number" || data.exp < Date.now()) return false;
+    if (revokedTokens.has(data.jti)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function requireAdmin(req, res, next) {
+  const auth = req.headers.authorization || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  verifyAdminToken(token).then((ok) => {
+    if (!ok) return res.status(401).json({ erro: "Não autorizado." });
+    next();
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Persistência das verificações de pedido (em arquivo, só no servidor Node)
+// ---------------------------------------------------------------------------
+const ESTADO_ARQ = path.join(__dirname, ".admin-state.json");
+let estado = { verificacoes: {} };
+try {
+  estado = JSON.parse(fs.readFileSync(ESTADO_ARQ, "utf8"));
+} catch {
+  /* estado vazio */
+}
+function salvarEstado() {
+  fs.writeFile(ESTADO_ARQ, JSON.stringify(estado), () => {});
+}
+
+// ---------------------------------------------------------------------------
+// Dados fictícios (modo MOCK / ADMIN_MOCK=1)
+// ---------------------------------------------------------------------------
+const mockSituacoes = [
+  { id: 1, codigo: "em_analise", nome: "Em análise", aprovado: false, cancelado: false, final: false, resource_uri: "/api/v1/situacaopedido/1/" },
+  { id: 2, codigo: "aprovado", nome: "Aprovado", aprovado: true, cancelado: false, final: false, resource_uri: "/api/v1/situacaopedido/2/" },
+  { id: 3, codigo: "em_separacao", nome: "Em separação", aprovado: false, cancelado: false, final: false, resource_uri: "/api/v1/situacaopedido/3/" },
+  { id: 4, codigo: "enviado", nome: "Enviado", aprovado: false, cancelado: false, final: false, resource_uri: "/api/v1/situacaopedido/4/" },
+  { id: 5, codigo: "entregue", nome: "Entregue", aprovado: false, cancelado: false, final: true, resource_uri: "/api/v1/situacaopedido/5/" },
+  { id: 6, codigo: "cancelado", nome: "Cancelado", aprovado: false, cancelado: true, final: false, resource_uri: "/api/v1/situacaopedido/6/" },
+];
+
+const mockPedidos = [
+  { id: 101, numero: "DG-2025001", cliente_nome: "Ana Beatriz Souza", cliente_email: "ana.souza@email.com", cliente: "/api/v1/cliente/55/", situacao: mockSituacoes[1], data_criacao: "2026-07-10T14:30:00", valor_subtotal: "459.90", valor_desconto: "0.00", valor_envio: "0.00", valor_total: "459.90", itens: [{ id: 1, nome: "Óculos Ray-Ban Aviador", quantidade: 1, preco_venda: "459.90" }], pagamentos: [{ forma_pagamento: { nome: "Pix" }, valor: "459.90" }], envios: [{ forma_envio: { nome: "Transportadora" }, prazo: 5, objeto: "BR123456789XY" }] },
+  { id: 102, numero: "DG-2025002", cliente_nome: "Carlos Mendes", cliente_email: "carlos.mendes@email.com", cliente: "/api/v1/cliente/61/", situacao: mockSituacoes[0], data_criacao: "2026-07-12T09:10:00", valor_subtotal: "1290.00", valor_desconto: "0.00", valor_envio: "0.00", valor_total: "1290.00", itens: [{ id: 2, nome: "Óculos Michael Kors Feminino", quantidade: 1, preco_venda: "1290.00" }], pagamentos: [{ forma_pagamento: { nome: "Cartão de crédito" }, valor: "1290.00" }], envios: [{ forma_envio: { nome: "Correios" }, prazo: 8, objeto: null }] },
+  { id: 103, numero: "DG-2025003", cliente_nome: "Beatriz Lima", cliente_email: "bia.lima@email.com", cliente: "/api/v1/cliente/72/", situacao: mockSituacoes[3], data_criacao: "2026-07-14T18:45:00", valor_subtotal: "239.90", valor_desconto: "0.00", valor_envio: "0.00", valor_total: "239.90", itens: [{ id: 3, nome: "Óculos Vogue Redondo", quantidade: 1, preco_venda: "239.90" }], pagamentos: [{ forma_pagamento: { nome: "Pix" }, valor: "239.90" }], envios: [{ forma_envio: { nome: "Transportadora" }, prazo: 4, objeto: "BR987654321ZW" }] },
+];
+
+const mockVerificacoes = {};
+
+function mockListPedidos() {
+  return {
+    meta: { limit: 100, offset: 0, total_count: mockPedidos.length, next: null, previous: null },
+    objects: mockPedidos.map((p) => ({
+      ...p,
+      verificado: Boolean(mockVerificacoes[String(p.id)]),
+      verificado_em: mockVerificacoes[String(p.id)] ? mockVerificacoes[String(p.id)].em : null,
+    })),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Chamada genérica à Loja Integrada (com credenciais injetadas)
+// ---------------------------------------------------------------------------
+async function chamarLI(method, resource, id, query, body) {
+  const upstreamUrl = new URL(
+    `${LOJA_INTEGRADA_API_BASE_URL}/${resource}/${id ? `${id}/` : ""}`
+  );
+  if (query) {
+    Object.entries(query).forEach(([key, value]) => {
+      if (value !== undefined && value !== "") upstreamUrl.searchParams.set(key, String(value));
+    });
+  }
+  upstreamUrl.searchParams.set("chave_aplicacao", LOJA_INTEGRADA_APP_KEY ?? "");
+  upstreamUrl.searchParams.set("chave_api", LOJA_INTEGRADA_API_KEY ?? "");
+  upstreamUrl.searchParams.set("format", "json");
+
+  const upstreamResponse = await fetch(upstreamUrl.toString(), {
+    method,
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: method === "POST" || method === "PUT" ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(15000),
+  });
+
+  const contentType = upstreamResponse.headers.get("content-type") || "";
+  const payload = contentType.includes("application/json")
+    ? await upstreamResponse.json()
+    : await upstreamResponse.text();
+
+  return { status: upstreamResponse.status, payload };
+}
+
+const RECURSOS_PERMITIDOS = new Set([
+  "produto",
+  "categoria",
+  "marca",
+  "cliente",
+  "pedido",
+  "formapagamento",
+  "formaenvio",
+  "situacaopedido",
+]);
+
+const RECURSOS_ESCRITA_PERMITIDOS = new Set(["cliente"]);
+
+const app = express();
+app.use(express.json({ limit: "512kb" }));
+app.disable("x-powered-by");
+
+// CORS restrito à origem do front (ou '*' só em dev).
+const originsPermitidas = FRONTEND_ORIGIN === "*" ? true : FRONTEND_ORIGIN.split(",").map((s) => s.trim());
+app.use(
+  cors({
+    origin: originsPermitidas,
+    methods: ["GET", "POST", "PUT", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: false,
+  })
+);
+
+// Cabeçalhos de segurança (não vazam stack traces; dificultam ataques).
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("X-Frame-Options", "DENY");
+  if (req.secure || req.headers["x-forwarded-proto"] === "https") {
+    res.setHeader("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
+  }
+  // CSP: permite estilos/imagens e fontes do app; bloqueia injects.
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' https:; connect-src 'self' https:; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'"
+  );
+  next();
+});
+
+app.get("/health", (_req, res) => res.json({ ok: true }));
+
+// ---------------------------------------------------------------------------
+// Área de admin
+// ---------------------------------------------------------------------------
+app.post("/api/admin/login", async (req, res) => {
+  if (senhaProducaoFraca) {
+    return res.status(503).json({ erro: "Serviço indisponível (configure a senha de admin)." });
+  }
+  if (!ADMIN_PASSWORD) {
+    return res.status(500).json({ erro: "Serviço indisponível." });
+  }
+  const ip = ipDo(req);
+
+  // Bloqueio por força bruta.
+  const bloq = checarBloqueio(ip);
+  if (bloq.bloqueado) {
+    console.warn(`[seguranca] Login bloqueado para ${ip} (restam ${bloq.resta}s).`);
+    return res.status(429).json({ erro: `Muitas tentativas. Tente novamente em ${bloq.resta}s.` });
+  }
+
+  const senha = (req.body && typeof req.body.senha === "string" ? req.body.senha : "") || "";
+  if (!senha || senha.length < SENHA_MIN) {
+    registrarTentativaFalha(ip);
+    return res.status(401).json({ erro: "Senha inválida." });
+  }
+  if (senha !== ADMIN_PASSWORD) {
+    registrarTentativaFalha(ip);
+    console.warn(`[seguranca] Falha de login para ${ip}.`);
+    return res.status(401).json({ erro: "Senha inválida." });
+  }
+
+  registrarTentativaSucesso(ip);
+  console.log(`[auditoria] Login admin OK — IP ${ip} em ${new Date().toISOString()}`);
+  return res.json({ token: await signAdminToken() });
+});
+
+// Logout: revoga o token atual.
+app.post("/api/admin/logout", requireAdmin, (req, res) => {
+  const token = (req.headers.authorization || "").replace("Bearer ", "");
+  if (token && token.includes(".")) {
+    try {
+      const payload = JSON.parse(b64urlDecodeStr(token.split(".")[0]));
+      if (payload.jti) revokedTokens.add(payload.jti);
+    } catch {
+      /* ignora */
+    }
+  }
+  return res.json({ ok: true });
+});
+
+// Lista TODOS os pedidos + flag de verificação.
+app.get("/api/admin/pedidos", requireAdmin, async (req, res) => {
+  if (MOCK) return res.json(mockListPedidos());
+  if (DEMO) return res.json(demoAdminPedidos());
+  try {
+    const { limit = "50", offset = "0", numero, cliente_email, cliente } = req.query;
+    const query = { limit, offset };
+    if (numero) query.numero = numero;
+    if (cliente_email) query.cliente_email = cliente_email;
+    if (cliente) query.cliente = cliente;
+
+    const { status, payload } = await chamarLI("GET", "pedido", undefined, query);
+    if (status !== 200) return res.status(status).json(payload);
+
+    const obj = payload;
+    const objects = (obj.objects || []).map((p) => ({
+      ...p,
+      verificado: Boolean(estado.verificacoes[String(p.id)]),
+      verificado_em: estado.verificacoes[String(p.id)] ? estado.verificacoes[String(p.id)].em : null,
+    }));
+    return res.json({ ...obj, objects });
+  } catch (err) {
+    console.error("[admin] erro ao listar pedidos:", err);
+    return res.status(502).json({ erro: "Falha ao se comunicar com a Loja Integrada." });
+  }
+});
+
+// Detalhe de um pedido + flag de verificação.
+app.get("/api/admin/pedidos/:id", requireAdmin, async (req, res) => {
+  if (MOCK) {
+    const p = mockPedidos.find((x) => String(x.id) === String(req.params.id));
+    if (!p) return res.status(404).json({ erro: "Pedido não encontrado." });
+    return res.json({
+      ...p,
+      verificado: Boolean(mockVerificacoes[String(p.id)]),
+      verificado_em: mockVerificacoes[String(p.id)] ? mockVerificacoes[String(p.id)].em : null,
+    });
+  }
+  if (DEMO) {
+    const r = demoAdminPedido(req.params.id);
+    return res.status(r.status).json(r.body);
+  }
+  try {
+    const { status, payload } = await chamarLI("GET", "pedido", req.params.id);
+    if (status !== 200) return res.status(status).json(payload);
+    const obj = payload;
+    return res.json({
+      ...obj,
+      verificado: Boolean(estado.verificacoes[String(obj.id)]),
+      verificado_em: estado.verificacoes[String(obj.id)] ? estado.verificacoes[String(obj.id)].em : null,
+    });
+  } catch (err) {
+    console.error("[admin] erro ao buscar pedido:", err);
+    return res.status(502).json({ erro: "Falha ao se comunicar com a Loja Integrada." });
+  }
+});
+
+// Atualiza a situação (status) de um pedido.
+app.put("/api/admin/pedidos/:id", requireAdmin, async (req, res) => {
+  if (MOCK) {
+    const p = mockPedidos.find((x) => String(x.id) === String(req.params.id));
+    if (!p) return res.status(404).json({ erro: "Pedido não encontrado." });
+    const sit = mockSituacoes.find((s) => String(s.id) === String((req.body || {}).situacao));
+    if (sit) p.situacao = sit;
+    return res.json(p);
+  }
+  try {
+    const body = req.body || {};
+    const liBody = {};
+    if (body.situacao !== undefined) liBody.situacao = body.situacao;
+    const { status, payload } = await chamarLI("PUT", "pedido", req.params.id, undefined, liBody);
+    return res.status(status).json(payload);
+  } catch (err) {
+    console.error("[admin] erro ao atualizar pedido:", err);
+    return res.status(502).json({ erro: "Falha ao se comunicar com a Loja Integrada." });
+  }
+});
+
+// Marca/desmarca um pedido como verificado.
+app.post("/api/admin/pedidos/:id/verificar", requireAdmin, async (req, res) => {
+  const id = String(req.params.id);
+  if (MOCK) {
+    const verificado = Boolean(req.body && req.body.verificado !== undefined ? req.body.verificado : true);
+    if (verificado) mockVerificacoes[id] = { em: new Date().toISOString() };
+    else delete mockVerificacoes[id];
+    return res.json({ id, verificado, verificado_em: mockVerificacoes[id] ? mockVerificacoes[id].em : null });
+  }
+  const verificado = Boolean(req.body && req.body.verificado !== undefined ? req.body.verificado : true);
+  if (verificado) estado.verificacoes[id] = { em: new Date().toISOString() };
+  else delete estado.verificacoes[id];
+  salvarEstado();
+  return res.json({
+    id,
+    verificado,
+    verificado_em: estado.verificacoes[id] ? estado.verificacoes[id].em : null,
+  });
+});
+
+// Situações disponíveis.
+app.get("/api/admin/situacoes", requireAdmin, async (_req, res) => {
+  if (MOCK) return res.json(mockSituacoes);
+  if (DEMO) return res.json(demoAdminSituacoes());
+  try {
+    const { status, payload } = await chamarLI("GET", "situacaopedido", undefined, { limit: 200 });
+    if (status !== 200) return res.status(status).json(payload);
+    return res.json((payload.objects || []));
+  } catch (err) {
+    console.error("[admin] erro ao buscar situações:", err);
+    return res.status(502).json({ erro: "Falha ao se comunicar com a Loja Integrada." });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// RELATÓRIOS / AGREGAÇÕES (alimenta gráficos do admin)
+// ---------------------------------------------------------------------------
+function agregarPedidos(objects) {
+  const porStatus = {};
+  const porDia = {};
+  let total = 0;
+  let totalAprovado = 0;
+  let TicketMedio = 0;
+  const aprovados = new Set(["aprovado", "em_separacao", "enviado", "entregue"]);
+
+  for (const p of objects) {
+    const situacao = (p.situacao && (p.situacao.nome || p.situacao.codigo)) || "sem_status";
+    porStatus[situacao] = (porStatus[situacao] || 0) + 1;
+
+    const valor = Number(p.valor_total || p.valor_subtotal || 0) || 0;
+    total += valor;
+    const cod = p.situacao?.codigo || "";
+    if (aprovados.has(cod)) totalAprovado += valor;
+
+    const dia = (p.data_criacao || "").slice(0, 10);
+    if (dia) {
+      porDia[dia] = porDia[dia] || { count: 0, total: 0 };
+      porDia[dia].count += 1;
+      porDia[dia].total += valor;
+    }
+  }
+
+  const dias = Object.keys(porDia).sort();
+  TicketMedio = objects.length ? total / objects.length : 0;
+
+  return {
+    totalPedidos: objects.length,
+    faturamentoTotal: Number(total.toFixed(2)),
+    faturamentoAprovado: Number(totalAprovado.toFixed(2)),
+    ticketMedio: Number(TicketMedio.toFixed(2)),
+    porStatus,
+    serieDiaria: dias.map((d) => ({ dia: d, count: porDia[d].count, total: Number(porDia[d].total.toFixed(2)) })),
+  };
+}
+
+// Busca paginada de TODOS os pedidos da loja (até o limite) para agregar.
+async function buscarTodosPedidos() {
+  const todos = [];
+  let offset = 0;
+  const limit = 200;
+  // Em demo, retorna os pedidos demo direto.
+  if (DEMO || MOCK) {
+    const base = DEMO ? demoAdminPedidos().objects : mockListPedidos().objects;
+    return base;
+  }
+  for (let i = 0; i < 20; i++) {
+    const { status, payload } = await chamarLI("GET", "pedido", undefined, { limit, offset });
+    if (status !== 200) break;
+    const objs = payload.objects || [];
+    todos.push(...objs);
+    if (objs.length < limit) break;
+    offset += limit;
+  }
+  return todos;
+}
+
+app.get("/api/admin/relatorio", requireAdmin, async (req, res) => {
+  try {
+    const objects = await buscarTodosPedidos();
+    const agreg = agregarPedidos(objects);
+
+    // Canal (app vs site): a LI não expõe distinção direta de forma padronizada.
+    // Usamos o campo `plataforma_pedido` / `origem` se existir; senão marcamos "site".
+    let porCanal = { site: 0, app: 0 };
+    for (const p of objects) {
+      const canal = (p.plataforma_pedido || p.origem || p.canal || "").toString().toLowerCase();
+      if (canal.includes("app") || canal.includes("mobile") || canal.includes("aplicativo")) porCanal.app += 1;
+      else porCanal.site += 1;
+    }
+    // Se nenhum pedido trouxe canal, mostra tudo como "site" (comportamento defensivo).
+    if (porCanal.app === 0 && porCanal.site === 0) porCanal = { site: objects.length, app: 0 };
+
+    return res.json({ ...agreg, porCanal });
+  } catch (err) {
+    console.error("[admin] erro ao gerar relatório:", err);
+    return res.status(502).json({ erro: "Falha ao gerar relatório." });
+  }
+});
+
+// Clientes distintos (e-mail + nome) dos pedidos — para o card de "clientes".
+app.get("/api/admin/clientes", requireAdmin, async (_req, res) => {
+  try {
+    const objects = await buscarTodosPedidos();
+    const mapa = new Map();
+    for (const p of objects) {
+      const email = (p.cliente_email || "").toLowerCase();
+      if (!email) continue;
+      if (!mapa.has(email)) mapa.set(email, { email, nome: p.cliente_nome || "", pedidos: 0, total: 0 });
+      const c = mapa.get(email);
+      c.pedidos += 1;
+      c.total += Number(p.valor_total || p.valor_subtotal || 0) || 0;
+    }
+    const clientes = Array.from(mapa.values()).map((c) => ({ ...c, total: Number(c.total.toFixed(2)) }));
+    clientes.sort((a, b) => b.total - a.total);
+    return res.json({ total: clientes.length, clientes });
+  } catch (err) {
+    console.error("[admin] erro ao listar clientes:", err);
+    return res.status(502).json({ erro: "Falha ao listar clientes." });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// CONFIG DE APIs (chaves da Loja Integrada / Mercado Pago) — usado pelo painel admin.
+// Fonte de verdade: Supabase (tabela store_config) quando SUPABASE_* estão setadas;
+// caso contrário, fallback para arquivo local .store-config.json. NUNCA devolve
+// os valores secretos, só o status.
+// ---------------------------------------------------------------------------
+app.get("/api/config", requireAdmin, async (_req, res) => {
+  try {
+    const status = await segredos.listConfig();
+    return res.json(status);
+  } catch (e) {
+    console.error("[config] falha ao ler:", e?.message);
+    return res.status(502).json({ erro: "Falha ao ler as chaves de API." });
+  }
+});
+
+app.put("/api/config", requireAdmin, async (req, res) => {
+  const body = req.body || {};
+  let alterou = 0;
+  try {
+    alterou = await segredos.saveConfig({
+      LI_APP_KEY: body.LI_APP_KEY,
+      LI_API_KEY: body.LI_API_KEY,
+      MP_ACCESS_TOKEN: body.MP_ACCESS_TOKEN,
+      MP_PUBLIC_KEY: body.MP_PUBLIC_KEY,
+    });
+  } catch (e) {
+    console.error("[config] falha ao salvar:", e?.message);
+    return res.status(502).json({ erro: "Falha ao salvar as chaves de API." });
+  }
+  if (alterou === 0) return res.status(400).json({ erro: "Nenhuma chave válida enviada." });
+  console.log(`[auditoria] Config de APIs atualizada (${alterou} chave(s)) por IP ${req.ip}`);
+  return res.json({ ok: true, alteradas: alterou });
+});
+
+// Chave PÚBLICA do Mercado Pago (segura para o front — usada pelo SDK de cartão).
+// NUNCA devolve o access_token.
+app.get("/api/mp-public-key", async (_req, res) => {
+  try {
+    const pk = await segredos.getSecret("MP_PUBLIC_KEY");
+    return res.json({ public_key: pk || null });
+  } catch (e) {
+    return res.json({ public_key: null });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// CHECKOUT (PIX / cartão). Em DEMO gera uma cobrança PIX simulada para o fluxo
+// funcionar ponta a ponta. Em produção, integrar com o Mercado Pago usando o
+// MP_ACCESS_TOKEN salvo em /api/config (Supabase ou arquivo local).
+// Em produção, o pagamento é processado via módulo seguro (server/pagamento.ts).
+// ---------------------------------------------------------------------------
+app.post("/api/checkout", async (req, res) => {
+  const body = req.body || {};
+  const { items, meio, email, card_token } = body;
+
+  // Validação de entrada (defesa em profundidade — não confia no front).
+  if (!Array.isArray(items) || items.length === 0) {
+    return res.status(400).json({ erro: "Carrinho vazio." });
+  }
+  if (!["pix", "cartao"].includes(meio)) {
+    return res.status(400).json({ erro: "Meio de pagamento inválido." });
+  }
+  if (email && (typeof email !== "string" || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))) {
+    return res.status(400).json({ erro: "E-mail inválido." });
+  }
+  if (meio === "cartao" && (!card_token || typeof card_token !== "string")) {
+    return res.status(400).json({ erro: "Token de cartão ausente (gere-o com o SDK do Mercado Pago no cliente)." });
+  }
+  if (items.length > 50) {
+    return res.status(400).json({ erro: "Carrinho excede o limite de itens." });
+  }
+
+  try {
+    const resultado = await processarCheckout({ items, meio, email, card_token });
+    console.log(
+      `[auditoria] Checkout ${meio} -> status=${resultado.status} valor=${resultado.valor_total} ` +
+        `mp_id=${resultado.mp_payment_id || "demo"} ip=${req.ip}`
+    );
+    return res.json(resultado);
+  } catch (e) {
+    const msg = e?.message || "Falha ao processar o pagamento.";
+    const status = typeof e?.status === "number" ? e.status : 502;
+    console.error(`[checkout] falha (${meio}) ip=${req.ip}:`, msg);
+    return res.status(status).json({ erro: msg });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Proxy público de dados da Loja Integrada
+// ---------------------------------------------------------------------------
+app.all("/api/loja-integrada/:resource/:id?", async (req, res) => {
+  const { resource, id } = req.params;
+
+  if (!RECURSOS_PERMITIDOS.has(resource)) {
+    return res.status(404).json({ erro: `Recurso "${resource}" não é exposto por este proxy.` });
+  }
+  if (req.method === "POST" && !RECURSOS_ESCRITA_PERMITIDOS.has(resource)) {
+    return res.status(405).json({ erro: `Criação via proxy não habilitada para "${resource}".` });
+  }
+  if (!["GET", "POST"].includes(req.method)) {
+    return res.status(405).json({ erro: "Método não suportado." });
+  }
+
+  if (DEMO) {
+    const query = Object.fromEntries(Object.entries(req.query).map(([k, v]) => [k, String(v)]));
+    if (req.method === "POST" && resource === "cliente") {
+      const r = demoCriarCliente(req.body || {});
+      return res.status(r.status).json(r.body);
+    }
+    const r = demoResponder(resource, id, req.method, query);
+    if (r) return res.status(r.status).json(r.body);
+    return res.status(404).json({ erro: `Recurso "${resource}" não tem dados de demo.` });
+  }
+
+  try {
+    const query = Object.fromEntries(Object.entries(req.query).map(([k, v]) => [k, String(v)]));
+    const { status, payload } = await chamarLI(req.method, resource, id, query);
+    res.status(status).send(payload);
+  } catch (err) {
+    console.error("[loja-integrada-proxy] erro ao chamar a Loja Integrada:", err);
+    res.status(502).json({ erro: "Falha ao se comunicar com a Loja Integrada." });
+  }
+});
+
+app.listen(PORT, () => {
+  console.log(`[loja-integrada-proxy] rodando em http://localhost:${PORT}`);
+  console.log(`[loja-integrada-proxy] endpoint: http://localhost:${PORT}/api/loja-integrada/produto/`);
+  console.log(`[loja-integrada-proxy] admin:    http://localhost:${PORT}/api/admin/login`);
+  if (ADMIN_PASSWORD) console.log(`[loja-integrada-proxy] segurança: rate-limit ${MAX_TENTATIVAS} tentativas / ${LOCKOUT_MS / 1000}s, token revogável, CSP/HSTS ativos.`);
+});
