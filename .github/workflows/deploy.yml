@@ -23,9 +23,33 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm run build
 
+  # 1b) Aplica o schema de segredos no Supabase (tabelas + RLS + seed).
+  # Usa a Supabase Access Token (PAT) guardada como secret. Idempotente (IF NOT EXISTS).
+  sync-supabase:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Aplicar schema no Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
+            echo "SUPABASE_ACCESS_TOKEN não definido — pulando sync do banco."
+            exit 0
+          fi
+          SQL=$(cat supabase/schema-segredos.sql)
+          RESP=$(curl -fsSL -X POST "$SUPABASE_URL/rest/v1/sql" \
+            -H "Authorization: Bearer ***" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -d "$(jq -n --arg q "$SQL" '{query:$q}')")
+          echo "Resposta Supabase: $RESP"
+
   # 2) Deploy do FRONT na Netlify (automático a cada push na main).
   deploy-front:
-    needs: test
+    needs: [test, sync-supabase]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -48,7 +72,7 @@ jobs:
 
   # 3) Deploy do PROXY no Render (trigger de deploy).
   deploy-backend:
-    needs: test
+    needs: [test, sync-supabase]
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Render Deploy
