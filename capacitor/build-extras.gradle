@@ -1,0 +1,35 @@
+// Build extras — mesclado automaticamente pelo Capacitor no android/app/build.gradle.
+// Lê as credenciais de assinatura de keystore.properties (gerado no CI) e
+// aplica no build de release, produzindo um AAB ASSINADO.
+//
+// Se keystore.properties não existir, o build de release falha propositalmente
+// (garante que só gera AAB assinado).
+
+def ksProps = new Properties()
+def ksFile = rootProject.file("app/keystore.properties")
+if (ksFile.exists()) {
+  ksProps.load(new FileInputStream(ksFile))
+}
+
+android {
+  signingConfigs {
+    release {
+      storeFile file(ksProps['storeFile'] ?: "dgriffe.keystore")
+      storePassword ksProps['storePassword']
+      keyAlias ksProps['keyAlias']
+      keyPassword ksProps['keyPassword']
+    }
+  }
+  buildTypes {
+    release {
+      signingConfig signingConfigs.release
+      minifyEnabled false
+      proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+    }
+  }
+  bundle {
+    abi {
+      enableSplit = false
+    }
+  }
+}

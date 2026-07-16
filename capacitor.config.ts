@@ -1,31 +1,37 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
-// Configuração do Capacitor para gerar o app Android (APK).
+// Configuração do Capacitor para gerar o app Android como AAB
+// (Android App Bundle) — formato EXIGIDO pela Google Play Store.
 //
-// IMPORTANTE — conectividade em produção:
-// O app web fala com o proxy da Loja Integrada via VITE_LOJA_INTEGRADA_PROXY_URL.
-// No emulador/celular, "localhost" aponta para o PRÓPRIO aparelho, não para o seu
-// PC. Por isso, em produção, defina VITE_LOJA_INTEGRADA_PROXY_URL para a URL
-// PÚBLICA do seu proxy (Render/Railway/VPS) ANTES de rodar `npm run build`.
+// PROXY EM PRODUÇÃO:
+// O app web fala com o backend (checkout MP + Loja Integrada) via
+// VITE_LOJA_INTEGRADA_PROXY_URL. No celular, "localhost" aponta para o
+// PRÓPRIO aparelho. Por isso, em produção, defina essa env para a URL
+// PÚBLICA do proxy (Render/Railway/VPS) ANTES do `npm run build`.
+// O build do AAB (GitHub Actions) injeta essa env automaticamente.
 //
-// Para testar localmente no emulador Android, use `npx cap run android` — o
-// Capacitor faz um "proxy reverso" automático de localhost:8787 do emulador
-// para o localhost:8787 do seu PC. Em um celular físico (APK instalado), será
-// necessário hospedar o proxy e ajustar a env.
+// Para testar localmente no emulador: `npx cap run android` faz o proxy
+// reverso de localhost:8787 do emulador -> localhost:8787 do PC.
+
+const PROXY_URL = (process.env.VITE_LOJA_INTEGRADA_PROXY_URL || "").replace(/\/$/, "");
 
 const config: CapacitorConfig = {
   appId: "com.dgriffe.app",
   appName: "D'Griffe Ótica",
   webDir: "dist",
   server: {
-    // Em dev com `npx cap run android` + emulador, o Capacitor redireciona
-    // localhost:8787 do emulador para o PC. Em produção (APK), o app usará a
-    // URL definida em VITE_LOJA_INTEGRADA_PROXY_URL (build-time).
+    // Em produção (AAB), o app consome a URL definida em build-time.
     androidScheme: "https",
+    // Garante que a URL do proxy seja embutida no bundle.
+    ...(PROXY_URL ? { hostname: PROXY_URL.replace(/^https?:\/\//, "") } : {}),
   },
   android: {
     backgroundColor: "#0A0A0A",
     allowMixedContent: true,
+    // AAB único (sem splits por ABI) — mais simples de publicar.
+    buildOptions: {
+      // O Gradle gera app-release.aab em android/app/build/outputs/bundle/release/
+    },
   },
 };
 
