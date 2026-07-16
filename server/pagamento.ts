@@ -9,7 +9,7 @@
 // - Em DEMO (sem MP_ACCESS_TOKEN), devolve PIX/cartão SIMULADO para o fluxo funcionar.
 
 import crypto from "node:crypto";
-import { getSecret } from "./db.ts";
+import { getSecret, creditarPontos, resgatarPontos, getRegrasFidelidade, getPontos } from "./db.ts";
 
 const MP_API = "https://api.mercadopago.com";
 
@@ -125,6 +125,9 @@ export interface CheckoutResult {
   li_pedido?: string | number | null;
   status?: string;
   valor_total?: number;
+  valor_original?: number;
+  pontos_creditados?: number;
+  desconto_aplicado?: number;
   pix_qr_base64?: string;
   pix_copia_cola?: string;
   email?: string | null;
@@ -138,19 +141,40 @@ export async function processarCheckout(params: {
   meio: "pix" | "cartao";
   email?: string;
   card_token?: string;
+  pontosResgate?: number;
 }): Promise<CheckoutResult> {
-  const { items, meio, email, card_token } = params;
+  const { items, meio, email, card_token, pontosResgate } = params;
 
   const autorizado = await obterValorAutorizado(items);
   if (!autorizado.ok) throw new Error(autorizado.erro || "Valor inválido.");
-  const total = autorizado.total;
+  let total = autorizado.total;
+
+  // Resgate de pontos (desconto) — só se o cliente tiver saldo suficiente.
+  let desconto = 0;
+  let usouPontos = 0;
+  const e = (email || "").trim().toLowerCase();
+  if (pontosResgate && pontosResgate > 0 && e) {
+    const regras = await getRegrasFidelidade();
+    const saldoPontos = await getPontos(e);
+    const pontosUtilizaveis = Math.min(pontosResgate, saldoPontos);
+    // Regra: pontosPorDesconto pontos = R$ 10 (ex.: 100 pts = R$ 10).
+    desconto = Math.floor((pontosUtilizaveis / regras.pontosPorDesconto) * 10);
+    if (desconto > 0 && desconto < total) {
+      usouPontos = await resgatarPontos(e, pontosUtilizaveis);
+      if (usouPontos > 0) total = Number((total - desconto).toFixed(2));
+      else desconto = 0;
+    } else {
+      desconto = 0;
+    }
+  }
 
   // Em DEMO (sem token MP válido ou modo demo), mantém fluxo simulado.
-  // Isso garante que o app funcione em ambiente de demonstração sem chamar o MP.
   const mpToken = await getSecret("MP_ACCESS_TOKEN").catch(() => null);
   const demoAtivo = process.env.DEMO_MODE === "true" || !mpToken;
   if (demoAtivo) {
     const idPedido = `DEMO-${Date.now().toString().slice(-8)}`;
+    // No demo, creditamos pontos imediatamente (simula pagamento aprovado).
+    const pontos = e ? await creditarPontos(e, total, idPedido) : 0;
     if (meio === "pix") {
       return {
         meio,
@@ -158,6 +182,9 @@ export async function processarCheckout(params: {
         li_pedido: null,
         status: "pendente",
         valor_total: total,
+        valor_original: autorizado.total,
+        desconto_aplicado: desconto,
+        pontos_creditados: pontos,
         pix_qr_base64:
           "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
         pix_copia_cola: `00020126BR.GOV.BCB.PIX-DEMO-${idPedido}-${total.toFixed(2)}5204000053039865802BR6009SAO PAULO62070503***6304DEMO`,
@@ -165,18 +192,22 @@ export async function processarCheckout(params: {
         demo: true,
       };
     }
-    return { meio, id: idPedido, status: "aprovado", valor_total: total, email: email || null, demo: true };
+    return { meio, id: idPedido, status: "aprovado", valor_total: total, valor_original: autorizado.total, desconto_aplicado: desconto, pontos_creditados: pontos, email: email || null, demo: true };
   }
 
   // Produção: chama a API real do Mercado Pago.
+  let resultado: CheckoutResult;
   if (meio === "pix") {
-    return await criarPixMP(mpToken, total, "Ótica D'Griffe", email);
-  }
-  if (meio === "cartao") {
+    resultado = await criarPixMP(mpToken, total, "Ótica D'Griffe", email);
+  } else {
     if (!card_token || typeof card_token !== "string" || card_token.length < 10) {
       throw new Error("Token de cartão inválido (deve ser gerado pelo SDK do Mercado Pago no cliente).");
     }
-    return await criarCartaoMP(mpToken, total, card_token, email);
+    resultado = await criarCartaoMP(mpToken, total, card_token, email);
   }
-  throw new Error("Meio de pagamento inválido.");
+  // Crédito de pontos ocorre quando o MP confirmar (webhook). Aqui registramos
+  // a intenção; o webhook/poll chamará creditarPontos após status "approved".
+  resultado.valor_original = autorizado.total;
+  resultado.desconto_aplicado = desconto;
+  return resultado;
 }

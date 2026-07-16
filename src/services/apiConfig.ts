@@ -74,6 +74,7 @@ export async function iniciarCheckout(payload: {
   meio: "pix" | "cartao";
   card_token?: string;
   email?: string;
+  pontosResgate?: number;
 }) {
   return adminCall<CheckoutResult>("checkout", { method: "POST", body: payload });
 }

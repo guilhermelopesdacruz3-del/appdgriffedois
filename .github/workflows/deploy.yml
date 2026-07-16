@@ -45,7 +45,14 @@ jobs:
             -H "Content-Type: application/json" \
             -H "Accept: application/json" \
             -d "$(jq -n --arg q "$SQL" '{query:$q}')")
-          echo "Resposta Supabase: $RESP"
+          echo "Resposta Supabase (segredos): $RESP"
+          SQL2=$(cat supabase/schema-fidelidade.sql)
+          RESP2=$(curl -fsSL -X POST "$SUPABASE_URL/rest/v1/sql" \
+            -H "Authorization: Bearer ***" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -d "$(jq -n --arg q "$SQL2" '{query:$q}')")
+          echo "Resposta Supabase (fidelidade): $RESP2"
 
   # 2) Deploy do FRONT na Netlify (automático a cada push na main).
   deploy-front:

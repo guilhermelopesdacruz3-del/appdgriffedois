@@ -4,6 +4,8 @@ import { useCliente } from "../hooks/useCliente";
 import { usePedidos } from "../hooks/usePedidos";
 import { useFavorites } from "../hooks/useUserLists";
 import { useProdutos } from "../hooks/useProdutos";
+import { useFidelidade } from "../hooks/useFidelidade";
+import { formatPrice } from "../utils";
 import type { Product } from "../data";
 import ProductCard from "../components/ProductCard";
 
@@ -15,6 +17,7 @@ export default function ProfilePage() {
   const { pedidos, loading: loadingPedidos, error: erroPedidos } = usePedidos(cliente?.id ?? null);
   const { favoriteIds, isFavorite, toggleFavorite } = useFavorites();
   const { produtos: todosProdutos } = useProdutos({ limit: 100 });
+  const { info: fidInfo } = useFidelidade(cliente?.email);
   const [subTela, setSubTela] = useState<SubTela | null>(null);
 
   const menuItems: { icon: ReactNode; label: string; subtitle: string; action: SubTela | null }[] = [
@@ -196,6 +199,12 @@ export default function ProfilePage() {
             {linha("E-mail", cliente?.email)}
             {linha("Telefone", cliente?.telefone)}
             {linha("CPF", cliente?.cpf)}
+            {linha("Pontos de fidelidade", fidInfo ? `${fidInfo.pontos} pts` : "0 pts")}
+            {fidInfo && fidInfo.desconto_max > 0 && (
+              <div className="py-2 text-[11px] text-green-600">
+                Você tem {formatPrice(fidInfo.desconto_max)} de desconto disponível para usar no checkout.
+              </div>
+            )}
             {linha("Cidade", cliente?.cidade ? `${cliente.cidade}${cliente.estado ? "/" + cliente.estado : ""}` : null)}
           </div>
         </div>

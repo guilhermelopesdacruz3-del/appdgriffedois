@@ -643,6 +643,25 @@ app.get("/api/mp-public-key", async (_req, res) => {
   }
 });
 
+// Saldo de fidelidade do cliente (por e-mail) + regras para o front calcular desconto.
+app.get("/api/fidelidade", async (req, res) => {
+  const email = String(req.query.email || "").trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    return res.status(400).json({ erro: "E-mail inválido." });
+  }
+  try {
+    const [pontos, regras] = await Promise.all([
+      segredos.getPontos(email),
+      segredos.getRegrasFidelidade(),
+    ]);
+    const descontoMax = Math.floor((pontos / regras.pontosPorDesconto) * 10);
+    return res.json({ email, pontos, regras, desconto_max: descontoMax });
+  } catch (e) {
+    console.error("[fidelidade] falha:", e?.message);
+    return res.status(502).json({ erro: "Falha ao ler o saldo de fidelidade." });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // CHECKOUT (PIX / cartão). Em DEMO gera uma cobrança PIX simulada para o fluxo
 // funcionar ponta a ponta. Em produção, integrar com o Mercado Pago usando o
@@ -651,7 +670,7 @@ app.get("/api/mp-public-key", async (_req, res) => {
 // ---------------------------------------------------------------------------
 app.post("/api/checkout", async (req, res) => {
   const body = req.body || {};
-  const { items, meio, email, card_token } = body;
+  const { items, meio, email, card_token, pontosResgate } = body;
 
   // Validação de entrada (defesa em profundidade — não confia no front).
   if (!Array.isArray(items) || items.length === 0) {
@@ -671,7 +690,7 @@ app.post("/api/checkout", async (req, res) => {
   }
 
   try {
-    const resultado = await processarCheckout({ items, meio, email, card_token });
+    const resultado = await processarCheckout({ items, meio, email, card_token, pontosResgate });
     console.log(
       `[auditoria] Checkout ${meio} -> status=${resultado.status} valor=${resultado.valor_total} ` +
         `mp_id=${resultado.mp_payment_id || "demo"} ip=${req.ip}`

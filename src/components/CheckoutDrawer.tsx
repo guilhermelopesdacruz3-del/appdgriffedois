@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { formatPrice } from "../utils";
 import { iniciarCheckout } from "../services/apiConfig";
+import { useFidelidade } from "../hooks/useFidelidade";
 
 interface CartItem {
   product: { id: number; name: string; brand: string; price: number; image: string; colors: string[]; colorNames: string[] };
@@ -22,10 +23,14 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: Ch
   const [erro, setErro] = useState<string | null>(null);
   const [pix, setPix] = useState<{ qr: string; copia: string } | null>(null);
   const [email, setEmail] = useState("");
+  const [pontosResgate, setPontosResgate] = useState(0);
+  const { info: fid } = useFidelidade(email.trim().toLowerCase() || null);
 
   if (!isOpen) return null;
 
   const total = items.reduce((s, it) => s + it.product.price * it.quantity, 0);
+  const descontoAtual = fid ? Math.min(fid.desconto_max, Math.floor((pontosResgate || 0) / fid.regras.pontosPorDesconto) * 10) : 0;
+  const totalComDesconto = Math.max(0, total - descontoAtual);
 
   const iniciar = async (meio: "pix" | "cartao") => {
     // O Mercado Pago exige e-mail válido para gerar a cobrança (PIX ou cartão).
@@ -42,6 +47,7 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: Ch
         items: items.map((it) => ({ price: it.product.price, qty: it.quantity, sku: String(it.product.id) })),
         meio,
         email: email || undefined,
+        pontosResgate: pontosResgate > 0 ? pontosResgate : undefined,
       });
       if (meio === "pix") {
         setPix({ qr: resultado.pix_qr_base64 || "", copia: resultado.pix_copia_cola || "" });
@@ -80,11 +86,31 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: Ch
             {passo === "escolher" && (
               <div className="space-y-3">
                 <input
-                  type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                  type="email" value={email} onChange={(e) => { setEmail(e.target.value); setPontosResgate(0); }}
                   placeholder="Seu e-mail" className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
                 />
+                {fid && fid.pontos > 0 && (
+                  <div className="bg-ice rounded-2xl p-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[11px] text-gray-500">Seus pontos</span>
+                      <span className="text-[11px] font-bold text-gold">{fid.pontos} pts</span>
+                    </div>
+                    <div className="flex items-center gap-2 mt-2">
+                      <input
+                        type="number" min={0} max={fid.pontos} value={pontosResgate}
+                        onChange={(e) => setPontosResgate(Math.max(0, Math.min(fid.pontos, Number(e.target.value) || 0)))}
+                        placeholder="Usar pontos"
+                        className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+                      />
+                      <span className="text-[11px] text-gray-500">-{formatPrice(descontoAtual)}</span>
+                    </div>
+                    {descontoAtual > 0 && (
+                      <p className="text-[10px] text-green-600 mt-1">Desconto aplicado: {formatPrice(descontoAtual)}</p>
+                    )}
+                  </div>
+                )}
                 <button onClick={() => iniciar("pix")} className="w-full h-14 bg-luxury-black text-white font-bold rounded-2xl active:scale-[0.98] transition-all">
-                  Pagar com PIX
+                  Pagar com PIX{totalComDesconto < total ? ` ${formatPrice(totalComDesconto)}` : ""}
                 </button>
                 <button onClick={() => iniciar("cartao")} className="w-full h-14 border border-luxury-black text-luxury-black font-bold rounded-2xl active:scale-[0.98] transition-all">
                   Cartão de Crédito

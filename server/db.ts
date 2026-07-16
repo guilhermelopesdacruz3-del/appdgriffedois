@@ -114,3 +114,89 @@ export async function getSecret(key: ConfigKey): Promise<string | null> {
   }
   return lerLocal()[key]?.value || null;
 }
+
+// ---------------------------------------------------------------------------
+// Fidelidade (pontos por compra)
+// ---------------------------------------------------------------------------
+// Regras padrão (admin pode ajustar via store_config): 1 ponto/R$1; 100 pts = R$10.
+const FID_LOCAL_PATH = path.join(__dirname, ".fidelidade.json");
+
+function lerFidelidadeLocal(): Record<string, number> {
+  try {
+    if (fs.existsSync(FID_LOCAL_PATH)) return JSON.parse(fs.readFileSync(FID_LOCAL_PATH, "utf8"));
+  } catch {
+    /* ignore */
+  }
+  return {};
+}
+function salvarFidelidadeLocal(obj: Record<string, number>) {
+  fs.writeFileSync(FID_LOCAL_PATH, JSON.stringify(obj, null, 2), { mode: 0o600 });
+}
+
+export async function getRegrasFidelidade(): Promise<{ pontosPorReal: number; pontosPorDesconto: number }> {
+  const def = { pontosPorReal: 1, pontosPorDesconto: 100 };
+  if (sb) {
+    const { data } = await sb.from("store_config").select("key,value").in("key", ["FID_PONTOS_POR_REAL", "FID_PONTOS_POR_DESC"]);
+    const mapa = new Map((data || []).map((r) => [r.key, Number(r.value) || 0]));
+    return {
+      pontosPorReal: mapa.get("FID_PONTOS_POR_REAL") || def.pontosPorReal,
+      pontosPorDesconto: mapa.get("FID_PONTOS_POR_DESC") || def.pontosPorDesconto,
+    };
+  }
+  return def;
+}
+
+export async function getPontos(email: string): Promise<number> {
+  const e = (email || "").trim().toLowerCase();
+  if (!e) return 0;
+  if (sb) {
+    const { data, error } = await sb.from("fidelidade").select("pontos").eq("email", e).single();
+    if (error || !data) return 0;
+    return data.pontos || 0;
+  }
+  return lerFidelidadeLocal()[e] || 0;
+}
+
+// Credita pontos após pagamento aprovado. valorGasto em reais.
+export async function creditarPontos(email: string, valorGasto: number, ref?: string): Promise<number> {
+  const e = (email || "").trim().toLowerCase();
+  if (!e || !(valorGasto > 0)) return 0;
+  const { pontosPorReal } = await getRegrasFidelidade();
+  const pontos = Math.floor(valorGasto * pontosPorReal);
+  if (pontos <= 0) return 0;
+  if (sb) {
+    const { error } = await sb.rpc("creditar_pontos", { p_email: e, p_pontos: pontos, p_ref: ref || null });
+    // Se a RPC não existir, fazemos upsert manual:
+    if (error) {
+      const { data } = await sb.from("fidelidade").select("pontos").eq("email", e).single();
+      const atual = (data?.pontos || 0) + pontos;
+      await sb.from("fidelidade").upsert({ email: e, pontos: atual, updated_at: new Date().toISOString() }, { onConflict: "email" });
+      await sb.from("fidelidade_historico").insert({ email: e, tipo: "credito", pontos, motivo: "compra", ref: ref || null });
+    }
+    return pontos;
+  }
+  const store = lerFidelidadeLocal();
+  store[e] = (store[e] || 0) + pontos;
+  salvarFidelidadeLocal(store);
+  return pontos;
+}
+
+// Resgata pontos (desconto no checkout). Retorna os pontos usados ou 0 se insuficiente.
+export async function resgatarPontos(email: string, pontos: number): Promise<number> {
+  const e = (email || "").trim().toLowerCase();
+  if (!e || pontos <= 0) return 0;
+  if (sb) {
+    const { data } = await sb.from("fidelidade").select("pontos").eq("email", e).single();
+    const saldo = data?.pontos || 0;
+    if (saldo < pontos) return 0;
+    await sb.from("fidelidade").upsert({ email: e, pontos: saldo - pontos, updated_at: new Date().toISOString() }, { onConflict: "email" });
+    await sb.from("fidelidade_historico").insert({ email: e, tipo: "resgate", pontos, motivo: "desconto", ref: null });
+    return pontos;
+  }
+  const store = lerFidelidadeLocal();
+  const saldo = store[e] || 0;
+  if (saldo < pontos) return 0;
+  store[e] = saldo - pontos;
+  salvarFidelidadeLocal(store);
+  return pontos;
+}
