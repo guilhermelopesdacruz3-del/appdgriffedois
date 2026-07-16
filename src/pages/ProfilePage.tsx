@@ -1,13 +1,23 @@
 import { useState } from "react";
+import type { ReactNode } from "react";
 import { useCliente } from "../hooks/useCliente";
 import { usePedidos } from "../hooks/usePedidos";
+import { useFavorites } from "../hooks/useUserLists";
+import { useProdutos } from "../hooks/useProdutos";
+import type { Product } from "../data";
+import ProductCard from "../components/ProductCard";
+
+type SubTela = "favoritos" | "dados" | "embreve";
 
 export default function ProfilePage() {
   const { cliente, loading: loadingCliente, error: erroCliente, entrarComEmail, sair } = useCliente();
   const [email, setEmail] = useState("");
   const { pedidos, loading: loadingPedidos, error: erroPedidos } = usePedidos(cliente?.id ?? null);
+  const { favoriteIds, isFavorite, toggleFavorite } = useFavorites();
+  const { produtos: todosProdutos } = useProdutos({ limit: 100 });
+  const [subTela, setSubTela] = useState<SubTela | null>(null);
 
-  const menuItems = [
+  const menuItems: { icon: ReactNode; label: string; subtitle: string; action: SubTela | null }[] = [
     {
       icon: (
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
@@ -17,6 +27,7 @@ export default function ProfilePage() {
       ),
       label: "Meus Dados",
       subtitle: "Nome, e-mail e telefone",
+      action: "dados",
     },
     {
       icon: (
@@ -27,6 +38,7 @@ export default function ProfilePage() {
       ),
       label: "Meus Pedidos",
       subtitle: "Acompanhe suas entregas",
+      action: null,
     },
     {
       icon: (
@@ -40,6 +52,7 @@ export default function ProfilePage() {
       ),
       label: "Receitas Salvas",
       subtitle: "Óculos de grau e lentes",
+      action: "embreve",
     },
     {
       icon: (
@@ -49,6 +62,7 @@ export default function ProfilePage() {
       ),
       label: "Favoritos",
       subtitle: "Peças que você amou",
+      action: "favoritos",
     },
     {
       icon: (
@@ -59,6 +73,7 @@ export default function ProfilePage() {
       ),
       label: "Segurança",
       subtitle: "Senha e autenticação",
+      action: "embreve",
     },
     {
       icon: (
@@ -69,6 +84,7 @@ export default function ProfilePage() {
       ),
       label: "Configurações",
       subtitle: "Notificações e preferências",
+      action: "embreve",
     },
   ];
 
@@ -120,6 +136,78 @@ export default function ProfilePage() {
           <p className="text-[10px] text-gray-400 mt-4">
             Seus dados de cliente e pedidos vêm diretamente da sua loja na Loja Integrada.
           </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (subTela) {
+    const voltar = (
+      <button
+        onClick={() => setSubTela(null)}
+        className="flex items-center gap-1 text-xs font-bold text-luxury-black mb-3"
+      >
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M19 12H5M12 19l-7-7 7-7" />
+        </svg>
+        Voltar
+      </button>
+    );
+
+    if (subTela === "favoritos") {
+      const favs = todosProdutos.filter((p: Product) => favoriteIds.includes(p.id));
+      return (
+        <div className="px-4 pt-6 pb-4">
+          {voltar}
+          <h3 className="text-base font-bold text-luxury-black mb-4">Favoritos</h3>
+          {favs.length === 0 ? (
+            <p className="text-xs text-gray-400 text-center mt-10">Você ainda não favoritou nenhuma peça.</p>
+          ) : (
+            <div className="grid grid-cols-2 gap-3">
+              {favs.map((p: Product) => (
+                <ProductCard
+                  key={p.id}
+                  product={p}
+                  isFavorite={isFavorite(p.id)}
+                  onToggleFavorite={() => toggleFavorite(p.id)}
+                  onSelect={() => {}}
+                  onAddToCart={() => {}}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (subTela === "dados") {
+      const linha = (k: string, v?: string | null) => (
+        <div className="flex justify-between py-3 border-b border-gray-100">
+          <span className="text-xs text-gray-400">{k}</span>
+          <span className="text-xs font-semibold text-luxury-black text-right max-w-[60%] truncate">{v || "—"}</span>
+        </div>
+      );
+      return (
+        <div className="px-5 pt-6 pb-4">
+          {voltar}
+          <h3 className="text-base font-bold text-luxury-black mb-4">Meus Dados</h3>
+          <div className="bg-white rounded-2xl p-4 shadow-sm">
+            {linha("Nome", cliente?.nome)}
+            {linha("E-mail", cliente?.email)}
+            {linha("Telefone", cliente?.telefone)}
+            {linha("CPF", cliente?.cpf)}
+            {linha("Cidade", cliente?.cidade ? `${cliente.cidade}${cliente.estado ? "/" + cliente.estado : ""}` : null)}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="px-5 pt-10 pb-4">
+        {voltar}
+        <div className="bg-white rounded-3xl p-6 shadow-sm text-center">
+          <p className="text-sm font-bold text-luxury-black">Em breve</p>
+          <p className="text-xs text-gray-400 mt-2">Esta funcionalidade estará disponível nas próximas atualizações.</p>
         </div>
       </div>
     );
@@ -225,7 +313,9 @@ export default function ProfilePage() {
         {menuItems.map((item, index) => (
           <button
             key={index}
-            className="w-full flex items-center gap-3 bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-all active:scale-[0.99] text-left"
+            onClick={() => item.action && setSubTela(item.action)}
+            disabled={!item.action}
+            className="w-full flex items-center gap-3 bg-white rounded-2xl p-4 shadow-sm hover:shadow-md transition-all active:scale-[0.99] text-left disabled:opacity-60"
           >
             <div className="w-9 h-9 rounded-xl bg-ice flex items-center justify-center text-gray-600 flex-shrink-0">
               {item.icon}
@@ -234,9 +324,13 @@ export default function ProfilePage() {
               <p className="text-xs font-semibold text-luxury-black">{item.label}</p>
               <p className="text-[10px] text-gray-400">{item.subtitle}</p>
             </div>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C0C0C0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M9 18l6-6-6-6" />
-            </svg>
+            {item.action ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#C0C0C0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M9 18l6-6-6-6" />
+              </svg>
+            ) : (
+              <span className="text-[9px] text-gray-300">abaixo</span>
+            )}
           </button>
         ))}
       </div>

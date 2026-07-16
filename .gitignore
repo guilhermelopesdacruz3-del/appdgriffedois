@@ -36,3 +36,8 @@ relatorio.json
 
 # Backup/pendrive de outro projeto (contem segredos reais)
 LOJA-DGRiffe-PENDRIVE/
+
+# Orphan/legado nao usado pelo app principal
+src/lib/supabase.ts
+api/
+deploy.sh

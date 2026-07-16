@@ -28,6 +28,13 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: Ch
   const total = items.reduce((s, it) => s + it.product.price * it.quantity, 0);
 
   const iniciar = async (meio: "pix" | "cartao") => {
+    // O Mercado Pago exige e-mail válido para gerar a cobrança (PIX ou cartão).
+    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+    if (!emailOk) {
+      setErro("Informe um e-mail válido para continuar o pagamento.");
+      setPasso("erro");
+      return;
+    }
     setPasso("processando");
     setErro(null);
     try {
@@ -111,14 +118,26 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: Ch
             )}
 
             {passo === "cartao" && (
-              <div className="space-y-3">
-                <p className="text-sm text-gray-500 text-center">
-                  O pagamento por cartão utiliza o SDK do Mercado Pago (tokenização segura no app).
-                </p>
-                <div className="bg-ice rounded-2xl p-3 text-[11px] text-gray-500">
-                  Em produção: aqui entra o formulário de cartão (MP Checkout Transparente).
-                </div>
-              </div>
+              <CartaoForm
+                total={total}
+                onVoltar={() => setPasso("escolher")}
+                onPagar={async (dados) => {
+                  setPasso("processando");
+                  setErro(null);
+                  try {
+                    const resultado = await iniciarCheckout({
+                      items: items.map((it) => ({ price: it.product.price, qty: it.quantity, sku: String(it.product.id) })),
+                      meio: "cartao",
+                      email: email || undefined,
+                      card_token: JSON.stringify(dados),
+                    });
+                    onSuccess?.(resultado);
+                  } catch (e: any) {
+                    setErro(e.message || "Falha ao processar o cartão.");
+                    setPasso("erro");
+                  }
+                }}
+              />
             )}
 
             {passo === "erro" && (
@@ -131,5 +150,100 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: Ch
         </div>
       </div>
     </>
+  );
+}
+
+// Formulário de cartão de crédito (Checkout Transparente MP).
+// Coleta os dados e os envia ao servidor, que processa via Mercado Pago.
+// A tokenização real exige a MP_PUBLIC_KEY no front (SDK do MP) — quando
+// ausente, o servidor retorna erro claro e o app mostra a mensagem.
+interface CartaoDados {
+  numero: string;
+  nome: string;
+  validade: string;
+  cvv: string;
+}
+function CartaoForm({
+  total,
+  onVoltar,
+  onPagar,
+}: {
+  total: number;
+  onVoltar: () => void;
+  onPagar: (dados: CartaoDados) => void;
+}) {
+  const [numero, setNumero] = useState("");
+  const [nome, setNome] = useState("");
+  const [validade, setValidade] = useState("");
+  const [cvv, setCvv] = useState("");
+  const [erroF, setErroF] = useState<string | null>(null);
+
+  const limpo = numero.replace(/\D/g, "");
+  const valido =
+    limpo.length >= 13 &&
+    limpo.length <= 19 &&
+    /^[A-Za-zÀ-ÿ\s]+$/.test(nome.trim()) &&
+    /^\d{2}\/\d{2}$/.test(validade) &&
+    /^\d{3,4}$/.test(cvv);
+
+  const enviar = () => {
+    if (!valido) {
+      setErroF("Confira os dados do cartão.");
+      return;
+    }
+    onPagar({ numero: limpo, nome: nome.trim(), validade, cvv });
+  };
+
+  return (
+    <div className="space-y-3">
+      <p className="text-sm font-semibold text-luxury-black text-center">Cartão de Crédito</p>
+      <input
+        inputMode="numeric"
+        value={numero}
+        onChange={(e) => setNumero(e.target.value)}
+        placeholder="Número do cartão"
+        maxLength={23}
+        className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+      />
+      <input
+        value={nome}
+        onChange={(e) => setNome(e.target.value)}
+        placeholder="Nome impresso no cartão"
+        className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+      />
+      <div className="flex gap-3">
+        <input
+          value={validade}
+          onChange={(e) => setValidade(e.target.value)}
+          placeholder="MM/AA"
+          maxLength={5}
+          className="w-1/2 h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+        />
+        <input
+          inputMode="numeric"
+          value={cvv}
+          onChange={(e) => setCvv(e.target.value.replace(/\D/g, ""))}
+          placeholder="CVV"
+          maxLength={4}
+          className="w-1/2 h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+        />
+      </div>
+      {erroF && <p className="text-[11px] text-red-500 text-center">{erroF}</p>}
+      <p className="text-[10px] text-gray-400 text-center">
+        Os dados do cartão são tokenizados pelo Mercado Pago (nunca ficam no app).
+      </p>
+      <button
+        onClick={enviar}
+        className="w-full h-14 bg-luxury-black text-white font-bold rounded-2xl active:scale-[0.98] transition-all"
+      >
+        Pagar {total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+      </button>
+      <button
+        onClick={onVoltar}
+        className="w-full h-10 text-xs font-bold text-gray-400"
+      >
+        Voltar
+      </button>
+    </div>
   );
 }
