@@ -13,25 +13,19 @@ import type { CapacitorConfig } from "@capacitor/cli";
 // Para testar localmente no emulador: `npx cap run android` faz o proxy
 // reverso de localhost:8787 do emulador -> localhost:8787 do PC.
 
-const PROXY_URL = (process.env.VITE_LOJA_INTEGRADA_PROXY_URL || "").replace(/\/$/, "");
-
 const config: CapacitorConfig = {
   appId: "com.dgriffe.app",
   appName: "D'Griffe Ótica",
   webDir: "dist",
   server: {
-    // Em produção (AAB), o app consome a URL definida em build-time.
+    // Em produção (AAB), o app consome a URL do proxy definida em
+    // VITE_LOJA_INTEGRADA_PROXY_URL (injetada no build-time). O front resolve
+    // essa env em runtime — não precisamos mexer no hostname do Capacitor.
     androidScheme: "https",
-    // Garante que a URL do proxy seja embutida no bundle.
-    ...(PROXY_URL ? { hostname: PROXY_URL.replace(/^https?:\/\//, "") } : {}),
   },
   android: {
     backgroundColor: "#0A0A0A",
     allowMixedContent: true,
-    // AAB único (sem splits por ABI) — mais simples de publicar.
-    buildOptions: {
-      // O Gradle gera app-release.aab em android/app/build/outputs/bundle/release/
-    },
   },
 };
 

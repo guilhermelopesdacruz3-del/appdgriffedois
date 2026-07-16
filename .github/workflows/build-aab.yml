@@ -3,18 +3,24 @@ name: Build AAB (Android App Bundle)
 # Gera o AAB assinado da D'Griffe para a Google Play Store.
 # Roda 100% na nuvem (GitHub Actions) — você NÃO precisa rodar nada no seu PC.
 #
-# Como usar:
-# 1) Adicione o secret GH_TOKEN (com escopo repo) no painel do GitHub.
-# 2) Rode o job "gen-keystore" uma vez (aba Actions > Build AAB > Run workflow).
-#    Ele cria o keystore e salva os secrets de assinatura automaticamente.
-# 3) Rode o job "build-aab" (ou faça push na main) -> o .aab fica em Artifacts/Release.
-#
-# O .aab é enviado para a Play Console (Interno de testes / Produção).
+# Como usar (só no navegador):
+# 1) Adicione o secret GH_TOKEN (PAT classic com escopo `repo`) no painel.
+# 2) Actions > "Build AAB" > Run workflow:
+#      - job = gen-keystore  (RODE 1x — cria e salva o keystore)
+#      - job = build-aab     (gera o .aab assinado)
+# O .aab fica em Artifacts (dgriffe-aab) e na Release (tag aab-N).
 
 on:
   workflow_dispatch:
-    # Rode manualmente: primeiro "gen-keystore" (1x), depois "build-aab".
-    # Não dispara no push para não falhar antes do keystore existir.
+    inputs:
+      job:
+        description: "Qual job rodar"
+        required: true
+        default: "build-aab"
+        type: choice
+        options:
+          - build-aab
+          - gen-keystore
 
 permissions:
   contents: write
@@ -22,10 +28,13 @@ permissions:
 jobs:
   # ---------------------------------------------------------------------------
   # 1) Gera o keystore de assinatura UMA vez e salva como secrets do repo.
+  #    Usa `gh secret set` (criptografa com a chave pública do repo).
   # ---------------------------------------------------------------------------
   gen-keystore:
-    if: github.event_name == 'workflow_dispatch'
+    if: github.event.inputs.job == 'gen-keystore'
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
     steps:
       - name: Gerar keystore
         env:
@@ -42,35 +51,25 @@ jobs:
             -storepass "$KS_PASS" -keypass "$KEY_PASS"
           echo "Keystore gerado."
 
-      - name: Salvar secrets via GitHub API
+      - name: Salvar secrets (gh secret set)
         env:
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
           KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD || 'dgriffe2026' }}
           KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS || 'dgriffe' }}
           KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD || 'dgriffe2026' }}
-          REPO: ${{ github.repository }}
         run: |
           B64=$(base64 -w0 $HOME/ks/dgriffe.keystore)
-          put() {
-            local name="$1"; local value="$2"
-            curl -fsSL -X PUT \
-              -H "Authorization: Bearer $GH_TOKEN" \
-              -H "Accept: application/vnd.github+json" \
-              "https://api.github.com/repos/$REPO/actions/secrets/$name" \
-              -d "$(jq -n --arg v "$value" '{encrypted_value:$v}')" || echo "Falha ao salvar $name"
-          }
-          put ANDROID_KEYSTORE_BASE64 "$B64"
-          put ANDROID_KEYSTORE_PASSWORD "$KS_PASS"
-          put ANDROID_KEY_ALIAS "$KEY_ALIAS"
-          put ANDROID_KEY_PASSWORD "$KEY_PASS"
+          echo "$B64" | gh secret set ANDROID_KEYSTORE_BASE64
+          echo "$KS_PASS" | gh secret set ANDROID_KEYSTORE_PASSWORD
+          echo "$KEY_ALIAS" | gh secret set ANDROID_KEY_ALIAS
+          echo "$KEY_PASS" | gh secret set ANDROID_KEY_PASSWORD
           echo "Secrets de assinatura salvos no repo."
 
   # ---------------------------------------------------------------------------
   # 2) Build do AAB assinado.
   # ---------------------------------------------------------------------------
   build-aab:
+    if: github.event.inputs.job == 'build-aab' || github.event_name != 'workflow_dispatch'
     runs-on: ubuntu-latest
-    needs: []   # roda independente do gen-keystore
     steps:
       - uses: actions/checkout@v4
 
@@ -109,7 +108,7 @@ jobs:
           KEY_PASS: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           if [ -z "$KS_B64" ]; then
-            echo "::warning::Keystore não encontrado. Rode o job gen-keystore primeiro."
+            echo "::error::Keystore não encontrado. Rode o job 'gen-keystore' primeiro (Actions > Build AAB > Run workflow > job=gen-keystore)."
             exit 1
           fi
           echo "$KS_B64" | base64 -d > android/app/dgriffe.keystore
