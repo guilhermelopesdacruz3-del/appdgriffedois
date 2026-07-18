@@ -1,9 +1,25 @@
 import { benefits } from "../data";
+import { useCliente } from "../hooks/useCliente";
+import { useFidelidade } from "../hooks/useFidelidade";
+
+function formatarData(iso?: string): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+}
 
 export default function LoyaltyPage() {
-  const currentPoints = 1650;
+  const { cliente } = useCliente();
+  const email = cliente?.email || null;
+  const { info, historico, loading } = useFidelidade(email);
+
+  const pontos = info?.pontos ?? 0;
+  const regras = info?.regras ?? { pontosPorReal: 1, pontosPorDesconto: 100 };
+  const descontoMax = info?.desconto_max ?? 0;
+
   const nextTier = 2000;
-  const progress = (currentPoints / nextTier) * 100;
+  const progress = Math.min(100, (pontos / nextTier) * 100);
+  const cashback = ((pontos / regras.pontosPorDesconto) * 10).toFixed(2);
 
   return (
     <div className="pb-4">
@@ -35,7 +51,7 @@ export default function LoyaltyPage() {
           {/* Points */}
           <div className="bg-luxury-gray/50 rounded-2xl p-4 mb-3 border border-gold/10">
             <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Pontos Acumulados</p>
-            <p className="text-3xl font-bold text-gold-gradient">{currentPoints.toLocaleString('pt-BR')}</p>
+            <p className="text-3xl font-bold text-gold-gradient">{pontos.toLocaleString('pt-BR')}</p>
             <div className="mt-3">
               <div className="flex justify-between items-center mb-1">
                 <span className="text-[9px] text-gray-500">Progresso para Platinum</span>
@@ -54,11 +70,11 @@ export default function LoyaltyPage() {
           <div className="flex gap-3">
             <div className="flex-1 bg-luxury-gray/50 rounded-xl p-3 border border-gold/10">
               <p className="text-[9px] text-gray-400 uppercase tracking-wider">Cashback</p>
-              <p className="text-lg font-bold text-white">R$ 165<span className="text-gold text-sm">,00</span></p>
+              <p className="text-lg font-bold text-white">R$ {cashback}<span className="text-gold text-sm">,00</span></p>
             </div>
             <div className="flex-1 bg-luxury-gray/50 rounded-xl p-3 border border-gold/10">
               <p className="text-[9px] text-gray-400 uppercase tracking-wider">Desconto Atual</p>
-              <p className="text-lg font-bold text-white">15<span className="text-gold text-sm">%</span></p>
+              <p className="text-lg font-bold text-white">{descontoMax}<span className="text-gold text-sm">%</span></p>
             </div>
           </div>
         </div>
@@ -110,7 +126,7 @@ export default function LoyaltyPage() {
             ) : (
               <div className="w-7 h-7 bg-gray-100 rounded-full flex items-center justify-center flex-shrink-0">
                 <span className="text-[10px] font-bold text-gray-400">
-                  {Math.round((currentPoints / benefit.points) * 100)}%
+                  {Math.round((pontos / benefit.points) * 100)}%
                 </span>
               </div>
             )}
@@ -134,6 +150,38 @@ export default function LoyaltyPage() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Histórico de fidelidade */}
+      <div className="px-5 mt-6 mb-3">
+        <h3 className="text-sm font-bold text-luxury-black">Histórico</h3>
+        <p className="text-[10px] text-gray-500">Seus créditos e resgates</p>
+      </div>
+
+      <div className="px-4 space-y-2">
+        {loading && <p className="text-[11px] text-gray-400 text-center py-4">Carregando…</p>}
+        {!loading && historico.length === 0 && (
+          <p className="text-[11px] text-gray-400 text-center py-4">
+            {email ? "Nenhuma movimentação ainda." : "Faça login para ver seu histórico."}
+          </p>
+        )}
+        {historico.map((h, i) => (
+          <div key={h.id ?? i} className="flex items-center gap-3 p-3 rounded-2xl bg-white shadow-sm border border-ice-dark/40">
+            <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-sm flex-shrink-0 ${h.tipo === "credito" ? "bg-green-100" : "bg-red-100"}`}>
+              {h.tipo === "credito" ? "⬆️" : "⬇️"}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-semibold text-luxury-black leading-tight">
+                {h.tipo === "credito" ? "Crédito" : "Resgate"}
+                {h.motivo ? ` · ${h.motivo}` : ""}
+              </p>
+              <p className="text-[10px] text-gray-400 mt-0.5">{formatarData(h.created_at)}</p>
+            </div>
+            <span className={`text-xs font-bold ${h.tipo === "credito" ? "text-green-600" : "text-red-500"}`}>
+              {h.tipo === "credito" ? "+" : "−"}{h.pontos}
+            </span>
+          </div>
+        ))}
       </div>
     </div>
   );

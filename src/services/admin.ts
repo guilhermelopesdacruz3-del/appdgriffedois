@@ -196,6 +196,16 @@ export async function listarSituacoes(): Promise<SituacaoPedido[]> {
   return adminRequest<SituacaoPedido[]>("/situacoes");
 }
 
+export interface ClienteAdminDetalhe {
+  cliente: any | null;
+  pedidos: any[];
+  fidelidade: { pontos: number; historico: any[] };
+}
+
+export async function buscarClienteAdmin(email: string): Promise<ClienteAdminDetalhe> {
+  return adminRequest<ClienteAdminDetalhe>(`/cliente/${encodeURIComponent(email)}`);
+}
+
 export function pedidoParaCSV(pedidos: AdminPedido[]): string {
   const header = ["numero", "cliente", "email", "data", "status", "total", "itens", "verificado"];
   const linhas = pedidos.map((p) =>

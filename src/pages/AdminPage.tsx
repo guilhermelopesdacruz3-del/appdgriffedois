@@ -11,6 +11,7 @@ import {
   listarClientesAdmin,
   listarPedidosAdmin,
   listarSituacoes,
+  buscarClienteAdmin,
   pedidoParaCSV,
   relatorioAdmin,
   type AdminPedido,
@@ -60,6 +61,23 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
   const [relatorio, setRelatorio] = useState<RelatorioAdmin | null>(null);
   const [clientes, setClientes] = useState<ClienteRelatorio[]>([]);
   const [relLoading, setRelLoading] = useState(false);
+
+  const [clienteDetalhe, setClienteDetalhe] = useState<{
+    email: string;
+    dados: any | null;
+    loading: boolean;
+    erro: string | null;
+  } | null>(null);
+
+  const abrirCliente = useCallback(async (email: string) => {
+    setClienteDetalhe({ email, dados: null, loading: true, erro: null });
+    try {
+      const d = await buscarClienteAdmin(email);
+      setClienteDetalhe({ email, dados: d, loading: false, erro: null });
+    } catch (e: any) {
+      setClienteDetalhe({ email, dados: null, loading: false, erro: e?.message || "Erro" });
+    }
+  }, []);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -321,7 +339,15 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
               </div>
 
               {erro && (
-                <div className="bg-red-50 border border-red-100 rounded-2xl p-3 text-center text-[11px] text-red-500">{erro}</div>
+                <div className="bg-red-50 border border-red-100 rounded-2xl p-3 flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-red-500 flex-1">{erro}</p>
+                  <button
+                    onClick={() => { setErro(null); carregar(); }}
+                    className="text-[10px] font-bold text-red-600 border border-red-200 rounded-lg px-2 py-1 active:scale-95 whitespace-nowrap"
+                  >
+                    Tentar de novo
+                  </button>
+                </div>
               )}
 
               {loading && (
@@ -374,11 +400,12 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
               )}
               {relatorio && (
                 <>
+                  <p className="text-[11px] font-semibold text-luxury-black mb-2">Visão Geral</p>
                   <div className="grid grid-cols-2 gap-2">
-                    <KpiCard label="Pedidos" value={String(relatorio.totalPedidos)} />
-                    <KpiCard label="Ticket Médio" value={formatPrice(relatorio.ticketMedio)} accent="#D4A853" />
-                    <KpiCard label="Faturamento" value={formatPrice(relatorio.faturamentoTotal)} accent="#10B981" />
-                    <KpiCard label="Aprovado" value={formatPrice(relatorio.faturamentoAprovado)} accent="#6366F1" />
+                    <KpiCard label="Pedidos" value={String(relatorio.totalPedidos)} trend="up" delta="total" />
+                    <KpiCard label="Ticket Médio" value={formatPrice(relatorio.ticketMedio)} accent="#D4A853" sub="por pedido" />
+                    <KpiCard label="Faturamento" value={formatPrice(relatorio.faturamentoTotal)} accent="#10B981" trend="up" delta="bruto" />
+                    <KpiCard label="Aprovado" value={formatPrice(relatorio.faturamentoAprovado)} accent="#6366F1" sub="confirmado" />
                   </div>
 
                   <div className="bg-white rounded-2xl p-4 shadow-sm">
@@ -415,7 +442,11 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                     </p>
                     <div className="space-y-2">
                       {clientes.slice(0, 10).map((c, i) => (
-                        <div key={c.email} className="flex items-center gap-2 text-[11px]">
+                        <button
+                          key={c.email}
+                          onClick={() => abrirCliente(c.email)}
+                          className="w-full flex items-center gap-2 text-[11px] text-left hover:bg-ice/60 rounded-xl p-1.5 transition-colors"
+                        >
                           <span className="w-5 h-5 rounded-full bg-ice flex items-center justify-center text-[9px] font-bold text-gray-500 flex-shrink-0">
                             {i + 1}
                           </span>
@@ -427,7 +458,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                             <p className="font-bold text-luxury-black">{formatPrice(c.total)}</p>
                             <p className="text-[9px] text-gray-400">{c.pedidos} pedidos</p>
                           </div>
-                        </div>
+                        </button>
                       ))}
                       {clientes.length === 0 && <p className="text-[11px] text-gray-400">Sem clientes.</p>}
                     </div>
@@ -500,10 +531,65 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
           </div>
         </div>
       )}
+
+      {/* Modal detalhe do cliente (A5) */}
+      {clienteDetalhe && (
+        <div className="fixed inset-0 z-40 bg-black/40 flex items-end justify-center" onClick={() => setClienteDetalhe(null)}>
+          <div className="w-full max-w-lg bg-white rounded-t-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-white px-5 py-3 flex items-center justify-between border-b border-gray-100">
+              <h3 className="text-sm font-bold text-luxury-black">Detalhe do Cliente</h3>
+              <button onClick={() => setClienteDetalhe(null)} className="text-gray-400 text-xl leading-none">×</button>
+            </div>
+            <div className="p-5 space-y-4">
+              {clienteDetalhe.loading && (
+                <div className="flex justify-center py-10">
+                  <div className="w-7 h-7 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+              {clienteDetalhe.erro && <p className="text-[11px] text-red-500">{clienteDetalhe.erro}</p>}
+              {clienteDetalhe.dados && (
+                <>
+                  <div className="bg-white border border-gray-100 rounded-2xl p-3">
+                    <p className="text-[11px] font-semibold text-luxury-black mb-1">Dados</p>
+                    <p className="text-[11px] text-gray-600">{clienteDetalhe.dados.cliente?.nome || "—"}</p>
+                    <p className="text-[11px] text-gray-400">{clienteDetalhe.email}</p>
+                    {clienteDetalhe.dados.cliente?.telefone && (
+                      <p className="text-[11px] text-gray-400">{clienteDetalhe.dados.cliente.telefone}</p>
+                    )}
+                  </div>
+                  <div className="bg-white border border-gray-100 rounded-2xl p-3">
+                    <p className="text-[11px] font-semibold text-luxury-black mb-1">Fidelidade</p>
+                    <p className="text-[11px] text-gray-600 font-bold text-gold">{clienteDetalhe.dados.fidelidade?.pontos ?? 0} pontos</p>
+                  </div>
+                  <div className="bg-white border border-gray-100 rounded-2xl p-3">
+                    <p className="text-[11px] font-semibold text-luxury-black mb-2">Pedidos ({clienteDetalhe.dados.pedidos?.length ?? 0})</p>
+                    <div className="space-y-2">
+                      {(clienteDetalhe.dados.pedidos || []).slice(0, 10).map((p: any) => (
+                        <div key={p.id} className="flex items-center justify-between gap-2 pb-2 border-b border-gray-50 last:border-0 last:pb-0">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[11px] font-medium text-luxury-black truncate">#{p.numero}</p>
+                            <p className="text-[10px] text-gray-400">{p.situacao?.nome || p.status}</p>
+                          </div>
+                          <span className="text-[11px] font-bold text-luxury-black flex-shrink-0">
+                            {formatPrice(Number(p.valor_total) || 0)}
+                          </span>
+                        </div>
+                      ))}
+                      {(clienteDetalhe.dados.pedidos || []).length === 0 && (
+                        <p className="text-[11px] text-gray-400">Nenhum pedido.</p>
+                      )}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
-
 function DetalhePedido({ id }: { id: number | string }) {
   const [pedido, setPedido] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -529,12 +615,17 @@ function DetalhePedido({ id }: { id: number | string }) {
   return (
     <div className="space-y-3">
       <div className="bg-white border border-gray-100 rounded-2xl p-3">
-        <p className="text-[11px] font-semibold text-luxury-black mb-2">Itens</p>
-        <div className="space-y-1.5">
+        <p className="text-[11px] font-semibold text-luxury-black mb-2">Itens do pedido</p>
+        <div className="space-y-2">
           {(pedido.itens || []).map((i: any) => (
-            <div key={i.id} className="flex items-center justify-between text-[11px]">
-              <span className="text-gray-600 truncate">{i.quantidade}x {i.nome}</span>
-              <span className="text-luxury-black font-medium">{formatPrice(Number(i.preco_venda) || 0)}</span>
+            <div key={i.id} className="flex items-center justify-between gap-2 pb-2 border-b border-gray-50 last:border-0 last:pb-0">
+              <div className="flex-1 min-w-0">
+                <p className="text-[11px] font-medium text-luxury-black truncate">{i.nome}</p>
+                <p className="text-[10px] text-gray-400">{i.quantidade}x · {formatPrice(Number(i.preco_venda) || 0)}</p>
+              </div>
+              <span className="text-[11px] font-bold text-luxury-black flex-shrink-0">
+                {formatPrice((Number(i.quantidade) || 0) * (Number(i.preco_venda) || 0))}
+              </span>
             </div>
           ))}
         </div>

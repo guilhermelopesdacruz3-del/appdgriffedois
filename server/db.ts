@@ -181,6 +181,55 @@ export async function creditarPontos(email: string, valorGasto: number, ref?: st
   return pontos;
 }
 
+// ---------------------------------------------------------------------------
+// Pedidos do Mercado Pago (espelho + idempotência de webhook)
+// ---------------------------------------------------------------------------
+export interface PedidoMP {
+  mp_payment_id: string;
+  email: string | null;
+  valor: number;
+  status: string;
+  external_reference?: string | null;
+  pontos_creditados?: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// true se já processamos este pagamento (evita crédito duplo de pontos).
+export async function jaProcessadoMP(mpPaymentId: string): Promise<boolean> {
+  if (!sb) return false;
+  const { data } = await sb.from("pedidos").select("mp_payment_id").eq("mp_payment_id", mpPaymentId).single();
+  return Boolean(data);
+}
+
+// Insere/atualiza o espelho do pedido MP. Se não houver Supabase, vira no-op.
+export async function upsertPedidoMP(p: PedidoMP): Promise<void> {
+  if (!sb) return;
+  const agora = new Date().toISOString();
+  await sb.from("pedidos").upsert(
+    {
+      mp_payment_id: p.mp_payment_id,
+      email: p.email,
+      valor: p.valor,
+      status: p.status,
+      external_reference: p.external_reference ?? null,
+      pontos_creditados: p.pontos_creditados ?? false,
+      updated_at: agora,
+    },
+    { onConflict: "mp_payment_id" }
+  );
+}
+
+// Marca o pedido como aprovado e registra que os pontos foram creditados.
+export async function confirmarPagamentoMP(mpPaymentId: string, creditouPontos: boolean): Promise<void> {
+  if (!sb) return;
+  await sb.from("pedidos").update({
+    status: "aprovado",
+    pontos_creditados: creditouPontos,
+    updated_at: new Date().toISOString(),
+  }).eq("mp_payment_id", mpPaymentId);
+}
+
 // Resgata pontos (desconto no checkout). Retorna os pontos usados ou 0 se insuficiente.
 export async function resgatarPontos(email: string, pontos: number): Promise<number> {
   const e = (email || "").trim().toLowerCase();
@@ -199,4 +248,57 @@ export async function resgatarPontos(email: string, pontos: number): Promise<num
   store[e] = saldo - pontos;
   salvarFidelidadeLocal(store);
   return pontos;
+}
+
+export interface HistoricoFidelidade {
+  id?: number;
+  email: string;
+  tipo: "credito" | "resgate";
+  pontos: number;
+  motivo?: string | null;
+  ref?: string | null;
+  created_at?: string;
+}
+
+// Histórico de créditos/resgates de um e-mail (tabela fidelidade_historico).
+export async function getHistoricoFidelidade(email: string, limite = 50): Promise<HistoricoFidelidade[]> {
+  const e = (email || "").trim().toLowerCase();
+  if (!e || !sb) return [];
+  const { data, error } = await sb
+    .from("fidelidade_historico")
+    .select("id,email,tipo,pontos,motivo,ref,created_at")
+    .eq("email", e)
+    .order("created_at", { ascending: false })
+    .limit(limite);
+  if (error) return [];
+  return (data || []) as HistoricoFidelidade[];
+}
+
+// ---------------------------------------------------------------------------
+// Auditoria de ações do admin (A8)
+// ---------------------------------------------------------------------------
+export interface AdminLog {
+  id?: number;
+  admin_email: string;
+  acao: string;
+  detalhe?: Record<string, unknown> | null;
+  ip?: string | null;
+  created_at?: string;
+}
+
+export async function registrarLog(entry: AdminLog): Promise<void> {
+  if (!sb) return;
+  const admin_email = (entry.admin_email || "").trim().toLowerCase();
+  if (!admin_email) return;
+  await sb.from("admin_logs").insert({
+    admin_email,
+    acao: String(entry.acao || "").trim(),
+    detalhe: entry.detalhe || {},
+    ip: entry.ip || null,
+    created_at: entry.created_at || new Date().toISOString(),
+  });
+}
+
+export function supabaseClient(): SupabaseClient | null {
+  return sb;
 }

@@ -33,7 +33,9 @@ import {
   demoAdminSituacoes,
 } from "./demo.mjs";
 import * as segredos from "./db.ts";
-import { processarCheckout } from "./pagamento.ts";
+import { processarCheckout } from "./pagamento.js";
+import { processarWebhookMP } from "./webhook.js";
+import { getHistoricoFidelidade, registrarLog, supabaseClient } from "./db.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -297,7 +299,7 @@ const RECURSOS_PERMITIDOS = new Set([
 const RECURSOS_ESCRITA_PERMITIDOS = new Set(["cliente"]);
 
 const app = express();
-app.use(express.json({ limit: "512kb" }));
+app.use(express.json({ limit: "512kb", verify: (req, _res, buf) => { req.rawBody = buf.toString("utf8"); } }));
 app.disable("x-powered-by");
 
 // CORS restrito à origem do front (ou '*' só em dev).
@@ -575,6 +577,37 @@ app.get("/api/admin/relatorio", requireAdmin, async (req, res) => {
   }
 });
 
+// Detalhe de um cliente: dados LI + pedidos + saldo de fidelidade.
+app.get("/api/admin/cliente/:email", requireAdmin, async (req, res) => {
+  const email = String(req.params.email || "").trim().toLowerCase();
+  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
+    return res.status(400).json({ erro: "E-mail inválido." });
+  }
+  try {
+    // Dados do cliente na LI
+    const { status: sc, payload: cli } = await chamarLI("GET", "cliente", undefined, { email, limit: 1 });
+    const cliente = sc === 200 && Array.isArray(cli?.objects) && cli.objects[0] ? cli.objects[0] : null;
+
+    // Pedidos do cliente (via proxy LI)
+    let pedidos: any[] = [];
+    if (cliente?.id) {
+      const { status: sp, payload: ped } = await chamarLI("GET", "pedido", undefined, { cliente: `/api/v1/cliente/${cliente.id}/`, limit: 20 });
+      if (sp === 200 && Array.isArray(ped?.objects)) pedidos = ped.objects;
+    }
+
+    // Fidelidade (Supabase)
+    const [pontos, historico] = await Promise.all([
+      segredos.getPontos(email),
+      segredos.getHistoricoFidelidade(email, 20),
+    ]);
+
+    return res.json({ cliente, pedidos, fidelidade: { pontos, historico } });
+  } catch (err) {
+    console.error("[admin] erro ao buscar cliente:", err);
+    return res.status(502).json({ erro: "Falha ao buscar o cliente." });
+  }
+});
+
 // Clientes distintos (e-mail + nome) dos pedidos — para o card de "clientes".
 app.get("/api/admin/clientes", requireAdmin, async (_req, res) => {
   try {
@@ -646,7 +679,7 @@ app.get("/api/mp-public-key", async (_req, res) => {
 // Saldo de fidelidade do cliente (por e-mail) + regras para o front calcular desconto.
 app.get("/api/fidelidade", async (req, res) => {
   const email = String(req.query.email || "").trim().toLowerCase();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
     return res.status(400).json({ erro: "E-mail inválido." });
   }
   try {
@@ -659,6 +692,21 @@ app.get("/api/fidelidade", async (req, res) => {
   } catch (e) {
     console.error("[fidelidade] falha:", e?.message);
     return res.status(502).json({ erro: "Falha ao ler o saldo de fidelidade." });
+  }
+});
+
+// Histórico de fidelidade (créditos/resgates) do cliente.
+app.get("/api/fidelidade/historico", async (req, res) => {
+  const email = String(req.query.email || "").trim().toLowerCase();
+  if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+    return res.status(400).json({ erro: "E-mail inválido." });
+  }
+  try {
+    const historico = await segredos.getHistoricoFidelidade(email);
+    return res.json({ email, historico });
+  } catch (e) {
+    console.error("[fidelidade] falha histórico:", e?.message);
+    return res.status(502).json({ erro: "Falha ao ler o histórico de fidelidade." });
   }
 });
 
@@ -705,6 +753,30 @@ app.post("/api/checkout", async (req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// WEBHOOK DO MERCADO PAGO — confirmação automática de pagamento.
+// O MP POSTa aqui quando o status de um pagamento muda. Validamos a assinatura
+// (HMAC com o access_token) e, se aprovado, creditamos pontos + espelhamos o
+// pedido no Supabase (idempotente por mp_payment_id). Sem isso, o pagamento
+// aprovado nunca voltava para o app (bug de produção).
+// ---------------------------------------------------------------------------
+app.post("/api/mp-webhook", async (req, res) => {
+  const raw = req.rawBody || JSON.stringify(req.body || {});
+  const sig = req.headers["x-signature"];
+  const sigStr = Array.isArray(sig) ? sig[0] : sig;
+  try {
+    const r = await processarWebhookMP(raw, sigStr);
+    if (r.status === "erro") {
+      console.warn(`[webhook-mp] ${r.erro}`);
+      return res.status(401).json({ erro: r.erro });
+    }
+    return res.status(200).json({ ok: true, status: r.status });
+  } catch (e) {
+    console.error("[webhook-mp] falha:", e?.message);
+    return res.status(200).json({ ok: true, status: "erro" }); // MP reenvia em caso de 5xx
+  }
+});
+
+// ---------------------------------------------------------------------------
 // Proxy público de dados da Loja Integrada
 // ---------------------------------------------------------------------------
 app.all("/api/loja-integrada/:resource/:id?", async (req, res) => {
@@ -713,10 +785,10 @@ app.all("/api/loja-integrada/:resource/:id?", async (req, res) => {
   if (!RECURSOS_PERMITIDOS.has(resource)) {
     return res.status(404).json({ erro: `Recurso "${resource}" não é exposto por este proxy.` });
   }
-  if (req.method === "POST" && !RECURSOS_ESCRITA_PERMITIDOS.has(resource)) {
-    return res.status(405).json({ erro: `Criação via proxy não habilitada para "${resource}".` });
+  if ((req.method === "POST" || req.method === "PUT") && !RECURSOS_ESCRITA_PERMITIDOS.has(resource)) {
+    return res.status(405).json({ erro: `Escrita via proxy não habilitada para "${resource}".` });
   }
-  if (!["GET", "POST"].includes(req.method)) {
+  if (!["GET", "POST", "PUT"].includes(req.method)) {
     return res.status(405).json({ erro: "Método não suportado." });
   }
 
@@ -747,3 +819,47 @@ app.listen(PORT, () => {
   console.log(`[loja-integrada-proxy] admin:    http://localhost:${PORT}/api/admin/login`);
   if (ADMIN_PASSWORD) console.log(`[loja-integrada-proxy] segurança: rate-limit ${MAX_TENTATIVAS} tentativas / ${LOCKOUT_MS / 1000}s, token revogável, CSP/HSTS ativos.`);
 });
+
+
+// ---------------------------------------------------------------------------
+// A7 — Export CSV de pedidos do painel admin
+// ---------------------------------------------------------------------------
+app.get("/api/admin/pedidos/csv", requireAdmin, async (req, res) => {
+  const admin = req.admin as { email: string } | undefined;
+  try {
+    const [pedidos, , , clientesRes] = await Promise.all([
+      listarPedidosAdmin(),
+      Promise.resolve(),
+      Promise.resolve(),
+      listarClientesAdmin(),
+    ]);
+
+
+... (truncated)
+// A8 — Logs de auditoria do painel admin
+app.get("/api/admin/logs", requireAdmin, async (req, res) => {
+  const admin = req.admin as { email: string } | undefined;
+  try {
+    const limit = Math.min(Number(req.query.limit || 200), 1000);
+    const page = Math.max(Number(req.query.page || 1), 1);
+    const offset = (page - 1) * limit;
+    const [countRes, logsRes] = await Promise.all([
+      supabaseClient()
+        .from("admin_logs")
+        .select("*", { count: "exact", head: true }),
+      supabaseClient()
+        .from("admin_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .range(offset, offset + limit - 1),
+    ]);
+    if (countRes.error) throw countRes.error;
+    const total = countRes.count || 0;
+    const logs = logsRes.data || [];
+    return res.json({ total, page, limit, logs });
+  } catch (e) {
+    console.error("[admin] erro ao listar logs:", e?.message);
+    return res.status(502).json({ erro: "Falha ao listar logs." });
+  }
+});
+

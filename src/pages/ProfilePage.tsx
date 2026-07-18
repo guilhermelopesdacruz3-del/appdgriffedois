@@ -5,20 +5,24 @@ import { usePedidos } from "../hooks/usePedidos";
 import { useFavorites } from "../hooks/useUserLists";
 import { useProdutos } from "../hooks/useProdutos";
 import { useFidelidade } from "../hooks/useFidelidade";
+import { usePedidoDetalhe } from "../hooks/usePedidoDetalhe";
+import OrderDetail from "../components/cliente/OrderDetail";
 import { formatPrice } from "../utils";
 import type { Product } from "../data";
 import ProductCard from "../components/ProductCard";
 
-type SubTela = "favoritos" | "dados" | "embreve";
+type SubTela = "favoritos" | "dados" | "editar-perfil" | "seguranca" | "config" | "embreve";
 
 export default function ProfilePage() {
-  const { cliente, loading: loadingCliente, error: erroCliente, entrarComEmail, sair } = useCliente();
+  const { cliente, loading: loadingCliente, error: erroCliente, entrarComEmail, sair, atualizarCliente } = useCliente();
   const [email, setEmail] = useState("");
   const { pedidos, loading: loadingPedidos, error: erroPedidos } = usePedidos(cliente?.id ?? null);
   const { favoriteIds, isFavorite, toggleFavorite } = useFavorites();
   const { produtos: todosProdutos } = useProdutos({ limit: 100 });
   const { info: fidInfo } = useFidelidade(cliente?.email);
   const [subTela, setSubTela] = useState<SubTela | null>(null);
+  const [pedidoSelecionado, setPedidoSelecionado] = useState<string | number | null>(null);
+  const { pedido, loading: loadingPedidoDetalhe } = usePedidoDetalhe(pedidoSelecionado);
 
   const menuItems: { icon: ReactNode; label: string; subtitle: string; action: SubTela | null }[] = [
     {
@@ -30,7 +34,7 @@ export default function ProfilePage() {
       ),
       label: "Meus Dados",
       subtitle: "Nome, e-mail e telefone",
-      action: "dados",
+      action: "editar-perfil",
     },
     {
       icon: (
@@ -76,7 +80,7 @@ export default function ProfilePage() {
       ),
       label: "Segurança",
       subtitle: "Senha e autenticação",
-      action: "embreve",
+      action: "seguranca",
     },
     {
       icon: (
@@ -87,7 +91,7 @@ export default function ProfilePage() {
       ),
       label: "Configurações",
       subtitle: "Notificações e preferências",
-      action: "embreve",
+      action: "config",
     },
   ];
 
@@ -183,6 +187,63 @@ export default function ProfilePage() {
       );
     }
 
+    if (subTela === "editar-perfil") {
+      const nomeAtual = cliente?.nome || "";
+      const telefoneAtual = cliente?.telefone || "";
+      const [nome, setNome] = useState(nomeAtual);
+      const [telefone, setTelefone] = useState(telefoneAtual);
+      const [salvando, setSalvando] = useState(false);
+      const [salvo, setSalvo] = useState(false);
+
+      const salvar = async () => {
+        setSalvando(true);
+        setSalvo(false);
+        try {
+          await atualizarCliente({
+            nome: nome.trim() ? nome.trim() : undefined,
+            telefone: telefone.trim() ? telefone.trim() : undefined,
+          });
+          setSalvo(true);
+          setTimeout(() => setSubTela("dados"), 800);
+        } catch (e) {
+          console.error(e);
+        } finally {
+          setSalvando(false);
+        }
+      };
+      return (
+        <div className="px-5 pt-6 pb-4">
+          {voltar}
+          <h3 className="text-base font-bold text-luxury-black mb-4">Editar dados</h3>
+          <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+            <div>
+              <label className="text-[11px] font-semibold text-luxury-black mb-1 block">Nome</label>
+              <input
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                className="w-full h-11 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+              />
+            </div>
+            <div>
+              <label className="text-[11px] font-semibold text-luxury-black mb-1 block">Telefone</label>
+              <input
+                value={telefone}
+                onChange={(e) => setTelefone(e.target.value)}
+                className="w-full h-11 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+              />
+            </div>
+            <button
+              onClick={salvar}
+              disabled={salvando || (!nome.trim() && !telefone.trim())}
+              className="w-full h-11 bg-black text-white text-xs font-bold rounded-xl disabled:opacity-50 active:scale-95 transition-all"
+            >
+              {salvando ? "Salvando..." : salvo ? "Salvo!" : "Salvar"}
+            </button>
+          </div>
+        </div>
+      );
+    }
+
     if (subTela === "dados") {
       const linha = (k: string, v?: string | null) => (
         <div className="flex justify-between py-3 border-b border-gray-100">
@@ -206,6 +267,55 @@ export default function ProfilePage() {
               </div>
             )}
             {linha("Cidade", cliente?.cidade ? `${cliente.cidade}${cliente.estado ? "/" + cliente.estado : ""}` : null)}
+          </div>
+        </div>
+      );
+    }
+
+    if (subTela === "seguranca") {
+      return (
+        <div className="px-5 pt-6 pb-4">
+          {voltar}
+          <h3 className="text-base font-bold text-luxury-black mb-4">Segurança</h3>
+          <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+            <div className="flex justify-between py-2 border-b border-gray-100">
+              <span className="text-xs text-gray-400">Conta vinculada</span>
+              <span className="text-xs font-semibold text-luxury-black text-right max-w-[60%] truncate">{cliente?.email}</span>
+            </div>
+            <p className="text-[11px] text-gray-400">
+              Sua conta é gerenciada pela Loja Integrada. A senha e autenticação
+              são definidas no site da loja.
+            </p>
+            <button
+              onClick={sair}
+              className="w-full h-11 bg-red-50 text-red-500 text-xs font-bold rounded-xl active:scale-95 transition-all"
+            >
+              Sair da conta
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (subTela === "config") {
+      return (
+        <div className="px-5 pt-6 pb-4">
+          {voltar}
+          <h3 className="text-base font-bold text-luxury-black mb-4">Configurações</h3>
+          <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
+            <label className="flex items-center justify-between cursor-pointer">
+              <span className="text-xs font-semibold text-luxury-black">Receber ofertas por e-mail</span>
+              <input type="checkbox" defaultChecked className="w-5 h-5 accent-gold" />
+            </label>
+            <div className="flex items-center justify-between py-2 border-t border-gray-100">
+              <span className="text-xs text-gray-400">Limpar favoritos</span>
+              <button
+                onClick={() => favoriteIds.forEach((id) => toggleFavorite(id))}
+                className="text-[11px] font-bold text-red-500"
+              >
+                Limpar
+              </button>
+            </div>
           </div>
         </div>
       );
@@ -296,7 +406,11 @@ export default function ProfilePage() {
         )}
 
         {pedidos.map((order) => (
-          <div key={order.id} className="bg-white rounded-2xl p-4 shadow-sm">
+          <button
+            key={order.id}
+            onClick={() => setPedidoSelecionado(order.id)}
+            className="w-full text-left bg-white rounded-2xl p-4 shadow-sm active:scale-[0.99] transition-all"
+          >
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs font-bold text-luxury-black">{order.id}</span>
               <span className="px-2 py-0.5 bg-green-50 text-green-600 text-[9px] font-bold rounded-full">
@@ -309,7 +423,7 @@ export default function ProfilePage() {
                 {order.total.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
               </span>
             </div>
-          </div>
+          </button>
         ))}
       </div>
 
@@ -344,20 +458,22 @@ export default function ProfilePage() {
         ))}
       </div>
 
-      {/* Logout */}
-      <div className="px-4 mt-6">
-        <button
-          onClick={sair}
-          className="w-full h-12 border border-red-200 text-red-500 text-xs font-semibold rounded-2xl hover:bg-red-50 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
-        >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" />
-            <polyline points="16 17 21 12 16 7" />
-            <line x1="21" y1="12" x2="9" y2="12" />
-          </svg>
-          Sair da Conta
-        </button>
-      </div>
+      {/* Detalhe do pedido (Utilidade 1) */}
+      {pedidoSelecionado && (
+        <div className="fixed inset-0 z-40 bg-black/40 flex items-end justify-center">
+          <div className="w-full max-w-lg bg-ice rounded-t-3xl max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            {loadingPedidoDetalhe && (
+              <div className="p-6 text-center text-xs text-gray-400">Carregando pedido...</div>
+            )}
+            {!loadingPedidoDetalhe && !pedido && (
+              <div className="p-6 text-center text-xs text-red-500">Não foi possível carregar este pedido.</div>
+            )}
+            {pedido && (
+              <OrderDetail pedido={pedido} onClose={() => setPedidoSelecionado(null)} />
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

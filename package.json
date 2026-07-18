@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "server": "node server/index.mjs"
+    "server": "tsx server/index.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",
@@ -20,7 +20,8 @@
     "express": "4.21.2",
     "react": "19.2.6",
     "react-dom": "19.2.6",
-    "tailwind-merge": "3.4.0"
+    "tailwind-merge": "3.4.0",
+    "tsx": "^4.23.1"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.1.17",

@@ -8,6 +8,17 @@ interface UseClienteResult {
   /** Busca o cliente pelo e-mail cadastrado na loja e guarda o resultado. */
   entrarComEmail: (email: string) => Promise<void>;
   sair: () => void;
+  /** Atualiza nome/telefone/endereço do cliente na Loja Integrada. */
+  atualizarCliente: (dados: {
+    nome?: string;
+    telefone?: string;
+    cidade?: string;
+    estado?: string;
+    cep?: string;
+    rua?: string;
+    numero?: string;
+    bairro?: string;
+  }) => Promise<void>;
 }
 
 /**
@@ -42,5 +53,53 @@ export function useCliente(): UseClienteResult {
 
   const sair = useCallback(() => setCliente(null), []);
 
-  return { cliente, loading, error, entrarComEmail, sair };
+  const atualizarCliente = useCallback(
+    async (dados: {
+      nome?: string;
+      telefone?: string;
+      cidade?: string;
+      estado?: string;
+      cep?: string;
+      rua?: string;
+      numero?: string;
+      bairro?: string;
+    }) => {
+      if (!cliente?.id) throw new Error("Nenhum cliente carregado.");
+      const PROXY =
+        (import.meta.env.VITE_LOJA_INTEGRADA_PROXY_URL as string | undefined)?.replace(
+          /\/api\/loja-integrada\/?$/,
+          ""
+        ) || "";
+      // Monta o corpo no formato da Loja Integrada (endereco é array).
+      const enderecos: any[] = [];
+      if (dados.rua || dados.cidade || dados.cep) {
+        enderecos.push({
+          principal: true,
+          endereco: dados.rua || "",
+          numero: dados.numero || "",
+          bairro: dados.bairro || "",
+          cidade: dados.cidade || "",
+          estado: dados.estado || "",
+          cep: dados.cep || "",
+        });
+      }
+      const body: any = {};
+      if (dados.nome) body.nome = dados.nome;
+      if (dados.telefone) body.telefone_celular = dados.telefone;
+      if (enderecos.length) body.enderecos = enderecos;
+
+      const res = await fetch(`${PROXY}/api/loja-integrada/cliente/${cliente.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error(`Falha ao atualizar (${res.status})`);
+      // Atualiza o estado local para refletir imediatamente.
+      const atualizado = await buscarClientePorEmail(cliente.email);
+      if (atualizado) setCliente(atualizado);
+    },
+    [cliente]
+  );
+
+  return { cliente, loading, error, entrarComEmail, sair, atualizarCliente };
 }

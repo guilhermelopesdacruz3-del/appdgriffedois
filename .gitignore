@@ -12,6 +12,12 @@ dist-locked-*
 server/.env
 server/.store-config.json
 
+# Backups locais de env (segredos reais - NUNCA comitar)
+.env.real
+.env.raiz.real
+server/.env.real
+*.env.real
+
 # Android / Capacitor (gerado pelo cap add android; pode conter handles travados)
 android/
 android_old/
@@ -41,3 +47,5 @@ LOJA-DGRiffe-PENDRIVE/
 src/lib/supabase.ts
 api/
 deploy.sh
+android/  
+dist/  
