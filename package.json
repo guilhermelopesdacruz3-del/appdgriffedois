@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "server": "tsx server/index.mjs"
+    "server": "tsx server/index.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",

@@ -1,38 +1,45 @@
-# Render — serviço do PROXY (backend Express).
-# Conecte este repo no Render e ele usa este arquivo automaticamente.
-# Build: instala deps + builda o front (single-file) como artefato opcional.
-# Start: sobe o proxy que também serve como ponte para a Loja Integrada.
+# Render.com deployment config for the D'Griffe proxy/backend.
+#
+# Caminho B (produção): o servidor sobe como Web Service público.
+# O app Android aponta para a URL pública via VITE_LOJA_INTEGRADA_PROXY_URL.
+#
+# Secrets necessários no painel do Render (Environment):
+#   - LOJA_INTEGRADA_APP_KEY
+#   - LOJA_INTEGRADA_API_KEY
+#   - ADMIN_PASSWORD
+#   - SUPABASE_URL
+#   - SUPABASE_SERVICE_ROLE
+#   - MP_ACCESS_TOKEN (Mercado Pago — etapa posterior)
+#   - MP_PUBLIC_KEY
+#
+# O server lê server/.env em dev, mas no Render usamos as env vars do painel.
+
 services:
   - type: web
     name: dgriffe-proxy
     runtime: node
+    region: oregon
     plan: free
-    region: oregon          # troque para a mais perto de você se quiser
-    branch: main
-    # Render usa o package.json raiz (type: module). Builda tudo.
+    rootDir: server
     buildCommand: npm install && npm run build
-    startCommand: node server/index.mjs
+    startCommand: node dist/index.js
     healthCheckPath: /health
     envVars:
-      - key: NODE_VERSION
-        value: "22"
+      - key: NODE_ENV
+        value: production
       - key: PORT
-        value: "10000"      # o Render injeta a porta em runtime; isso é fallback
-      - key: DEMO_MODE
-        value: "false"
-      - key: FRONTEND_ORIGIN
-        sync: false          # defina no painel: https://SEU-SITE.netlify.app
+        value: 10000
+      - key: LOJA_INTEGRADA_APP_KEY
+        sync: false
+      - key: LOJA_INTEGRADA_API_KEY
+        sync: false
       - key: ADMIN_PASSWORD
-        sync: false          # DEFINA NO PAINEL — senha forte, nunca demo123
-      - key: ADMIN_SECRET
-        sync: false          # defina no painel (string longa aleatória)
-      - key: LI_APP_KEY
-        sync: false          # chave real da Loja Integrada
-      - key: LI_API_KEY
-        sync: false          # chave real da Loja Integrada
+        sync: false
       - key: SUPABASE_URL
         sync: false
       - key: SUPABASE_SERVICE_ROLE
-        sync: false          # SERVICE_ROLE do Supabase (server-only)
-      # MP_ACCESS_TOKEN / MP_PUBLIC_KEY são salvos pelo painel admin (vão ao Supabase).
-      # Mantenha-os fora do repo.
+        sync: false
+      - key: MP_ACCESS_TOKEN
+        sync: false
+      - key: MP_PUBLIC_KEY
+        sync: false

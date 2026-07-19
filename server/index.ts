@@ -33,9 +33,9 @@ import {
   demoAdminSituacoes,
 } from "./demo.mjs";
 import * as segredos from "./db.ts";
-import { processarCheckout } from "./pagamento.js";
-import { processarWebhookMP } from "./webhook.js";
-import { getHistoricoFidelidade, registrarLog, supabaseClient } from "./db.js";
+import { processarCheckout } from "./pagamento.ts";
+import { processarWebhookMP } from "./webhook.ts";
+import { getHistoricoFidelidade, registrarLog, supabaseClient } from "./db.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -860,19 +860,34 @@ app.listen(PORT, () => {
 // ---------------------------------------------------------------------------
 // A7 — Export CSV de pedidos do painel admin
 // ---------------------------------------------------------------------------
-app.get("/api/admin/pedidos/csv", requireAdmin, async (req, res) => {
-  const admin = req.admin as { email: string } | undefined;
+app.get("/api/admin/pedidos/csv", requireAdmin, async (_req, res) => {
+  const admin = _req.admin as { email: string } | undefined;
   try {
-    const [pedidos, , , clientesRes] = await Promise.all([
-      listarPedidosAdmin(),
-      Promise.resolve(),
-      Promise.resolve(),
-      listarClientesAdmin(),
-    ]);
-
-
-... (truncated)
-// A8 — Logs de auditoria do painel admin
+    const { pedidos } = await listarPedidosAdmin({ limit: 1000, offset: 0 });
+    const header = ["numero", "cliente", "email", "data", "status", "total", "itens", "verificado"];
+    const linhas = (pedidos || []).map((p) =>
+      [
+        p.numero,
+        p.cliente_nome,
+        p.cliente_email,
+        p.data,
+        p.status,
+        p.total.toFixed(2),
+        p.items,
+        p.verificado ? "sim" : "nao",
+      ]
+        .map((v) => `"${String(v).replace(/"/g, '""')}"`)
+        .join(",")
+    );
+    const csv = [header.join(","), ...linhas].join("\n");
+    res.setHeader("Content-Type", "text/csv; charset=utf-8");
+    res.setHeader("Content-Disposition", 'attachment; filename="pedidos-dgriffe.csv"');
+    return res.send(csv);
+  } catch (e) {
+    console.error("[admin] erro ao exportar CSV:", e?.message);
+    return res.status(502).json({ erro: "Falha ao exportar CSV." });
+  }
+});
 app.get("/api/admin/logs", requireAdmin, async (req, res) => {
   const admin = req.admin as { email: string } | undefined;
   try {
