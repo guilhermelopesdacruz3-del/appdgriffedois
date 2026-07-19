@@ -96,6 +96,11 @@ jobs:
           npx cap add android --no-app-build 2>/dev/null || echo "android já existe"
           cp capacitor/build-extras.gradle android/app/build-extras.gradle
           npx cap sync android
+      - name: Garantir assinatura do AAB (apply build-extras.gradle)
+        run: |
+          if ! grep -q "build-extras.gradle" android/app/build.gradle; then
+            sed -i "s|apply from: 'capacitor.build.gradle'|apply from: 'capacitor.build.gradle'\napply from: 'build-extras.gradle'|" android/app/build.gradle
+          fi
       - name: Restaurar keystore
         env:
           KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -161,6 +166,11 @@ jobs:
           npx cap add android --no-app-build 2>/dev/null || echo "android já existe"
           cp capacitor/build-extras.gradle android/app/build-extras.gradle
           npx cap sync android
+      - name: Garantir assinatura do AAB (apply build-extras.gradle)
+        run: |
+          if ! grep -q "build-extras.gradle" android/app/build.gradle; then
+            sed -i "s|apply from: 'capacitor.build.gradle'|apply from: 'capacitor.build.gradle'\napply from: 'build-extras.gradle'|" android/app/build.gradle
+          fi
       - name: Restaurar keystore
         env:
           KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
