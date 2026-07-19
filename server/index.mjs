@@ -712,10 +712,32 @@ app.get("/api/fidelidade/historico", async (req, res) => {
 
 // ---------------------------------------------------------------------------
 // CHECKOUT (PIX / cartão). Em DEMO gera uma cobrança PIX simulada para o fluxo
-// funcionar ponta a ponta. Em produção, integrar com o Mercado Pago usando o
-// MP_ACCESS_TOKEN salvo em /api/config (Supabase ou arquivo local).
-// Em produção, o pagamento é processado via módulo seguro (server/pagamento.ts).
+// funcionar ponta a ponta. Em produção, cria o pedido na Loja Integrada primeiro,
+// usa o número do pedido como external_reference e depois chama o Mercado Pago.
 // ---------------------------------------------------------------------------
+async function criarPedidoLI(email, items, total) {
+  if (!email || !Array.isArray(items) || items.length === 0) return null;
+  const clienteResp = await chamarLI("GET", "cliente", undefined, { email, limit: 1 });
+  const cliente = clienteResp.payload?.objects?.[0];
+  if (!cliente?.id) return null;
+
+  const body = {
+    cliente: `/api/v1/cliente/${cliente.id}/`,
+    cliente_email: email,
+    valor_total: Number(total.toFixed(2)),
+    itens: items.map((it) => ({
+      produto: String(it.sku || it.product?.id || ""),
+      quantidade: Number(it.qty || it.quantity || 1),
+      preco_venda: Number(it.price || 0),
+    })),
+  };
+
+  const r = await chamarLI("POST", "pedido", undefined, {}, body);
+  const pedido = r.payload?.object || r.payload;
+  const numero = pedido?.numero || pedido?.id || null;
+  return numero ? String(numero) : null;
+}
+
 app.post("/api/checkout", async (req, res) => {
   const body = req.body || {};
   const { items, meio, email, card_token, pontosResgate } = body;
@@ -738,11 +760,25 @@ app.post("/api/checkout", async (req, res) => {
   }
 
   try {
-    const resultado = await processarCheckout({ items, meio, email, card_token, pontosResgate });
-    console.log(
-      `[auditoria] Checkout ${meio} -> status=${resultado.status} valor=${resultado.valor_total} ` +
-        `mp_id=${resultado.mp_payment_id || "demo"} ip=${req.ip}`
-    );
+    const autorizado = await obterValorAutorizado(items);
+    if (!autorizado.ok) throw new Error(autorizado.erro || "Valor inválido.");
+    let total = autorizado.total;
+
+    // Tenta criar o pedido na Loja Integrada (não bloqueia o checkout se falhar).
+    const numeroPedidoLI = await criarPedidoLI(email, items, total).catch(() => null);
+
+    let resultado: CheckoutResult;
+    if (meio === "pix") {
+      resultado = await criarPixMP(mpToken, total, numeroPedidoLI ? `Pedido ${numeroPedidoLI}` : "Ótica D'Griffe", email);
+    } else {
+      if (!card_token || typeof card_token !== "string" || card_token.length < 10) {
+        throw new Error("Token de cartão inválido (deve ser gerado pelo SDK do Mercado Pago no cliente).");
+      }
+      resultado = await criarCartaoMP(mpToken, total, card_token, email);
+    }
+    resultado.li_pedido = numeroPedidoLI;
+    resultado.valor_original = autorizado.total;
+    resultado.desconto_aplicado = desconto;
     return res.json(resultado);
   } catch (e) {
     const msg = e?.message || "Falha ao processar o pagamento.";
