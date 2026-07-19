@@ -296,7 +296,7 @@ const RECURSOS_PERMITIDOS = new Set([
   "situacaopedido",
 ]);
 
-const RECURSOS_ESCRITA_PERMITIDOS = new Set(["cliente"]);
+const RECURSOS_ESCRITA_PERMITIDOS = new Set(["cliente", "pedido"]);
 
 const app = express();
 app.use(express.json({ limit: "512kb", verify: (req, _res, buf) => { req.rawBody = buf.toString("utf8"); } }));
