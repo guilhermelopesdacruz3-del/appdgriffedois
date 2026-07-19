@@ -206,6 +206,37 @@ export async function buscarClienteAdmin(email: string): Promise<ClienteAdminDet
   return adminRequest<ClienteAdminDetalhe>(`/cliente/${encodeURIComponent(email)}`);
 }
 
+export interface ListarLogsAdminResult {
+  logs: Array<{
+    id: number;
+    admin_email: string;
+    acao: string;
+    detalhe?: Record<string, unknown> | null;
+    ip?: string | null;
+    created_at?: string;
+  }>;
+  total?: number;
+}
+
+export async function listarLogsAdmin(opts: {
+  limit?: number;
+  offset?: number;
+  admin_email?: string;
+  acao?: string;
+  inicio?: string;
+  fim?: string;
+} = {}): Promise<ListarLogsAdminResult> {
+  const params = new URLSearchParams();
+  if (opts.limit !== undefined) params.set("limit", String(opts.limit));
+  if (opts.offset !== undefined) params.set("offset", String(opts.offset));
+  if (opts.admin_email) params.set("admin_email", opts.admin_email);
+  if (opts.acao) params.set("acao", opts.acao);
+  if (opts.inicio) params.set("inicio", opts.inicio);
+  if (opts.fim) params.set("fim", opts.fim);
+  const qs = params.toString();
+  return adminRequest<ListarLogsAdminResult>(`/logs${qs ? `?${qs}` : ""}`);
+}
+
 export function pedidoParaCSV(pedidos: AdminPedido[]): string {
   const header = ["numero", "cliente", "email", "data", "status", "total", "itens", "verificado"];
   const linhas = pedidos.map((p) =>

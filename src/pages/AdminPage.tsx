@@ -32,7 +32,7 @@ function downloadCSV(csv: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-type Aba = "pedidos" | "relatorios";
+type Aba = "pedidos" | "relatorios" | "logs";
 
 export default function AdminPage({ onExit }: { onExit: () => void }) {
   const [token, setToken] = useState<string | null>(() => getAdminToken());
@@ -48,6 +48,8 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
 
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("todos");
+  const [filtroDataInicio, setFiltroDataInicio] = useState("");
+  const [filtroDataFim, setFiltroDataFim] = useState("");
   const [situacoes, setSituacoes] = useState<SituacaoPedido[]>([]);
   const [mostrarConfig, setMostrarConfig] = useState(false);
 
@@ -62,12 +64,21 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
   const [clientes, setClientes] = useState<ClienteRelatorio[]>([]);
   const [relLoading, setRelLoading] = useState(false);
 
+  // Cliente detalhe
   const [clienteDetalhe, setClienteDetalhe] = useState<{
     email: string;
     dados: any | null;
     loading: boolean;
     erro: string | null;
   } | null>(null);
+
+  // Logs (A8)
+  const [logs, setLogs] = useState<any[]>([]);
+  const [logsLoading, setLogsLoading] = useState(false);
+  const [logsFiltroEmail, setLogsFiltroEmail] = useState("");
+  const [logsFiltroAcao, setLogsFiltroAcao] = useState("");
+  const [logsDataInicio, setLogsDataInicio] = useState("");
+  const [logsDataFim, setLogsDataFim] = useState("");
 
   const abrirCliente = useCallback(async (email: string) => {
     setClienteDetalhe({ email, dados: null, loading: true, erro: null });
@@ -84,15 +95,14 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
     setErro(null);
     try {
       const termo = busca.trim();
-      const resultado = await listarPedidosAdmin({
-        limit: 100,
-        offset: 0,
-        ...(termo.includes("@")
-          ? { cliente_email: termo }
-          : termo
-          ? { numero: termo }
-          : {}),
-      });
+      const filtro: Record<string, unknown> = { limit: 100, offset: 0 };
+      if (termo.includes("@")) filtro.cliente_email = termo;
+      else if (termo) filtro.numero = termo;
+      if (filtroStatus && filtroStatus !== "todos") filtro.status = filtroStatus;
+      if (filtroDataInicio) filtro.data_inicio = filtroDataInicio;
+      if (filtroDataFim) filtro.data_fim = filtroDataFim;
+
+      const resultado = await listarPedidosAdmin(filtro as any);
       setPedidos(resultado.pedidos);
       setTotal(resultado.total);
     } catch (e) {
@@ -100,7 +110,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
     } finally {
       setLoading(false);
     }
-  }, [busca]);
+  }, [busca, filtroStatus, filtroDataInicio, filtroDataFim]);
 
   const carregarSituacoes = useCallback(async () => {
     try {
@@ -122,6 +132,38 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
       setRelLoading(false);
     }
   }, []);
+
+  const carregarLogs = useCallback(async () => {
+    setLogsLoading(true);
+    try {
+      const q: Record<string, unknown> = { limit: 50 };
+      if (logsFiltroEmail) q.admin_email = logsFiltroEmail;
+      if (logsFiltroAcao) q.acao = logsFiltroAcao;
+      if (logsDataInicio) q.inicio = logsDataInicio;
+      if (logsDataFim) q.fim = logsDataFim;
+
+      const res = await fetch("/api/admin/logs?" + new URLSearchParams(q as any).toString(), {
+        headers: { Authorization: `Bearer ${getAdminToken()}` },
+      });
+      const json = await res.json();
+      if (!res.ok) throw new Error((json as any)?.erro || "Falha ao carregar logs");
+      setLogs((json as any).logs || []);
+    } catch (e) {
+      setErro((e as Error).message);
+    } finally {
+      setLogsLoading(false);
+    }
+  }, [logsFiltroEmail, logsFiltroAcao, logsDataInicio, logsDataFim]);
+
+  const exportarLogsCSV = () => {
+    const linhas = [
+      ["id", "admin_email", "acao", "detalhe", "ip", "created_at"].join(";"),
+      ...(logs as any[]).map((l) =>
+        [l.id, l.admin_email, l.acao, JSON.stringify(l.detalhe || {}), l.ip || "", l.created_at || ""].join(";")
+      ),
+    ];
+    downloadCSV(linhas.join("\n"), "logs-admin.csv");
+  };
 
   useEffect(() => {
     if (token) {
@@ -221,9 +263,20 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
     }
   };
 
-  const pedidosFiltrados = pedidos.filter((p) =>
-    filtroStatus === "todos" ? true : p.status === filtroStatus
-  );
+  const pedidosFiltrados = pedidos.filter((p) => {
+    if (filtroStatus !== "todos" && p.status !== filtroStatus) return false;
+    if (filtroDataInicio) {
+      const d = new Date(p.data || "0");
+      if (d < new Date(filtroDataInicio)) return false;
+    }
+    if (filtroDataFim) {
+      const d = new Date(p.data || "0");
+      const fim = new Date(filtroDataFim);
+      fim.setHours(23, 59, 59, 999);
+      if (d > fim) return false;
+    }
+    return true;
+  });
 
   const exportarCSV = () => downloadCSV(pedidoParaCSV(pedidosFiltrados), "pedidos-dgriffe.csv");
 
@@ -285,7 +338,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
         </div>
 
         <div className="flex gap-1 px-4 pt-3">
-          {(["pedidos", "relatorios"] as Aba[]).map((a) => (
+          {(["pedidos", "relatorios", "logs"] as Aba[]).map((a) => (
             <button
               key={a}
               onClick={() => setAba(a)}
@@ -293,7 +346,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                 aba === a ? "bg-luxury-black text-white" : "bg-white text-gray-500"
               }`}
             >
-              {a === "pedidos" ? "Pedidos" : "Relatórios"}
+              {a === "pedidos" ? "Pedidos" : a === "relatorios" ? "Relatórios" : "Logs"}
             </button>
           ))}
         </div>
@@ -330,6 +383,18 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                     <option key={s.id} value={s.nome}>{s.nome}</option>
                   ))}
                 </select>
+                <input
+                  type="date"
+                  value={filtroDataInicio}
+                  onChange={(e) => setFiltroDataInicio(e.target.value)}
+                  className="h-10 px-3 rounded-xl border border-gray-200 text-xs bg-white"
+                />
+                <input
+                  type="date"
+                  value={filtroDataFim}
+                  onChange={(e) => setFiltroDataFim(e.target.value)}
+                  className="h-10 px-3 rounded-xl border border-gray-200 text-xs bg-white"
+                />
                 <button
                   onClick={exportarCSV}
                   className="h-10 px-3 border border-gold/40 text-gold-dark text-[11px] font-bold rounded-xl active:scale-95 whitespace-nowrap"
@@ -466,6 +531,77 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                 </>
               )}
             </>
+          )}
+
+          {aba === "logs" && (
+            <div className="space-y-3">
+              <div className="bg-white rounded-2xl p-4 shadow-sm space-y-2">
+                <p className="text-[11px] font-semibold text-luxury-black">Logs de auditoria</p>
+                <div className="flex gap-2">
+                  <input
+                    value={logsFiltroEmail}
+                    onChange={(e) => setLogsFiltroEmail(e.target.value)}
+                    placeholder="admin_email"
+                    className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-gold"
+                  />
+                  <input
+                    value={logsFiltroAcao}
+                    onChange={(e) => setLogsFiltroAcao(e.target.value)}
+                    placeholder="acao"
+                    className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-gold"
+                  />
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="date"
+                    value={logsDataInicio}
+                    onChange={(e) => setLogsDataInicio(e.target.value)}
+                    className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-xs bg-white"
+                  />
+                  <input
+                    type="date"
+                    value={logsDataFim}
+                    onChange={(e) => setLogsDataFim(e.target.value)}
+                    className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-xs bg-white"
+                  />
+                  <button
+                    onClick={carregarLogs}
+                    className="h-10 px-3 bg-luxury-black text-white text-[11px] font-bold rounded-xl active:scale-95 whitespace-nowrap"
+                  >
+                    Filtrar
+                  </button>
+                  <button
+                    onClick={exportarLogsCSV}
+                    className="h-10 px-3 border border-gold/40 text-gold-dark text-[11px] font-bold rounded-xl active:scale-95 whitespace-nowrap"
+                  >
+                    Exportar CSV
+                  </button>
+                </div>
+              </div>
+
+              {logsLoading && (
+                <div className="flex justify-center py-10">
+                  <div className="w-7 h-7 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+                </div>
+              )}
+
+              {!logsLoading && logs.length === 0 && (
+                <div className="bg-white rounded-2xl p-6 shadow-sm text-center text-xs text-gray-400">Nenhum log encontrado.</div>
+              )}
+
+              <div className="space-y-2">
+                {logs.map((l) => (
+                  <div key={l.id} className="bg-white rounded-2xl p-3 shadow-sm space-y-1">
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] font-bold text-luxury-black">{l.acao}</p>
+                      <span className="text-[10px] text-gray-400">{new Date(l.created_at).toLocaleString("pt-BR")}</span>
+                    </div>
+                    <p className="text-[10px] text-gray-500 truncate">{l.admin_email} {l.ip ? `· ${l.ip}` : ""}</p>
+                    <pre className="text-[10px] text-gray-600 whitespace-pre-wrap break-words">{JSON.stringify(l.detalhe || {}, null, 2)}</pre>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </div>
