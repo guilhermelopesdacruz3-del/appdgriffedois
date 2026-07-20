@@ -866,7 +866,7 @@ async function criarClienteLI(email: string, dados: { nome?: string; telefone?: 
   return payload;
 }
 
-// POST /api/cliente/cadastro -> cria usuário no Supabase Auth (OTP) + perfil + sincroniza LI
+// POST /api/cliente/cadastro -> envia OTP por e-mail (cria o usuário se não existir)
 app.post("/api/cliente/cadastro", async (req, res) => {
   const { email, nome, telefone, cpf } = req.body || {};
   const e = (email || "").trim().toLowerCase();
@@ -877,29 +877,31 @@ app.post("/api/cliente/cadastro", async (req, res) => {
   if (!sb) return res.status(503).json({ erro: "Banco de dados indisponível (modo demo)." });
 
   try {
-    // 1) Cria o usuário no Supabase Auth (OTP habilitado por padrão no projeto).
-    //    Geramos uma senha temporária forte (nunca usada pelo cliente, que loga via OTP).
-    const tempPass = crypto.randomBytes(24).toString("base64").replace(/[^a-zA-Z0-9]/g, "") + "A1!";
-    const { data: user, error: createErr } = await sb.auth.admin.createUser({
+    // 1) Envia OTP por e-mail. shouldCreateUser:true cria o usuário se ainda
+    //    não existir; se já existir, apenas reenvia o código.
+    const { error: otpErr } = await sb.auth.signInWithOtp({
       email: e,
-      password: tempPass,
-      email_confirm: true,
-      user_metadata: { nome: nome || "", telefone: telefone || "", cpf: cpf || "" },
+      options: {
+        shouldCreateUser: true,
+        data: { nome: nome || "", telefone: telefone || "", cpf: cpf || "" },
+      },
     });
-    if (createErr) {
-      if (/already exists/i.test(createErr.message)) {
-        // Usuário já existe: apenas reenvia o OTP.
-        const { error: otpErr } = await sb.auth.admin.inviteOrResend(e);
-        if (otpErr && !/otp|magic|email/i.test(otpErr.message)) {
-          return res.status(400).json({ erro: "E-mail já cadastrado. Tente entrar." });
-        }
-      } else {
-        return res.status(400).json({ erro: createErr.message });
+    if (otpErr) {
+      // Rate limit do Supabase (muitas tentativas) — mensagem amigável.
+      if (/rate limit/i.test(otpErr.message)) {
+        return res.status(429).json({ erro: "Muitas tentativas. Aguarde alguns minutos e tente de novo." });
       }
+      return res.status(400).json({ erro: otpErr.message });
     }
 
-    // 2) Cria/atualiza o perfil (tabela profiles).
-    const userId = user?.id || (await sb.auth.admin.listUsers()).data?.users?.find((u) => u.email === e)?.id;
+    // 2) Se o usuário acabou de ser criado, garantimos o perfil e a sincronização LI.
+    //    (Para usuários já existentes, o perfil é atualizado na verificação do OTP.)
+    let userId: string | undefined;
+    try {
+      const list = await sb.auth.admin.listUsers();
+      userId = list.data?.users?.find((u) => u.email === e)?.id;
+    } catch { /* ignora */ }
+
     if (userId) {
       try {
         await sb.from("profiles").upsert({
@@ -913,21 +915,17 @@ app.post("/api/cliente/cadastro", async (req, res) => {
       } catch (profileErr) {
         console.warn("[cadastro] falha ao salvar perfil (ignorado):", (profileErr as Error)?.message);
       }
-    }
 
-    // 3) Sincroniza com a Loja Integrada (se houver credenciais configuradas).
-    try {
-      const { LI_APP_KEY, LI_API_KEY } = await getSecretsLI();
-      if (LI_APP_KEY && LI_API_KEY) {
-        await criarClienteLI(e, { nome, telefone, cpf });
+      // 3) Sincroniza com a Loja Integrada (se houver credenciais configuradas).
+      try {
+        const { LI_APP_KEY, LI_API_KEY } = await getSecretsLI();
+        if (LI_APP_KEY && LI_API_KEY) {
+          await criarClienteLI(e, { nome, telefone, cpf });
+        }
+      } catch (liErr) {
+        console.warn("[cadastro] falha ao sincronizar com Loja Integrada (ignorado):", (liErr as Error)?.message);
       }
-    } catch (liErr) {
-      console.warn("[cadastro] falha ao sincronizar com Loja Integrada (ignorado):", (liErr as Error)?.message);
     }
-
-    // 4) Envia o OTP por e-mail (Supabase Auth).
-    const { error: signInErr } = await sb.auth.signInWithOtp({ email: e, options: { shouldCreateUser: false } });
-    if (signInErr) return res.status(400).json({ erro: signInErr.message });
 
     return res.json({ ok: true, mensagem: "Enviamos um código de verificação para seu e-mail." });
   } catch (err) {
