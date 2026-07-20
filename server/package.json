@@ -13,9 +13,7 @@
     "dotenv": "16.4.7",
     "express": "4.21.2",
     "tsx": "^4.23.1",
-    "@supabase/supabase-js": "^2.110.6"
-  },
-  "devDependencies": {
+    "@supabase/supabase-js": "^2.110.6",
     "esbuild": "^0.24.0"
   }
 }
