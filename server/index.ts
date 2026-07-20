@@ -20,6 +20,7 @@
 import "dotenv/config";
 import express from "express";
 import cors from "cors";
+import helmet from "helmet";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -36,6 +37,7 @@ import * as segredos from "./db.ts";
 import { processarCheckout } from "./pagamento.ts";
 import { processarWebhookMP } from "./webhook.ts";
 import { getHistoricoFidelidade, registrarLog, supabaseClient } from "./db.ts";
+import cupomApp from "./cupom.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -330,6 +332,8 @@ app.use((req, res, next) => {
 });
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
+
+
 
 // ---------------------------------------------------------------------------
 // Área de admin
@@ -740,16 +744,15 @@ async function criarPedidoLI(email, items, total) {
 
 app.post("/api/checkout", async (req, res) => {
   const body = req.body || {};
-  const { items, meio, email, card_token, pontosResgate } = body;
+  const { items, meio, email, card_token, pontosResgate, cupom } = body;
 
-  // Validação de entrada (defesa em profundidade — não confia no front).
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ erro: "Carrinho vazio." });
   }
   if (!["pix", "cartao"].includes(meio)) {
     return res.status(400).json({ erro: "Meio de pagamento inválido." });
   }
-  if (email && (typeof email !== "string" || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email))) {
+  if (email && (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
     return res.status(400).json({ erro: "E-mail inválido." });
   }
   if (meio === "cartao" && (!card_token || typeof card_token !== "string")) {
@@ -760,27 +763,16 @@ app.post("/api/checkout", async (req, res) => {
   }
 
   try {
-    const autorizado = await obterValorAutorizado(items);
-    if (!autorizado.ok) throw new Error(autorizado.erro || "Valor inválido.");
-    let total = autorizado.total;
-
-    // Tenta criar o pedido na Loja Integrada (não bloqueia o checkout se falhar).
-    const numeroPedidoLI = await criarPedidoLI(email, items, total).catch(() => null);
-
-    let resultado: CheckoutResult;
-    if (meio === "pix") {
-      resultado = await criarPixMP(mpToken, total, numeroPedidoLI ? `Pedido ${numeroPedidoLI}` : "Ótica D'Griffe", email);
-    } else {
-      if (!card_token || typeof card_token !== "string" || card_token.length < 10) {
-        throw new Error("Token de cartão inválido (deve ser gerado pelo SDK do Mercado Pago no cliente).");
-      }
-      resultado = await criarCartaoMP(mpToken, total, card_token, email);
-    }
-    resultado.li_pedido = numeroPedidoLI;
-    resultado.valor_original = autorizado.total;
-    resultado.desconto_aplicado = desconto;
+    const resultado = await processarCheckout({
+      items: items.map((it) => ({ price: Number(it.price), qty: Number(it.qty), sku: String(it.sku || it.product_id || "") })),
+      meio,
+      email,
+      card_token,
+      pontosResgate: Number(pontosResgate || 0) || undefined,
+      cupom: cupom || undefined,
+    });
     return res.json(resultado);
-  } catch (e) {
+  } catch (e: any) {
     const msg = e?.message || "Falha ao processar o pagamento.";
     const status = typeof e?.status === "number" ? e.status : 502;
     console.error(`[checkout] falha (${meio}) ip=${req.ip}:`, msg);
@@ -848,6 +840,121 @@ app.all("/api/loja-integrada/:resource/:id?", async (req, res) => {
     res.status(502).json({ erro: "Falha ao se comunicar com a Loja Integrada." });
   }
 });
+
+// ---------------------------------------------------------------------------
+// CADASTRO DE CLIENTE (OTP por e-mail, sem senha) + sincronização Loja Integrada
+// ---------------------------------------------------------------------------
+import crypto from "node:crypto";
+
+// Lê as chaves da Loja Integrada (do Supabase store_config ou env local).
+async function getSecretsLI(): Promise<{ LI_APP_KEY?: string; LI_API_KEY?: string }> {
+  const appKey = (await getSecret("LI_APP_KEY")) || process.env.LOJA_INTEGRADA_APP_KEY || "";
+  const apiKey = (await getSecret("LI_API_KEY")) || process.env.LOJA_INTEGRADA_API_KEY || "";
+  return { LI_APP_KEY: appKey || undefined, LI_API_KEY: apiKey || undefined };
+}
+
+// Cria o cliente na Loja Integrada (se as credenciais existirem).
+async function criarClienteLI(email: string, dados: { nome?: string; telefone?: string; cpf?: string }) {
+  const { LI_APP_KEY, LI_API_KEY } = await getSecretsLI();
+  if (!LI_APP_KEY || !LI_API_KEY) return null;
+  const body: any = { email };
+  if (dados.nome) body.nome = dados.nome;
+  if (dados.telefone) body.telefone_celular = dados.telefone;
+  if (dados.cpf) body.cpf = dados.cpf;
+  const { status, payload } = await chamarLI("POST", "cliente", undefined, {}, body);
+  if (status >= 400) throw new Error(`LI ${status}: ${JSON.stringify(payload).slice(0, 200)}`);
+  return payload;
+}
+
+// POST /api/cliente/cadastro -> cria usuário no Supabase Auth (OTP) + perfil + sincroniza LI
+app.post("/api/cliente/cadastro", async (req, res) => {
+  const { email, nome, telefone, cpf } = req.body || {};
+  const e = (email || "").trim().toLowerCase();
+  if (!e || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) {
+    return res.status(400).json({ erro: "E-mail inválido." });
+  }
+  const sb = supabaseClient();
+  if (!sb) return res.status(503).json({ erro: "Banco de dados indisponível (modo demo)." });
+
+  try {
+    // 1) Cria o usuário no Supabase Auth (OTP habilitado por padrão no projeto).
+    //    Geramos uma senha temporária forte (nunca usada pelo cliente, que loga via OTP).
+    const tempPass = crypto.randomBytes(24).toString("base64").replace(/[^a-zA-Z0-9]/g, "") + "A1!";
+    const { data: user, error: createErr } = await sb.auth.admin.createUser({
+      email: e,
+      password: tempPass,
+      email_confirm: true,
+      user_metadata: { nome: nome || "", telefone: telefone || "", cpf: cpf || "" },
+    });
+    if (createErr) {
+      if (/already exists/i.test(createErr.message)) {
+        // Usuário já existe: apenas reenvia o OTP.
+        const { error: otpErr } = await sb.auth.admin.inviteOrResend(e);
+        if (otpErr && !/otp|magic|email/i.test(otpErr.message)) {
+          return res.status(400).json({ erro: "E-mail já cadastrado. Tente entrar." });
+        }
+      } else {
+        return res.status(400).json({ erro: createErr.message });
+      }
+    }
+
+    // 2) Cria/atualiza o perfil (tabela profiles).
+    const userId = user?.id || (await sb.auth.admin.listUsers()).data?.users?.find((u) => u.email === e)?.id;
+    if (userId) {
+      try {
+        await sb.from("profiles").upsert({
+          id: userId,
+          email: e,
+          nome: nome || null,
+          telefone: telefone || null,
+          cpf: cpf || null,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "id" });
+      } catch (profileErr) {
+        console.warn("[cadastro] falha ao salvar perfil (ignorado):", (profileErr as Error)?.message);
+      }
+    }
+
+    // 3) Sincroniza com a Loja Integrada (se houver credenciais configuradas).
+    try {
+      const { LI_APP_KEY, LI_API_KEY } = await getSecretsLI();
+      if (LI_APP_KEY && LI_API_KEY) {
+        await criarClienteLI(e, { nome, telefone, cpf });
+      }
+    } catch (liErr) {
+      console.warn("[cadastro] falha ao sincronizar com Loja Integrada (ignorado):", (liErr as Error)?.message);
+    }
+
+    // 4) Envia o OTP por e-mail (Supabase Auth).
+    const { error: signInErr } = await sb.auth.signInWithOtp({ email: e, options: { shouldCreateUser: false } });
+    if (signInErr) return res.status(400).json({ erro: signInErr.message });
+
+    return res.json({ ok: true, mensagem: "Enviamos um código de verificação para seu e-mail." });
+  } catch (err) {
+    console.error("[cadastro] erro:", err);
+    return res.status(500).json({ erro: "Falha ao criar cadastro." });
+  }
+});
+
+// POST /api/cliente/verificar -> valida o OTP e retorna a sessão
+app.post("/api/cliente/verificar", async (req, res) => {
+  const { email, token } = req.body || {};
+  const e = (email || "").trim().toLowerCase();
+  if (!e || !token || !/^\d{6}$/.test(String(token))) {
+    return res.status(400).json({ erro: "E-mail e código de 6 dígitos são obrigatórios." });
+  }
+  const sb = supabaseClient();
+  if (!sb) return res.status(503).json({ erro: "Banco de dados indisponível (modo demo)." });
+  try {
+    const { data, error } = await sb.auth.verifyOtp({ email: e, token: String(token), type: "email" });
+    if (error) return res.status(401).json({ erro: error.message });
+    return res.json({ ok: true, session: data.session, user: data.user });
+  } catch (err) {
+    return res.status(500).json({ erro: "Falha ao verificar código." });
+  }
+});
+
+app.use("/", cupomApp);
 
 app.listen(PORT, () => {
   console.log(`[loja-integrada-proxy] rodando em http://localhost:${PORT}`);

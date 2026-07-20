@@ -2,6 +2,7 @@ import { useState } from "react";
 import { formatPrice } from "../utils";
 import { iniciarCheckout } from "../services/apiConfig";
 import { useFidelidade } from "../hooks/useFidelidade";
+import { validarCupom, usarCupom } from "../services/cupom";
 
 interface CartItem {
   product: { id: number; name: string; brand: string; price: number; image: string; colors: string[]; colorNames: string[] };
@@ -24,13 +25,27 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: Ch
   const [pix, setPix] = useState<{ qr: string; copia: string } | null>(null);
   const [email, setEmail] = useState("");
   const [pontosResgate, setPontosResgate] = useState(0);
+  const [cupomCodigo, setCupomCodigo] = useState("");
+  const [cupomAplicado, setCupomAplicado] = useState<{ codigo: string; tipo: string; valor: number; id: string } | null>(null);
+  const [cupomErro, setCupomErro] = useState<string | null>(null);
   const { info: fid } = useFidelidade(email.trim().toLowerCase() || null);
 
   if (!isOpen) return null;
 
   const total = items.reduce((s, it) => s + it.product.price * it.quantity, 0);
-  const descontoAtual = fid ? Math.min(fid.desconto_max, Math.floor((pontosResgate || 0) / fid.regras.pontosPorDesconto) * 10) : 0;
-  const totalComDesconto = Math.max(0, total - descontoAtual);
+  const descontoPontos = fid ? Math.min(fid.desconto_max, Math.floor((pontosResgate || 0) / fid.regras.pontosPorDesconto) * 10) : 0;
+  const descontoCupom = cupomAplicado ? (cupomAplicado.tipo === "percentual" ? total * (cupomAplicado.valor / 100) : Number(cupomAplicado.valor)) : 0;
+  const totalComDesconto = Math.max(0, total - descontoPontos - descontoCupom);
+
+  const aplicarCupom = async () => {
+    setCupomErro(null);
+    if (!cupomCodigo.trim()) return;
+    const res = await validarCupom(cupomCodigo.trim());
+    if (!res.valido || !res.cupom) return setCupomErro(res.erro || "Cupom inválido.");
+    if (res.cupom.valor_minimo != null && total < res.cupom.valor_minimo) return setCupomErro(`Mínimo ${formatPrice(Number(res.cupom.valor_minimo))}.`);
+    setCupomAplicado({ codigo: res.cupom.codigo, tipo: res.cupom.tipo, valor: Number(res.cupom.valor), id: res.cupom.id });
+    if (res.atribuicao_id) await usarCupom(res.cupom.id, 0).catch(() => {});
+  };
 
   const iniciar = async (meio: "pix" | "cartao") => {
     // O Mercado Pago exige e-mail válido para gerar a cobrança (PIX ou cartão).
@@ -48,6 +63,7 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: Ch
         meio,
         email: email || undefined,
         pontosResgate: pontosResgate > 0 ? pontosResgate : undefined,
+        cupom: cupomAplicado || undefined,
       });
       if (meio === "pix") {
         setPix({ qr: resultado.pix_qr_base64 || "", copia: resultado.pix_copia_cola || "" });
@@ -102,13 +118,36 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: Ch
                         placeholder="Usar pontos"
                         className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
                       />
-                      <span className="text-[11px] text-gray-500">-{formatPrice(descontoAtual)}</span>
+                      <span className="text-[11px] text-gray-500">-{formatPrice(descontoPontos)}</span>
                     </div>
-                    {descontoAtual > 0 && (
-                      <p className="text-[10px] text-green-600 mt-1">Desconto aplicado: {formatPrice(descontoAtual)}</p>
+                    {descontoPontos > 0 && (
+                      <p className="text-[10px] text-green-600 mt-1">Desconto pontos: {formatPrice(descontoPontos)}</p>
                     )}
                   </div>
                 )}
+
+                <div className="bg-ice rounded-2xl p-3">
+                  <div className="flex items-center gap-2">
+                    <input
+                      value={cupomCodigo}
+                      onChange={(e) => setCupomCodigo(e.target.value.toUpperCase())}
+                      placeholder="Cupom"
+                      className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold uppercase"
+                    />
+                    <button onClick={aplicarCupom} className="h-10 px-4 bg-luxury-black text-white text-xs font-bold rounded-xl">Aplicar</button>
+                  </div>
+                  {cupomAplicado && (
+                    <p className="text-[10px] text-green-600 mt-1">
+                      Cupom {cupomAplicado.codigo} aplicado: -{formatPrice(descontoCupom)}
+                    </p>
+                  )}
+                  {cupomErro && <p className="text-[10px] text-red-500 mt-1">{cupomErro}</p>}
+                </div>
+
+                <div className="flex justify-between text-xs text-gray-500">
+                  <span>Total{descontoCupom > 0 || descontoPontos > 0 ? " com descontos" : ""}</span>
+                  <span className="font-bold text-luxury-black">{formatPrice(totalComDesconto)}</span>
+                </div>
                 <button onClick={() => iniciar("pix")} className="w-full h-14 bg-luxury-black text-white font-bold rounded-2xl active:scale-[0.98] transition-all">
                   Pagar com PIX{totalComDesconto < total ? ` ${formatPrice(totalComDesconto)}` : ""}
                 </button>

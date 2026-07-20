@@ -13,7 +13,7 @@ import ProductCard from "../components/ProductCard";
 
 type SubTela = "favoritos" | "dados" | "editar-perfil" | "seguranca" | "config" | "embreve";
 
-export default function ProfilePage() {
+export default function ProfilePage({ onNavigate }: { onNavigate?: (page: string) => void }) {
   const { cliente, loading: loadingCliente, error: erroCliente, entrarComEmail, sair, atualizarCliente } = useCliente();
   const [email, setEmail] = useState("");
   const { pedidos, loading: loadingPedidos, error: erroPedidos } = usePedidos(cliente?.id ?? null);
@@ -139,6 +139,14 @@ export default function ProfilePage() {
           {erroCliente && (
             <p className="text-[11px] text-red-500 mt-3">{erroCliente}</p>
           )}
+
+          <button
+            type="button"
+            onClick={() => onNavigate?.("cadastro")}
+            className="w-full mt-4 h-12 bg-gradient-to-br from-gold to-gold-dark text-luxury-black text-xs font-bold rounded-2xl active:scale-[0.98] transition-all"
+          >
+            Criar minha conta
+          </button>
 
           <p className="text-[10px] text-gray-400 mt-4">
             Seus dados de cliente e pedidos vêm diretamente da sua loja na Loja Integrada.

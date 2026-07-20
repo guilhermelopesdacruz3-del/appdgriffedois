@@ -13,6 +13,7 @@ import CatalogPage from "./pages/CatalogPage";
 import ProductPage from "./pages/ProductPage";
 import LoyaltyPage from "./pages/LoyaltyPage";
 import ProfilePage from "./pages/ProfilePage";
+import ClienteCadastro from "./pages/ClienteCadastro";
 import AdminPage from "./pages/AdminPage";
 import { ProductGridSkeleton } from "./components/ProductSkeleton";
 import { useFavorites, useRecentlyViewed } from "./hooks/useUserLists";
@@ -220,7 +221,8 @@ export default function App() {
           />
         )}
         {currentPage === "loyalty" && <LoyaltyPage />}
-        {currentPage === "profile" && <ProfilePage />}
+        {currentPage === "profile" && <ProfilePage onNavigate={handleNavigate} />}
+        {currentPage === "cadastro" && <ClienteCadastro onVoltar={() => setCurrentPage("profile")} />}
       </main>
 
       {/* Bottom Navigation */}

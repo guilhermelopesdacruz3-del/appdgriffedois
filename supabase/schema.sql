@@ -1,107 +1,196 @@
 -- ===========================================================================
--- Loja Integrada Conectada · Schema Supabase (revisado c/ guia oficial Supabase)
--- Aplicar via SQL Editor OU supabase db query / MCP execute_sql.
+-- D'Griffe Ótica — Schema completo do Supabase
+-- Aplicar no SQL Editor do projeto: https://unpbvztvscuisqnzofqp.supabase.co
+-- (ou via psql com a connection string do banco).
+-- Idempotente: CREATE TABLE IF NOT EXISTS + policies com DROP se existirem.
 -- ===========================================================================
 
--- 1) store_config: admin cola as chaves das APIs (LI + Mercado Pago) pela UI.
-create table if not exists public.store_config (
-  key         text primary key,
-  value       text,
-  is_secret   boolean not null default false,
-  updated_at  timestamptz not null default now()
+-- ---------------------------------------------------------------------------
+-- 1) store_config — segredos do backend (LI + Mercado Pago). SÓ service_role.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS store_config (
+  key text PRIMARY KEY,
+  value text,
+  is_secret boolean DEFAULT true,
+  updated_at timestamptz DEFAULT now()
 );
 
--- 2) profiles: cliente logado (espelha cliente da Loja Integrada).
-create table if not exists public.profiles (
-  id            uuid primary key references auth.users(id) on delete cascade,
-  nome          text,
-  email         text,
-  telefone      text,
-  li_cliente_id integer,
-  created_at    timestamptz not null default now()
+-- ---------------------------------------------------------------------------
+-- 2) profiles — espelho do auth.users (id = auth.uid()).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS profiles (
+  id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  email text,
+  nome text,
+  telefone text,
+  cpf text,
+  cidade text,
+  estado text,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
 );
 
--- 3) pedidos: substitui o .admin-state.json e o mock em memória.
-create table if not exists public.pedidos (
-  id            uuid primary key default gen_random_uuid(),
-  numero        text,
-  cliente_id    uuid references public.profiles(id) on delete set null,
-  status        text,
-  total         numeric(12,2) default 0,
-  verificado    boolean not null default false,
-  verificado_em timestamptz,
-  payload       jsonb,
-  created_at    timestamptz not null default now()
+-- ---------------------------------------------------------------------------
+-- 3) fidelidade — saldo de pontos por e-mail.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS fidelidade (
+  email text PRIMARY KEY,
+  pontos integer DEFAULT 0,
+  updated_at timestamptz DEFAULT now()
 );
 
--- 4) admin_users: quem tem acesso ao painel admin.
-create table if not exists public.admin_users (
-  user_id uuid primary key references auth.users(id) on delete cascade,
-  created_at timestamptz not null default now()
+-- ---------------------------------------------------------------------------
+-- 4) fidelidade_historico — log de créditos/resgates.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS fidelidade_historico (
+  id bigserial PRIMARY KEY,
+  email text NOT NULL,
+  tipo text NOT NULL CHECK (tipo IN ('credito','resgate')),
+  pontos integer NOT NULL,
+  motivo text,
+  ref text,
+  created_at timestamptz DEFAULT now()
 );
 
--- 5) is_admin(): SECURITY INVOKER (não DEFINER) + checagem de uid no corpo.
---    Evita o risco de função PUBLIC-callable com privilégios elevados.
-create or replace function public.is_admin()
-returns boolean
-language sql
-security invoker
-set search_path = public
-as $$
-  select exists (
-    select 1 from public.admin_users where user_id = (select auth.uid())
-  );
+-- ---------------------------------------------------------------------------
+-- 5) pedidos — espelho dos pagamentos do Mercado Pago (idempotência webhook).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS pedidos (
+  mp_payment_id text PRIMARY KEY,
+  email text,
+  valor numeric(12,2) DEFAULT 0,
+  status text DEFAULT 'pendente',
+  external_reference text,
+  pontos_creditados boolean DEFAULT false,
+  created_at timestamptz DEFAULT now(),
+  updated_at timestamptz DEFAULT now()
+);
+
+-- ---------------------------------------------------------------------------
+-- 6) admin_logs — auditoria de ações do admin.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS admin_logs (
+  id bigserial PRIMARY KEY,
+  admin_email text NOT NULL,
+  acao text NOT NULL,
+  detalhe jsonb DEFAULT '{}',
+  ip text,
+  created_at timestamptz DEFAULT now()
+);
+
+-- ---------------------------------------------------------------------------
+-- 7) cupons — definição de cupons.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS cupons (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  codigo text NOT NULL UNIQUE,
+  tipo text NOT NULL CHECK (tipo IN ('percentual','fixo')),
+  valor numeric(12,2) NOT NULL DEFAULT 0,
+  valor_minimo numeric(12,2),
+  max_usos integer,
+  usos integer DEFAULT 0,
+  data_inicio timestamptz NOT NULL,
+  data_fim timestamptz NOT NULL,
+  ativo boolean DEFAULT true,
+  created_at timestamptz DEFAULT now(),
+  created_by text
+);
+
+-- ---------------------------------------------------------------------------
+-- 8) cupons_usuarios — atribuição de cupom a um usuário.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS cupons_usuarios (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  cupom_id uuid REFERENCES cupons(id) ON DELETE CASCADE,
+  user_id uuid NOT NULL,
+  usado boolean DEFAULT false,
+  usado_em timestamptz,
+  created_at timestamptz DEFAULT now(),
+  UNIQUE (cupom_id, user_id)
+);
+
+-- ===========================================================================
+-- RPC: creditar_pontos (usada em db.ts → creditarPontos)
+-- ===========================================================================
+CREATE OR REPLACE FUNCTION creditar_pontos(p_email text, p_pontos integer, p_ref text)
+RETURNS integer
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+  atual integer;
+BEGIN
+  INSERT INTO fidelidade (email, pontos, updated_at)
+  VALUES (p_email, p_pontos, now())
+  ON CONFLICT (email) DO UPDATE SET pontos = fidelidade.pontos + p_pontos, updated_at = now()
+  RETURNING pontos INTO atual;
+
+  INSERT INTO fidelidade_historico (email, tipo, pontos, motivo, ref)
+  VALUES (p_email, 'credito', p_pontos, 'compra', p_ref);
+
+  RETURN p_pontos;
+END;
 $$;
 
--- ====================== RLS ======================
-alter table public.store_config enable row level security;
-alter table public.profiles     enable row level security;
-alter table public.pedidos      enable row level security;
-alter table public.admin_users  enable row level security;
+-- ===========================================================================
+-- RLS — habilitado em todas. service_role (backend) bypassa automaticamente.
+-- Policies abaixo controlam o acesso dos usuários (anon/user token).
+-- ===========================================================================
+ALTER TABLE store_config ENABLE ROW LEVEL SECURITY;
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fidelidade ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fidelidade_historico ENABLE ROW LEVEL SECURITY;
+ALTER TABLE pedidos ENABLE ROW LEVEL SECURITY;
+ALTER TABLE admin_logs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cupons ENABLE ROW LEVEL SECURITY;
+ALTER TABLE cupons_usuarios ENABLE ROW LEVEL SECURITY;
 
--- store_config: só admin (leitura+escrita). Service_role (edge fn) bypassa RLS.
-drop policy if exists "admin_all_store_config" on public.store_config;
-create policy "admin_all_store_config"
-  on public.store_config for all
-  to authenticated
-  using (public.is_admin())
-  with check (public.is_admin());
+-- store_config: ninguém (anon/user) lê ou escreve. Só service_role.
+DROP POLICY IF EXISTS "store_config_no_public" ON store_config;
+CREATE POLICY "store_config_no_public" ON store_config FOR ALL TO anon USING (false) WITH CHECK (false);
 
--- profiles: usuário próprio ou admin.
-drop policy if exists "profiles_self" on public.profiles;
-create policy "profiles_self"
-  on public.profiles for all
-  to authenticated
-  using ((select auth.uid()) = id or public.is_admin())
-  with check ((select auth.uid()) = id or public.is_admin());
+-- profiles: usuário vê/edita o próprio.
+DROP POLICY IF EXISTS "profiles_owner" ON profiles;
+CREATE POLICY "profiles_owner" ON profiles FOR ALL USING (auth.uid() = id) WITH CHECK (auth.uid() = id);
 
--- pedidos: dono vê os seus; admin vê tudo.
-drop policy if exists "pedidos_self_or_admin" on public.pedidos;
-create policy "pedidos_self_or_admin"
-  on public.pedidos for all
-  to authenticated
-  using ((select auth.uid()) = cliente_id or public.is_admin())
-  with check ((select auth.uid()) = cliente_id or public.is_admin());
+-- fidelidade: usuário vê o próprio (por e-mail correspondente ao uid).
+DROP POLICY IF EXISTS "fidelidade_owner" ON fidelidade;
+CREATE POLICY "fidelidade_owner" ON fidelidade FOR SELECT USING (
+  email = (SELECT email FROM profiles WHERE id = auth.uid())
+);
 
--- admin_users: só admin lê.
-drop policy if exists "admin_users_read" on public.admin_users;
-create policy "admin_users_read"
-  on public.admin_users for select
-  to authenticated
-  using (public.is_admin());
+-- fidelidade_historico: usuário vê o próprio.
+DROP POLICY IF EXISTS "fidelidade_historico_owner" ON fidelidade_historico;
+CREATE POLICY "fidelidade_historico_owner" ON fidelidade_historico FOR SELECT USING (
+  email = (SELECT email FROM profiles WHERE id = auth.uid())
+);
 
--- ====================== Data API exposure ======================
--- Tabelas em schema public podem não ficar expostas automaticamente.
--- Conceder acesso explícito aos roles (com RLS já ligada acima).
-grant select, insert, update, delete on public.store_config to authenticated;
-grant select, insert, update, delete on public.profiles to authenticated;
-grant select, insert, update, delete on public.pedidos to authenticated;
-grant select on public.admin_users to authenticated;
+-- pedidos: usuário vê os próprios (por e-mail).
+DROP POLICY IF EXISTS "pedidos_owner" ON pedidos;
+CREATE POLICY "pedidos_owner" ON pedidos FOR SELECT USING (
+  email = (SELECT email FROM profiles WHERE id = auth.uid())
+);
 
--- ====================== Seed inicial ======================
-insert into public.store_config (key, value, is_secret) values
-  ('LI_APP_KEY',       '', true),
-  ('LI_API_KEY',       '', true),
-  ('MP_ACCESS_TOKEN',  '', true),
-  ('ADMIN_PASSWORD',   '', true)
-on conflict (key) do nothing;
+-- admin_logs: nenhum acesso público. Só service_role.
+DROP POLICY IF EXISTS "admin_logs_no_public" ON admin_logs;
+CREATE POLICY "admin_logs_no_public" ON admin_logs FOR ALL TO anon USING (false) WITH CHECK (false);
+
+-- cupons: todos podem LER cupons ativos (para validação no checkout); escrita só service_role.
+DROP POLICY IF EXISTS "cupons_read_active" ON cupons;
+CREATE POLICY "cupons_read_active" ON cupons FOR SELECT USING (ativo = true);
+DROP POLICY IF EXISTS "cupons_no_public_write" ON cupons;
+CREATE POLICY "cupons_no_public_write" ON cupons FOR INSERT TO anon WITH CHECK (false);
+
+-- cupons_usuarios: usuário vê os próprios.
+DROP POLICY IF EXISTS "cupons_usuarios_owner" ON cupons_usuarios;
+CREATE POLICY "cupons_usuarios_owner" ON cupons_usuarios FOR SELECT USING (
+  user_id = auth.uid()
+);
+
+-- ===========================================================================
+-- Índices auxiliares
+-- ===========================================================================
+CREATE INDEX IF NOT EXISTS idx_fidelidade_historico_email ON fidelidade_historico(email);
+CREATE INDEX IF NOT EXISTS idx_pedidos_email ON pedidos(email);
+CREATE INDEX IF NOT EXISTS idx_cupons_codigo ON cupons(codigo);
+CREATE INDEX IF NOT EXISTS idx_cupons_usuarios_user ON cupons_usuarios(user_id);

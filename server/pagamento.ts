@@ -133,6 +133,7 @@ export interface CheckoutResult {
   email?: string | null;
   demo?: boolean;
   mp_payment_id?: string | number;
+  cupom?: { codigo: string; tipo: string; valor: number };
   [k: string]: unknown;
 }
 
@@ -142,8 +143,9 @@ export async function processarCheckout(params: {
   email?: string;
   card_token?: string;
   pontosResgate?: number;
+  cupom?: { codigo: string; tipo: string; valor: number; id: string };
 }): Promise<CheckoutResult> {
-  const { items, meio, email, card_token, pontosResgate } = params;
+  const { items, meio, email, card_token, pontosResgate, cupom } = params;
 
   const autorizado = await obterValorAutorizado(items);
   if (!autorizado.ok) throw new Error(autorizado.erro || "Valor inválido.");
@@ -166,6 +168,16 @@ export async function processarCheckout(params: {
     } else {
       desconto = 0;
     }
+  }
+
+  // Cupom
+  let descontoCupom = 0;
+  if (cupom?.valor && total > 0) {
+    if (cupom.tipo === "percentual") descontoCupom = Number((total * (Number(cupom.valor) / 100)).toFixed(2));
+    else descontoCupom = Number(cupom.valor);
+    descontoCupom = Math.min(descontoCupom, total);
+    total = Number((total - descontoCupom).toFixed(2));
+    desconto = Number((desconto + descontoCupom).toFixed(2));
   }
 
   // Em DEMO (sem token MP válido ou modo demo), mantém fluxo simulado.

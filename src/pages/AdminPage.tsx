@@ -20,7 +20,10 @@ import {
   type SituacaoPedido,
 } from "../services/admin";
 import { saveApiConfig } from "../services/apiConfig";
+import { criarCupom, listarCupons, enviarCupom, type Cupom } from "../services/cupomApp";
 import { BarChart, PieChart, KpiCard } from "../components/admin/AdminCharts";
+import CuponsAdmin from "./admin/CuponsAdmin";
+import AdminDashboard from "./AdminDashboard";
 
 function downloadCSV(csv: string, filename: string) {
   const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
@@ -32,7 +35,7 @@ function downloadCSV(csv: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-type Aba = "pedidos" | "relatorios" | "logs";
+type Aba = "pedidos" | "dashboard" | "cupons" | "relatorios" | "logs";
 
 export default function AdminPage({ onExit }: { onExit: () => void }) {
   const [token, setToken] = useState<string | null>(() => getAdminToken());
@@ -79,6 +82,20 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
   const [logsFiltroAcao, setLogsFiltroAcao] = useState("");
   const [logsDataInicio, setLogsDataInicio] = useState("");
   const [logsDataFim, setLogsDataFim] = useState("");
+
+  // Cupons
+  const [cupons, setCupons] = useState<Cupom[]>([]);
+  const [cuponsLoading, setCuponsLoading] = useState(false);
+  const [novoCodigo, setNovoCodigo] = useState("");
+  const [novoTipo, setNovoTipo] = useState<"percentual" | "fixo">("percentual");
+  const [novoValor, setNovoValor] = useState("");
+  const [novoMinimo, setNovoMinimo] = useState("");
+  const [novoMaxUsos, setNovoMaxUsos] = useState("");
+  const [novaDataInicio, setNovaDataInicio] = useState("");
+  const [novaDataFim, setNovaDataFim] = useState("");
+  const [cupomDestinatarios, setCupomDestinatarios] = useState("");
+  const [cupomEnviando, setCupomEnviando] = useState<string | null>(null);
+  const [cupomErro, setCupomErro] = useState<string | null>(null);
 
   const abrirCliente = useCallback(async (email: string) => {
     setClienteDetalhe({ email, dados: null, loading: true, erro: null });
@@ -170,8 +187,9 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
       carregar();
       carregarSituacoes();
       carregarRelatorio();
+      if (aba === "cupons") carregarCupons();
     }
-  }, [token, carregar, carregarSituacoes, carregarRelatorio]);
+  }, [token, carregar, carregarSituacoes, carregarRelatorio, aba]);
 
   const fazerLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -338,7 +356,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
         </div>
 
         <div className="flex gap-1 px-4 pt-3">
-          {(["pedidos", "relatorios", "logs"] as Aba[]).map((a) => (
+          {(["pedidos", "dashboard", "cupons", "relatorios", "logs"] as Aba[]).map((a) => (
             <button
               key={a}
               onClick={() => setAba(a)}
@@ -346,7 +364,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                 aba === a ? "bg-luxury-black text-white" : "bg-white text-gray-500"
               }`}
             >
-              {a === "pedidos" ? "Pedidos" : a === "relatorios" ? "Relatórios" : "Logs"}
+              {a === "pedidos" ? "Pedidos" : a === "dashboard" ? "Dashboard" : a === "cupons" ? "Cupons" : a === "relatorios" ? "Relatórios" : "Logs"}
             </button>
           ))}
         </div>
@@ -354,6 +372,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
         <div className="p-4 space-y-3">
           {mostrarConfig && <ApiConfigPanel onClose={() => setMostrarConfig(false)} />}
 
+          {aba === "dashboard" && <AdminDashboard token={token as string} />}
           {aba === "pedidos" && (
             <>
               <div className="flex gap-2">
@@ -456,6 +475,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
             </>
           )}
 
+          {aba === "cupons" && <CuponsAdmin />}
           {aba === "relatorios" && (
             <>
               {relLoading && (

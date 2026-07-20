@@ -65,6 +65,7 @@ export interface CheckoutResult {
   valor_total?: number;
   email?: string | null;
   demo?: boolean;
+  cupom?: { codigo: string; tipo: string; valor: number };
   [k: string]: unknown;
 }
 
@@ -75,6 +76,7 @@ export async function iniciarCheckout(payload: {
   card_token?: string;
   email?: string;
   pontosResgate?: number;
+  cupom?: { codigo: string; tipo: string; valor: number; id: string };
 }) {
   return adminCall<CheckoutResult>("checkout", { method: "POST", body: payload });
 }
