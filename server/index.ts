@@ -39,10 +39,7 @@ import { processarWebhookMP } from "./webhook.ts";
 import { getHistoricoFidelidade, registrarLog, supabaseClient } from "./db.ts";
 import cupomApp from "./cupom.ts";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-
 const {
-  LOJA_INTEGRADA_APP_KEY,
   LOJA_INTEGRADA_API_KEY,
   LOJA_INTEGRADA_API_BASE_URL = "https://api.awsli.com.br/api/v1",
   FRONTEND_ORIGIN = "*",
