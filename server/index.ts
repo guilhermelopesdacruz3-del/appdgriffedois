@@ -76,7 +76,7 @@ if (!DEMO) {
   }
 }
 
-if (!LOJA_INTEGRADA_APP_KEY || !LOJA_INTEGRADA_API_KEY) {
+if (!process.env.LOJA_INTEGRADA_APP_KEY || !process.env.LOJA_INTEGRADA_API_KEY) {
   console.warn(
     "[loja-integrada-proxy] AVISO: LOJA_INTEGRADA_APP_KEY e/ou LOJA_INTEGRADA_API_KEY não configuradas."
   );
