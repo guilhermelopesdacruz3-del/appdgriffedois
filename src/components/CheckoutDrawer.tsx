@@ -2,7 +2,7 @@ import { useState } from "react";
 import { formatPrice, isValidEmail } from "../utils";
 import { iniciarCheckout } from "../services/apiConfig";
 import { useFidelidade } from "../hooks/useFidelidade";
-import { validarCupom, usarCupom } from "../services/cupom";
+import { validarCupom, usarCupom } from "../services/cupomApp";
 
 interface CartItem {
   product: { id: number; name: string; brand: string; price: number; image: string; colors: string[]; colorNames: string[] };

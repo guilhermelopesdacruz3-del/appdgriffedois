@@ -3,12 +3,15 @@ const BASE_URL =
   "/api/loja-integrada";
 
 async function request<T>(path: string, opts: { method?: string; body?: unknown; auth?: boolean } = {}): Promise<T> {
+  // O backend monta o router de cupons em /api/loja-integrada, e dentro dele as
+  // rotas começam com /api/cupons/... — então a URL final é
+  // /api/loja-integrada/api/cupons/... . Mantemos o prefixo completo do proxy.
   const token = opts.auth !== false ? sessionStorage.getItem("dg_admin_token") : null;
   const headers: Record<string, string> = { Accept: "application/json" };
   if (opts.body !== undefined) headers["Content-Type"] = "application/json";
   if (token) headers["Authorization"] = `Bearer ${token}`;
 
-  const res = await fetch(`${BASE_URL.replace(/\/api\/loja-integrada\/?$/, "") + path}`, {
+  const res = await fetch(`${BASE_URL}${path}`, {
     method: opts.method || "GET",
     headers,
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,

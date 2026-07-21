@@ -7,11 +7,12 @@ import { useProdutos } from "../hooks/useProdutos";
 import { useFidelidade } from "../hooks/useFidelidade";
 import { usePedidoDetalhe } from "../hooks/usePedidoDetalhe";
 import OrderDetail from "../components/cliente/OrderDetail";
+import MeusCupons from "./MeusCupons";
 import { formatPrice } from "../utils";
 import type { Product } from "../data";
 import ProductCard from "../components/ProductCard";
 
-type SubTela = "favoritos" | "dados" | "editar-perfil" | "seguranca" | "config" | "embreve";
+type SubTela = "favoritos" | "cupons" | "dados" | "editar-perfil" | "seguranca" | "config" | "embreve";
 
 export default function ProfilePage({ onNavigate }: { onNavigate?: (page: string) => void }) {
   const { cliente, loading: loadingCliente, error: erroCliente, entrarComEmail, sair, atualizarCliente } = useCliente();
@@ -70,6 +71,17 @@ export default function ProfilePage({ onNavigate }: { onNavigate?: (page: string
       label: "Favoritos",
       subtitle: "Peças que você amou",
       action: "favoritos",
+    },
+    {
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z" />
+          <line x1="7" y1="7" x2="7.01" y2="7" />
+        </svg>
+      ),
+      label: "Meus Cupons",
+      subtitle: "Cupons e descontos",
+      action: "cupons",
     },
     {
       icon: (
@@ -191,6 +203,15 @@ export default function ProfilePage({ onNavigate }: { onNavigate?: (page: string
               ))}
             </div>
           )}
+        </div>
+      );
+    }
+
+    if (subTela === "cupons") {
+      return (
+        <div className="px-4 pt-6 pb-4">
+          {voltar}
+          <MeusCupons />
         </div>
       );
     }
