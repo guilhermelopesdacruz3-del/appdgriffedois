@@ -3,10 +3,10 @@ import { relatorioAdmin, listarPedidosAdmin, listarSituacoes, buscarClienteAdmin
 import { listarCupons, enviarCupom, criarCupom, type Cupom } from "../services/cupomApp";
 import { formatPrice } from "../utils";
 
-export default function AdminDashboard({ token }: { token: string }) {
+export default function AdminDashboard(_props: { token: string }) {
   const [relatorio, setRelatorio] = useState<any>(null);
   const [pedidos, setPedidos] = useState<any[]>([]);
-  const [situacoes, setSituacoes] = useState<any[]>([]);
+  const [_situacoes, setSituacoes] = useState<any[]>([]);
   const [clientes, setClientes] = useState<any[]>([]);
   const [logs, setLogs] = useState<any[]>([]);
   const [cupons, setCupons] = useState<Cupom[]>([]);
@@ -42,7 +42,8 @@ export default function AdminDashboard({ token }: { token: string }) {
 
   const enviarCupomSelecionado = async (id: string, user_id?: string) => {
     try {
-      await enviarCupom(id, user_id ? undefined : "todos", user_id ? [user_id] : undefined);
+      const user_ids = user_id ? [user_id] : undefined;
+      await enviarCupom(id, user_ids ? { user_ids } : { grupo: "todos" });
       alert("Cupom enviado!");
     } catch (e: any) {
       alert(e.message);
@@ -95,7 +96,7 @@ export default function AdminDashboard({ token }: { token: string }) {
           <div className="bg-white rounded-2xl p-4 shadow-sm">
             <p className="text-xs font-bold text-luxury-black mb-2">Clientes ({clientes.length})</p>
             <div className="space-y-1 max-h-60 overflow-y-auto">
-              {clientes.slice(0, 20).map((c, i) => (
+              {clientes.slice(0, 20).map((c) => (
                 <div key={c.email} className="flex items-center justify-between text-[11px]">
                   <div className="min-w-0">
                     <p className="font-semibold text-luxury-black truncate">{c.nome || c.email}</p>

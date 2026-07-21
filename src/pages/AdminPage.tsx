@@ -20,7 +20,6 @@ import {
   type SituacaoPedido,
 } from "../services/admin";
 import { saveApiConfig } from "../services/apiConfig";
-import { criarCupom, listarCupons, enviarCupom, type Cupom } from "../services/cupomApp";
 import { BarChart, PieChart, KpiCard } from "../components/admin/AdminCharts";
 import CuponsAdmin from "./admin/CuponsAdmin";
 import AdminDashboard from "./AdminDashboard";
@@ -82,20 +81,6 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
   const [logsFiltroAcao, setLogsFiltroAcao] = useState("");
   const [logsDataInicio, setLogsDataInicio] = useState("");
   const [logsDataFim, setLogsDataFim] = useState("");
-
-  // Cupons
-  const [cupons, setCupons] = useState<Cupom[]>([]);
-  const [cuponsLoading, setCuponsLoading] = useState(false);
-  const [novoCodigo, setNovoCodigo] = useState("");
-  const [novoTipo, setNovoTipo] = useState<"percentual" | "fixo">("percentual");
-  const [novoValor, setNovoValor] = useState("");
-  const [novoMinimo, setNovoMinimo] = useState("");
-  const [novoMaxUsos, setNovoMaxUsos] = useState("");
-  const [novaDataInicio, setNovaDataInicio] = useState("");
-  const [novaDataFim, setNovaDataFim] = useState("");
-  const [cupomDestinatarios, setCupomDestinatarios] = useState("");
-  const [cupomEnviando, setCupomEnviando] = useState<string | null>(null);
-  const [cupomErro, setCupomErro] = useState<string | null>(null);
 
   const abrirCliente = useCallback(async (email: string) => {
     setClienteDetalhe({ email, dados: null, loading: true, erro: null });
@@ -187,7 +172,6 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
       carregar();
       carregarSituacoes();
       carregarRelatorio();
-      if (aba === "cupons") carregarCupons();
     }
   }, [token, carregar, carregarSituacoes, carregarRelatorio, aba]);
 
