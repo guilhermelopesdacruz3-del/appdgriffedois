@@ -954,6 +954,9 @@ app.post("/api/cliente/verificar", async (req, res) => {
 
 app.use("/", cupomApp);
 
+// URL curta para a dashboard do admin no navegador.
+app.get("/admin", (_req, res) => res.redirect(301, "/#/admin"));
+
 app.listen(PORT, () => {
   console.log(`[loja-integrada-proxy] rodando em http://localhost:${PORT}`);
   console.log(`[loja-integrada-proxy] endpoint: http://localhost:${PORT}/api/loja-integrada/produto/`);
