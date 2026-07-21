@@ -55,7 +55,10 @@ export default function CatalogPage({
     if (activeFilter === "favoritos") return isFavorite ? isFavorite(p.id) : false;
     if (activeFilter === "3D") return p.has3D;
     if (activeFilter === "Provador") return p.hasTryOn;
-    if (activeFilter === "Sol" || activeFilter === "Grau") return p.category === activeFilter;
+    if (activeFilter === "Sol" || activeFilter === "Grau") {
+      const re = activeFilter === "Sol" ? /sol/i : /grau/i;
+      return re.test(p.category);
+    }
     return p.brand === activeFilter;
   });
 

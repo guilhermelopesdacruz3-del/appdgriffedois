@@ -15,12 +15,13 @@ interface HomePageProps {
 }
 
 export default function HomePage({ products, onSelectProduct, onAddToCart, onNavigate, onTryOn, recentIds = [], isFavorite, onToggleFavorite }: HomePageProps) {
-  // O mapeador (src/services/lojaIntegrada/mappers.ts) só define product.badge
-  // como "Destaque" quando o produto está marcado como destaque na Loja
-  // Integrada — os valores antigos aqui nunca eram produzidos, então a seção
-  // "Destaques" ficava sempre vazia.
+  // O mapeador da LI normalmente retorna o nome real da categoria (ex.:
+  // "Óculos de Sol"), não o rótulo curto "Sol". Filtramos por contenção para
+  // que as seções da home não fiquem vazias quando a LI usa nomes diferentes.
+  const isCategoriaSol = (cat: string) => /sol/i.test(cat);
+
   const featuredProducts = products.filter(p => p.badge === "Destaque").slice(0, 4);
-  const solProducts = products.filter(p => p.category === "Sol").slice(0, 4);
+  const solProducts = products.filter(p => isCategoriaSol(p.category)).slice(0, 4);
   const recentProducts = recentIds
     .map((id) => products.find((p) => p.id === id))
     .filter((p): p is Product => Boolean(p))

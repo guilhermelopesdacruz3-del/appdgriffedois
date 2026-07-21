@@ -21,16 +21,14 @@ export interface Product {
 }
 
 /**
- * Os produtos, clientes e pedidos deste app agora vêm da API da Loja
- * Integrada em tempo real — veja src/services/lojaIntegrada.
+ * Observação sobre a fonte de dados:
  *
- * - Produtos: src/hooks/useProdutos.ts (usado em App.tsx)
- * - Cliente logado: src/hooks/useCliente.ts (usado em ProfilePage.tsx)
- * - Pedidos do cliente: src/hooks/usePedidos.ts (usado em ProfilePage.tsx)
+ * Produtos, clientes e pedidos vêm da API da Loja Integrada em tempo real
+ * (veja src/services/lojaIntegrada). O array de produtos mockado que existia
+ * aqui foi removido.
  *
- * O array mockado que existia aqui foi removido. Se o proxy (veja /server)
- * ainda não estiver configurado, as telas mostram um estado vazio/erro em
- * vez de dados fixos — assim você percebe rápido se a integração caiu.
+ * `categories` e `benefits` abaixo SÃO usados nas telas (HomePage e LoyaltyPage)
+ * como UI estática de navegação/recompensas — não são dados da loja.
  */
 
 export const categories = [
