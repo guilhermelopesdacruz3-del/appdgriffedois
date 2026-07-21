@@ -24,8 +24,8 @@ import helmet from "helmet";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { config as dotenvConfig } from "dotenv";
-dotenvConfig({ path: path.join(path.dirname(fileURLToPath(import.meta.url)), ".env") });
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const DIST_DIR = path.resolve(__dirname, "..", "dist");
 import {
   demoResponder,
   demoCriarCliente,
@@ -952,12 +952,12 @@ app.post("/api/cliente/verificar", async (req, res) => {
   }
 });
 
-app.use(express.static("dist"));
+app.use(express.static(DIST_DIR));
 
 app.use("/", cupomApp);
 
 app.get("/admin", (_req, res) => res.redirect(301, "/#/admin"));
-app.get("*", (_req, res) => res.sendFile(path.resolve("dist/index.html")));
+app.get("*", (_req, res) => res.sendFile(path.join(DIST_DIR, "index.html")));
 
 app.listen(PORT, () => {
   console.log(`[loja-integrada-proxy] rodando em http://localhost:${PORT}`);
