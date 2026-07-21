@@ -949,12 +949,7 @@ app.post("/api/cliente/verificar", async (req, res) => {
   }
 });
 
-app.use(express.static(DIST_DIR));
-
-app.use("/", cupomApp);
-
-app.get("/admin", (_req, res) => res.redirect(301, "/#/admin"));
-app.get("*", (_req, res) => res.sendFile(path.join(DIST_DIR, "index.html")));
+app.use("/api/loja-integrada", cupomApp);
 
 app.listen(PORT, () => {
   console.log(`[loja-integrada-proxy] rodando em http://localhost:${PORT}`);
