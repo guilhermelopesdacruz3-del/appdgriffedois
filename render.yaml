@@ -1,28 +1,12 @@
-# Render.com deployment config for the D'Griffe proxy/backend.
-#
-# Caminho B (produção): o servidor sobe como Web Service público.
-# O app Android aponta para a URL pública via VITE_LOJA_INTEGRADA_PROXY_URL.
-#
-# Secrets necessários no painel do Render (Environment):
-#   - LOJA_INTEGRADA_APP_KEY
-#   - LOJA_INTEGRADA_API_KEY
-#   - ADMIN_PASSWORD
-#   - SUPABASE_URL
-#   - SUPABASE_SERVICE_ROLE
-#   - MP_ACCESS_TOKEN (Mercado Pago — etapa posterior)
-#   - MP_PUBLIC_KEY
-#
-# O server lê server/.env em dev, mas no Render usamos as env vars do painel.
-
 services:
   - type: web
     name: dgriffe-proxy
     runtime: node
     region: oregon
     plan: free
-    rootDir: server
-    buildCommand: npm install && npm run build
-    startCommand: node dist/index.js
+    rootDir: .
+    buildCommand: npm install --prefix server && npm run build --prefix server && npm install && npm run build
+    startCommand: node server/dist/index.js
     healthCheckPath: /health
     envVars:
       - key: NODE_ENV
