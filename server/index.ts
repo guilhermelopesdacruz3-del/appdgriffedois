@@ -42,7 +42,7 @@ import cupomApp from "./cupom.ts";
 const {
   LOJA_INTEGRADA_API_KEY,
   LOJA_INTEGRADA_API_BASE_URL = "https://api.awsli.com.br/api/v1",
-  FRONTEND_ORIGIN = "*",
+  FRONTEND_ORIGIN = "https://appdgriffedois-3xwz-hrxf1ru63.vercel.app",
   PORT = 8787,
   ADMIN_PASSWORD,
   ADMIN_SECRET = "altere-este-segredo-admin-num-environment",
@@ -865,6 +865,10 @@ async function criarClienteLI(email: string, dados: { nome?: string; telefone?: 
 
 // POST /api/cliente/cadastro -> envia OTP por e-mail (cria o usuário se não existir)
 app.post("/api/cliente/cadastro", async (req, res) => {
+  const ip = ipDo(req);
+  const bloq = checarBloqueio(ip);
+  if (bloq.bloqueado) return res.status(429).json({ erro: `Muitas tentativas. Tente em ${bloq.resta}s.` });
+
   const { email, nome, telefone, cpf } = req.body || {};
   const e = (email || "").trim().toLowerCase();
   if (!e || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) {
@@ -933,6 +937,10 @@ app.post("/api/cliente/cadastro", async (req, res) => {
 
 // POST /api/cliente/verificar -> valida o OTP e retorna a sessão
 app.post("/api/cliente/verificar", async (req, res) => {
+  const ip = ipDo(req);
+  const bloq = checarBloqueio(ip);
+  if (bloq.bloqueado) return res.status(429).json({ erro: `Muitas tentativas. Tente em ${bloq.resta}s.` });
+
   const { email, token } = req.body || {};
   const e = (email || "").trim().toLowerCase();
   if (!e || !token || !/^\d{6}$/.test(String(token))) {
@@ -942,9 +950,14 @@ app.post("/api/cliente/verificar", async (req, res) => {
   if (!sb) return res.status(503).json({ erro: "Banco de dados indisponível (modo demo)." });
   try {
     const { data, error } = await sb.auth.verifyOtp({ email: e, token: String(token), type: "email" });
-    if (error) return res.status(401).json({ erro: error.message });
+    if (error) {
+      registrarTentativaFalha(ip);
+      return res.status(401).json({ erro: error.message });
+    }
+    registrarTentativaSucesso(ip);
     return res.json({ ok: true, session: data.session, user: data.user });
   } catch (err) {
+    registrarTentativaFalha(ip);
     return res.status(500).json({ erro: "Falha ao verificar código." });
   }
 });
