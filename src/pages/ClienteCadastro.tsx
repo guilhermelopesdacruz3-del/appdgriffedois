@@ -1,6 +1,12 @@
 import { useState } from "react";
 import { cadastrarCliente, verificarOtp } from "../services/cliente";
-import { supabase } from "../lib/supabase";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  import.meta.env.VITE_SUPABASE_URL as string,
+  import.meta.env.VITE_SUPABASE_ANON as string,
+  { auth: { persistSession: true, autoRefreshToken: true } }
+);
 
 type Etapa = "dados" | "codigo";
 
