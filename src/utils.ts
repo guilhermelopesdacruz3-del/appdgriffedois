@@ -20,3 +20,10 @@ export function formatPrice(price: number): string {
 export function formatInstallment(count: number, value: number): string {
   return `${count}x de ${value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}`;
 }
+
+const EMAIL_RE = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
+
+/** Validação centralizada de e-mail (usada no checkout, fidelidade, perfil). */
+export function isValidEmail(email: string): boolean {
+  return EMAIL_RE.test((email || "").trim());
+}

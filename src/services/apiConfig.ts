@@ -4,6 +4,31 @@
 
 import { getAdminToken, clearAdminToken } from "./admin";
 
+// Chamadas do APP DO CLIENTE (rotas públicas: /api/checkout, /api/fidelidade, etc).
+// NÃO envia token de admin. Usado pelo fluxo de compra do cliente final.
+async function clientCall<T>(path: string, opts: { method?: string; body?: unknown } = {}): Promise<T> {
+  const res = await fetch(`/api/${path}`, {
+    method: opts.method ?? "GET",
+    headers: {
+      ...(opts.body !== undefined ? { "Content-Type": "application/json" } : {}),
+    },
+    body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
+  });
+  const text = await res.text();
+  let json: any = null;
+  try {
+    json = text ? JSON.parse(text) : null;
+  } catch {
+    json = { raw: text };
+  }
+  if (!res.ok) {
+    const erro = json?.erro || json?.message || `API ${path} -> ${res.status}`;
+    throw new Error(erro);
+  }
+  return json as T;
+}
+
+// Chamadas do ADMIN (exigem token de admin em /api/admin/*).
 async function adminCall<T>(path: string, opts: { method?: string; body?: unknown } = {}): Promise<T> {
   const token = getAdminToken();
   const res = await fetch(`/api/${path}`, {
@@ -78,5 +103,6 @@ export async function iniciarCheckout(payload: {
   pontosResgate?: number;
   cupom?: { codigo: string; tipo: string; valor: number; id: string };
 }) {
-  return adminCall<CheckoutResult>("checkout", { method: "POST", body: payload });
+  // Rota pública do cliente (server/index.ts:742, sem requireAdmin).
+  return clientCall<CheckoutResult>("checkout", { method: "POST", body: payload });
 }

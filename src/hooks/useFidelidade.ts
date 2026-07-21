@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { isValidEmail } from "../utils";
 
 const PROXY = (import.meta.env.VITE_LOJA_INTEGRADA_PROXY_URL as string | undefined)?.replace(/\/api\/loja-integrada\/?$/, "") || "";
 
@@ -28,7 +29,7 @@ export function useFidelidade(email: string | null | undefined) {
 
   useEffect(() => {
     const e = (email || "").trim().toLowerCase();
-    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(e)) {
+    if (!isValidEmail(e)) {
       setInfo(null);
       setHistorico([]);
       return;

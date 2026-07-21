@@ -34,7 +34,14 @@ export default function App() {
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [tryOnProduct, setTryOnProduct] = useState<Product | null>(null);
   const [tryOnOpen, setTryOnOpen] = useState(false);
-  const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [cartItems, setCartItems] = useState<CartItem[]>(() => {
+    try {
+      const raw = window.localStorage.getItem("dgriffe:carrinho");
+      return raw ? (JSON.parse(raw) as CartItem[]) : [];
+    } catch {
+      return [];
+    }
+  });
   const [showCartNotification, setShowCartNotification] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -155,6 +162,15 @@ export default function App() {
     setTryOnOpen(false);
     setTimeout(() => setTryOnProduct(null), 300);
   }, []);
+
+  // Persiste o carrinho no localStorage (sobrevive a recarregamentos).
+  useEffect(() => {
+    try {
+      window.localStorage.setItem("dgriffe:carrinho", JSON.stringify(cartItems));
+    } catch {
+      /* ignora quota/privado */
+    }
+  }, [cartItems]);
 
   const isProductPage = currentPage === "product";
 

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { formatPrice } from "../utils";
+import { formatPrice, isValidEmail } from "../utils";
 import { iniciarCheckout } from "../services/apiConfig";
 import { useFidelidade } from "../hooks/useFidelidade";
 import { validarCupom, usarCupom } from "../services/cupom";
@@ -49,7 +49,7 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: Ch
 
   const iniciar = async (meio: "pix" | "cartao") => {
     // O Mercado Pago exige e-mail válido para gerar a cobrança (PIX ou cartão).
-    const emailOk = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+    const emailOk = isValidEmail(email.trim());
     if (!emailOk) {
       setErro("Informe um e-mail válido para continuar o pagamento.");
       setPasso("erro");
