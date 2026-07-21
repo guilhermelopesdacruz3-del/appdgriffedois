@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { buscarClientePorEmail, type ClienteApp } from "../services/lojaIntegrada";
 
 interface UseClienteResult {
@@ -32,6 +32,17 @@ export function useCliente(): UseClienteResult {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Recupera o cliente logado de um reload anterior (persistência leve).
+  useEffect(() => {
+    try {
+      const email = window.localStorage.getItem("dgriffe:cliente_email");
+      if (email) entrarComEmail(email);
+    } catch {
+      /* ignora */
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const entrarComEmail = useCallback(async (email: string) => {
     setLoading(true);
     setError(null);
@@ -43,6 +54,11 @@ export function useCliente(): UseClienteResult {
         return;
       }
       setCliente(encontrado);
+      try {
+        window.localStorage.setItem("dgriffe:cliente_email", email.trim().toLowerCase());
+      } catch {
+        /* ignora */
+      }
     } catch (err) {
       setError((err as Error).message);
       setCliente(null);
@@ -51,7 +67,14 @@ export function useCliente(): UseClienteResult {
     }
   }, []);
 
-  const sair = useCallback(() => setCliente(null), []);
+  const sair = useCallback(() => {
+    setCliente(null);
+    try {
+      window.localStorage.removeItem("dgriffe:cliente_email");
+    } catch {
+      /* ignora */
+    }
+  }, []);
 
   const atualizarCliente = useCallback(
     async (dados: {
