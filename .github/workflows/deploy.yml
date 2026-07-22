@@ -54,10 +54,12 @@ jobs:
             -d "$(jq -n --arg q "$SQL2" '{query:$q}')")
           echo "Resposta Supabase (fidelidade): $RESP2"
 
-  # 2) Deploy do FRONT na Netlify (automático a cada push na main).
+  # 2) Deploy do FRONT no Cloudflare Pages.
   deploy-front:
     needs: [test, sync-supabase]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -66,16 +68,14 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - name: Deploy Netlify
-        uses: nwtgck/actions-netlify@v3
+      - name: Deploy to Cloudflare Pages
+        uses: cloudflare/pages-action@v1
         with:
-          publish-dir: ./dist
-          production-deploy: true
-          enable-pull-request-comment: false
-        env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
-        # VITE_LOJA_INTEGRADA_PROXY_URL deve estar definido nas env vars da Netlify.
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          projectName: appdgriffedois
+          directory: ./dist
+          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
   # 3) Deploy do PROXY no Render.
   # O Render já faz auto-deploy direto do GitHub (a cada push na main), então
