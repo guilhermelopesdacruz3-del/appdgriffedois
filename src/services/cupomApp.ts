@@ -64,20 +64,20 @@ export async function criarCupom(dados: {
   data_fim: string;
   destinatarios?: string[];
 }): Promise<Cupom> {
-  return request<Cupom>("/admin/cupons", { method: "POST", body: dados });
+  return request<Cupom>("/api/admin/cupons", { method: "POST", body: dados });
 }
 
 export async function listarCupons(): Promise<Cupom[]> {
-  return request<Cupom[]>("/admin/cupons");
+  return request<Cupom[]>("/api/admin/cupons");
 }
 
 export type EnviarCupomPayload = { user_ids?: string[]; grupo?: "todos" | "vip" };
 export async function enviarCupom(id: string, dados: EnviarCupomPayload): Promise<{ atribuidos: number }> {
-  return request<{ atribuidos: number }>(`/admin/cupons/${encodeURIComponent(id)}/enviar`, { method: "POST", body: dados });
+  return request<{ atribuidos: number }>(`/api/admin/cupons/${encodeURIComponent(id)}/enviar`, { method: "POST", body: dados });
 }
 
 export async function meusCupons(): Promise<CupomUsuario[]> {
-  return request<CupomUsuario[]>("/cupons/meus", { auth: true });
+  return request<CupomUsuario[]>("/api/cupons/meus", { auth: true });
 }
 
 export async function validarCupom(codigo: string): Promise<{
@@ -86,9 +86,9 @@ export async function validarCupom(codigo: string): Promise<{
   cupom?: Cupom;
   atribuicao_id?: string;
 }> {
-  return request(`/cupons/validar/${encodeURIComponent(codigo)}`);
+  return request(`/api/cupons/validar/${encodeURIComponent(codigo)}`);
 }
 
 export async function usarCupom(id: string, discount: number): Promise<{ ok: boolean; desconto: number }> {
-  return request<{ ok: boolean; desconto: number }>(`/cupons/${encodeURIComponent(id)}/usar`, { method: "POST", body: { discount } });
+  return request<{ ok: boolean; desconto: number }>(`/api/cupons/${encodeURIComponent(id)}/usar`, { method: "POST", body: { discount } });
 }
