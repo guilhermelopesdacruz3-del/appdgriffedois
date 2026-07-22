@@ -57,24 +57,24 @@ export default function AdminDashboard(_props: { token: string }) {
         </div>
       )}
 
-      {!loading && aba === "visao" && relatorio && (
+      {!loading && aba === "visao" && (
         <>
           <div className="grid grid-cols-2 gap-2">
             <div className="bg-white rounded-2xl p-3 shadow-sm">
               <p className="text-[10px] text-gray-400">Pedidos</p>
-              <p className="text-lg font-bold text-luxury-black">{relatorio.totalPedidos}</p>
+              <p className="text-lg font-bold text-luxury-black">{relatorio ? relatorio.totalPedidos : "—"}</p>
             </div>
             <div className="bg-white rounded-2xl p-3 shadow-sm">
               <p className="text-[10px] text-gray-400">Faturamento</p>
-              <p className="text-lg font-bold text-luxury-black">{formatPrice(relatorio.faturamentoTotal)}</p>
+              <p className="text-lg font-bold text-luxury-black">{relatorio ? formatPrice(relatorio.faturamentoTotal) : "—"}</p>
             </div>
             <div className="bg-white rounded-2xl p-3 shadow-sm">
               <p className="text-[10px] text-gray-400">Ticket Médio</p>
-              <p className="text-lg font-bold text-gold">{formatPrice(relatorio.ticketMedio)}</p>
+              <p className="text-lg font-bold text-gold">{relatorio ? formatPrice(relatorio.ticketMedio) : "—"}</p>
             </div>
             <div className="bg-white rounded-2xl p-3 shadow-sm">
               <p className="text-[10px] text-gray-400">Aprovado</p>
-              <p className="text-lg font-bold text-green-600">{formatPrice(relatorio.faturamentoAprovado)}</p>
+              <p className="text-lg font-bold text-green-600">{relatorio ? formatPrice(relatorio.faturamentoAprovado) : "—"}</p>
             </div>
           </div>
 
@@ -83,23 +83,25 @@ export default function AdminDashboard(_props: { token: string }) {
             <p className="text-[11px] text-gray-500 mb-2">Catálogo e checkout dependem das chaves da Loja Integrada e Mercado Pago. Configure na aba "APIs" (canto superior direito).</p>
           </div>
 
-          <div className="bg-white rounded-2xl p-4 shadow-sm">
-            <p className="text-xs font-bold text-luxury-black mb-2">Pedidos Recentes ({pedidos.length})</p>
-            <div className="space-y-1 max-h-60 overflow-y-auto">
-              {pedidos.slice(0, 20).map((p) => (
-                <div key={p.id} className="flex items-center justify-between text-[11px]">
-                  <div className="min-w-0">
-                    <p className="font-semibold text-luxury-black">#{p.numero}</p>
-                    <p className="text-gray-400 truncate">{p.cliente_nome} · {p.cliente_email}</p>
+          {pedidos.length > 0 && (
+            <div className="bg-white rounded-2xl p-4 shadow-sm">
+              <p className="text-xs font-bold text-luxury-black mb-2">Pedidos Recentes ({pedidos.length})</p>
+              <div className="space-y-1 max-h-60 overflow-y-auto">
+                {pedidos.slice(0, 20).map((p) => (
+                  <div key={p.id} className="flex items-center justify-between text-[11px]">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-luxury-black">#{p.numero}</p>
+                      <p className="text-gray-400 truncate">{p.cliente_nome} · {p.cliente_email}</p>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="font-bold text-luxury-black">{formatPrice(Number(p.valor_total) || 0)}</p>
+                      <p className="text-gray-400">{new Date(p.data_criacao).toLocaleDateString("pt-BR")}</p>
+                    </div>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="font-bold text-luxury-black">{formatPrice(Number(p.valor_total) || 0)}</p>
-                    <p className="text-gray-400">{new Date(p.data_criacao).toLocaleDateString("pt-BR")}</p>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </>
       )}
 
