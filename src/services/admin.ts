@@ -1,16 +1,12 @@
 import type { LIPedido } from "./lojaIntegrada/types";
 import { mapPedidoParaApp } from "./lojaIntegrada/mappers";
 
-const PROXY_BASE_URL: string =
-  (import.meta.env.VITE_LOJA_INTEGRADA_PROXY_URL as string | undefined)?.replace(/\/$/, "") ||
-  "/api/loja-integrada";
-
-// O proxy de admin fica no mesmo servidor do proxy da Loja Integrada, só muda
-// o prefixo do path (/api/admin em vez de /api/loja-integrada).
-const ADMIN_BASE_URL: string =
-  PROXY_BASE_URL.replace(/\/api\/loja-integrada\/?$/, "") + "/api/admin";
-
 const TOKEN_KEY = "dg_admin_token";
+
+// O proxy de admin usa URL RELATIVA (/api/admin) para que, em produção, a
+// Netlify faça o proxy (netlify.toml: /api/* -> Render) sem problemas de CORS.
+// Em dev, o Vite já redireciona /api para o backend local.
+const ADMIN_BASE_URL: string = "/api/admin";
 
 export function getAdminToken(): string | null {
   return sessionStorage.getItem(TOKEN_KEY);
