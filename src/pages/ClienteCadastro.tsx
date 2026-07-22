@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { cadastrarCliente, verificarOtp } from "../services/cliente";
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import TermosPrivacidade from "./TermosPrivacidade";
 
 // Lazy + defensivo: o app NÃO pode quebrar no bootstrap só porque falta a
 // env var da Supabase. Criamos o client só na hora de usar (no fluxo OTP),
@@ -30,13 +31,23 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [mensagem, setMensagem] = useState<string | null>(null);
+  const [aceite, setAceite] = useState(false);
+  const [mostrarTermos, setMostrarTermos] = useState(false);
+
+  if (mostrarTermos) {
+    return <TermosPrivacidade onVoltar={() => setMostrarTermos(false)} />;
+  }
 
   const enviarCadastro = async (e: React.FormEvent) => {
     e.preventDefault();
     setErro(null);
+    if (!aceite) {
+      setErro("É necessário aceitar os Termos e a Política de Privacidade para continuar.");
+      return;
+    }
     setLoading(true);
     try {
-      const r = await cadastrarCliente({ email, nome, telefone, cpf });
+      const r = await cadastrarCliente({ email, nome, telefone, cpf, aceiteLgpd: true });
       if (r.ok) {
         setMensagem(r.mensagem || "Código enviado para seu e-mail.");
         setEtapa("codigo");
@@ -122,6 +133,25 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
               placeholder="CPF (opcional)"
               className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
             />
+            <label className="flex items-start gap-2 mt-1 text-[10px] text-gray-500 leading-tight">
+              <input
+                type="checkbox"
+                checked={aceite}
+                onChange={(e) => setAceite(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-gold flex-shrink-0"
+              />
+              <span>
+                Li e aceito a{" "}
+                <button
+                  type="button"
+                  onClick={() => setMostrarTermos(true)}
+                  className="underline text-luxury-black font-semibold"
+                >
+                  Política de Privacidade e os Termos de Uso
+                </button>
+                . Confirmo que meus dados serão tratados conforme a LGPD.
+              </span>
+            </label>
             <button
               type="submit"
               disabled={loading}

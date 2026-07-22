@@ -937,6 +937,8 @@ app.post("/api/cliente/cadastro", async (req, res) => {
           nome: nome || null,
           telefone: telefone || null,
           cpf: cpf || null,
+          aceite_lgpd: Boolean(req.body?.aceiteLgpd) || false,
+          aceite_lgpd_em: Boolean(req.body?.aceiteLgpd) ? new Date().toISOString() : null,
           updated_at: new Date().toISOString(),
         }, { onConflict: "id" });
       } catch (profileErr) {

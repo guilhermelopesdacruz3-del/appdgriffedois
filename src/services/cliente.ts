@@ -22,6 +22,7 @@ export async function cadastrarCliente(dados: {
   nome?: string;
   telefone?: string;
   cpf?: string;
+  aceiteLgpd?: boolean;
 }): Promise<{ ok: boolean; mensagem?: string }> {
   return post("/cadastro", dados);
 }
