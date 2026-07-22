@@ -25,6 +25,9 @@ android_old/
 # Netlify / Render (não versionar build artifacts, mas os .toml/.yaml ficam)
 .netlify/
 
+# Cache de vídeos do YouTube (gerado em runtime, não versionar)
+server/.youtube-cache.json
+
 # Logs e lixo
 *.log
 npm-debug.log*
