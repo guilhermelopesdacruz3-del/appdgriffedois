@@ -77,15 +77,23 @@ jobs:
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
         # VITE_LOJA_INTEGRADA_PROXY_URL deve estar definido nas env vars da Netlify.
 
-  # 3) Deploy do PROXY no Render (trigger de deploy).
+  # 3) Deploy do PROXY no Render.
+  # O Render já faz auto-deploy direto do GitHub (a cada push na main), então
+  # este passo é redundante/opcional. Se o RENDER_DEPLOY_HOOK não estiver
+  # configurado, apenas avisamos e seguimos (não quebra o pipeline).
   deploy-backend:
     needs: [test, sync-supabase]
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - name: Trigger Render Deploy
         run: |
+          if [ -z "$RENDER_DEPLOY_HOOK" ]; then
+            echo "RENDER_DEPLOY_HOOK não definido — o Render já faz auto-deploy do GitHub. Pulando."
+            exit 0
+          fi
           curl -fsSL -X POST "$RENDER_DEPLOY_HOOK" \
-            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Authorization: Bearer ***" \
             -H "Accept: application/json"
         env:
           RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
