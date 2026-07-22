@@ -15,9 +15,7 @@ import { getReceitas, criarReceita, atualizarReceita, apagarReceita } from "../s
 import type { Receita } from "../types";
 import { useState, useEffect } from "react";
 
-import { getReceitas, criarReceita, atualizarReceita, apagarReceita } from "../services/receitas";
-import type { Receita } from "../types";
-import { useState, useEffect } from "react";
+import { getFavoritos, type Favorito } from "../services/favoritos";
 
 function ReceitasSalvas({ email }: { email: string }) {
   const [itens, setItens] = useState<Receita[]>([]);
@@ -124,6 +122,79 @@ function ReceitasSalvas({ email }: { email: string }) {
             <p className="text-[10px] text-gray-400">
               {new Date(r.created_at).toLocaleString("pt-BR")}
             </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function FavoritosSalvos({ email }: { email: string }) {
+  const [itens, setItens] = useState<Favorito[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+
+  const carregar = async () => {
+    setLoading(true);
+    setErro(null);
+    try {
+      const lista = await getFavoritos(email);
+      setItens(lista);
+    } catch (e) {
+      setErro((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!email) return;
+    carregar();
+  }, [email]);
+
+  const remover = async (id: string) => {
+    try {
+      await apagarFavorito(id, email);
+      setItens((prev) => prev.filter((x) => x.id !== id));
+    } catch (e) {
+      setErro((e as Error).message);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {erro && <p className="text-[11px] text-red-500">{erro}</p>}
+
+      {loading && (
+        <div className="bg-white rounded-2xl p-4 shadow-sm text-center text-xs text-gray-400">
+          Carregando favoritos...
+        </div>
+      )}
+
+      {!loading && itens.length === 0 && (
+        <div className="bg-white rounded-2xl p-4 shadow-sm text-center text-xs text-gray-400">
+          Você ainda não tem favoritos salvos.
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {itens.map((f) => (
+          <div key={f.id} className="bg-white rounded-2xl p-4 shadow-sm space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wider text-gray-400">
+                Produto #{f.produto_id}
+              </span>
+              <button
+                onClick={() => remover(f.id)}
+                className="text-[10px] font-bold text-red-500"
+              >
+                Remover
+              </button>
+            </div>
+            <p className="text-xs text-luxury-black">{f.nome}</p>
+            {f.imagem && (
+              <img src={f.imagem} alt={f.nome} className="w-full h-32 object-cover rounded-xl" />
+            )}
           </div>
         ))}
       </div>
@@ -349,27 +420,11 @@ export default function ProfilePage({ onNavigate }: { onNavigate?: (page: string
     }
 
     if (subTela === "favoritos") {
-      const favs = todosProdutos.filter((p: Product) => favoriteIds.includes(p.id));
       return (
         <div className="px-4 pt-6 pb-4">
           {voltar}
           <h3 className="text-base font-bold text-luxury-black mb-4">Favoritos</h3>
-          {favs.length === 0 ? (
-            <p className="text-xs text-gray-400 text-center mt-10">Você ainda não favoritou nenhuma peça.</p>
-          ) : (
-            <div className="grid grid-cols-2 gap-3">
-              {favs.map((p: Product) => (
-                <ProductCard
-                  key={p.id}
-                  product={p}
-                  isFavorite={isFavorite(p.id)}
-                  onToggleFavorite={() => toggleFavorite(p.id)}
-                  onSelect={() => {}}
-                  onAddToCart={() => {}}
-                />
-              ))}
-            </div>
-          )}
+          {cliente?.email ? <FavoritosSalvos email={cliente.email} /> : <p className="text-xs text-gray-400 text-center mt-10">Faça login para ver seus favoritos.</p>}
         </div>
       );
     }

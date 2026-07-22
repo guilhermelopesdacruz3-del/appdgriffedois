@@ -73,7 +73,9 @@ export async function saveApiConfig(cfg: {
   LI_APP_KEY?: string;
   LI_API_KEY?: string;
   MP_ACCESS_TOKEN?: string;
-  ADMIN_PASSWORD?: string;
+  MP_PUBLIC_KEY?: string;
+  YT_API_KEY?: string;
+  YT_CHANNEL_ID?: string;
 }) {
   return adminCall("config", { method: "PUT", body: cfg });
 }
