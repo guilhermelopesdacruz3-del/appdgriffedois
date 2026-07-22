@@ -327,11 +327,11 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
 
   return (
     <div className="min-h-screen bg-ice">
-      <div className="max-w-lg mx-auto min-h-screen bg-ice relative">
+      <div className="max-w-5xl mx-auto min-h-screen bg-ice relative">
         <div className="sticky top-0 z-20 bg-luxury-black text-white px-5 py-3 flex items-center justify-between">
           <div>
             <h1 className="text-sm font-bold">Painel Admin</h1>
-            <p className="text-[10px] text-gray-400">{total} pedidos no total</p>
+            <p className="text-[10px] text-gold-dark font-semibold">{total} pedidos no total</p>
           </div>
           <div className="flex items-center gap-2">
             <button onClick={() => setMostrarConfig((v) => !v)} className="text-[10px] font-bold text-gold-dark hover:text-gold">APIs</button>
@@ -407,11 +407,11 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
               </div>
 
               {erro && (
-                <div className="bg-red-50 border border-red-100 rounded-2xl p-3 flex items-center justify-between gap-2">
-                  <p className="text-[11px] text-red-500 flex-1">{erro}</p>
+                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3 flex items-center justify-between gap-2">
+                  <p className="text-[11px] text-amber-700 flex-1">{erro}</p>
                   <button
                     onClick={() => { setErro(null); carregar(); }}
-                    className="text-[10px] font-bold text-red-600 border border-red-200 rounded-lg px-2 py-1 active:scale-95 whitespace-nowrap"
+                    className="text-[10px] font-bold text-amber-800 border border-amber-200 rounded-lg px-2 py-1 active:scale-95 whitespace-nowrap"
                   >
                     Tentar de novo
                   </button>
@@ -425,7 +425,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
               )}
 
               {!loading && pedidosFiltrados.length === 0 && (
-                <div className="bg-white rounded-2xl p-6 shadow-sm text-center text-xs text-gray-400">Nenhum pedido encontrado.</div>
+                <div className="bg-white rounded-2xl p-6 py-10 shadow-sm text-center text-xs text-gray-400">Nenhum pedido encontrado.</div>
               )}
 
               <div className="space-y-2">

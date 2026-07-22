@@ -73,10 +73,10 @@ export default function CuponsAdmin() {
       <form onSubmit={criar} className="bg-white rounded-2xl p-4 space-y-3">
         <p className="text-xs font-bold text-luxury-black">Criar cupom</p>
         <div className="flex gap-2">
-          <input value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="Código" className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-xs uppercase" required />
+          <input value={codigo} onChange={(e) => setCodigo(e.target.value)} placeholder="Código (ex: VERAO20)" className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-xs uppercase" required />
           <select value={tipo} onChange={(e) => setTipo(e.target.value as any)} className="h-10 px-3 rounded-xl border border-gray-200 text-xs bg-white">
-            <option value="percentual">%</option>
-            <option value="fixo">R$ fixo</option>
+            <option value="percentual">% Percentual</option>
+            <option value="fixo">R$ Fixo</option>
           </select>
         </div>
         <div className="flex gap-2">
@@ -85,11 +85,17 @@ export default function CuponsAdmin() {
         </div>
         <div className="flex gap-2">
           <input value={maxUsos} onChange={(e) => setMaxUsos(e.target.value)} placeholder="Máx. usos" type="number" className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-xs" />
-          <input type="datetime-local" value={inicio} onChange={(e) => setInicio(e.target.value)} className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-xs" />
+          <div className="flex-1">
+            <label className="block text-[9px] text-gray-400 mb-0.5 px-1">Início</label>
+            <input type="datetime-local" value={inicio} onChange={(e) => setInicio(e.target.value)} className="w-full h-10 px-3 rounded-xl border border-gray-200 text-xs" />
+          </div>
         </div>
-        <input type="datetime-local" value={fim} onChange={(e) => setFim(e.target.value)} className="w-full h-10 px-3 rounded-xl border border-gray-200 text-xs" required />
+        <div>
+          <label className="block text-[9px] text-gray-400 mb-0.5 px-1">Término</label>
+          <input type="datetime-local" value={fim} onChange={(e) => setFim(e.target.value)} className="w-full h-10 px-3 rounded-xl border border-gray-200 text-xs" required />
+        </div>
         <input value={destinatarios} onChange={(e) => setDestinatarios(e.target.value)} placeholder="IDs de usuários (separados por vírgula) — opcional" className="w-full h-10 px-3 rounded-xl border border-gray-200 text-xs" />
-        <button type="submit" className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl">Criar cupom</button>
+        <button type="submit" className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl active:scale-[0.98] transition-all">Criar cupom</button>
       </form>
 
       {erro && <p className="text-[11px] text-red-500">{erro}</p>}
