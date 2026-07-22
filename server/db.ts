@@ -17,7 +17,7 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_STORE_PATH = path.join(__dirname, ".store-config.json");
-export const CONFIG_KEYS = ["LI_APP_KEY", "LI_API_KEY", "MP_ACCESS_TOKEN", "MP_PUBLIC_KEY"] as const;
+export const CONFIG_KEYS = ["LI_APP_KEY", "LI_API_KEY", "MP_ACCESS_TOKEN", "MP_PUBLIC_KEY", "YT_API_KEY", "YT_CHANNEL_ID"] as const;
 export type ConfigKey = (typeof CONFIG_KEYS)[number];
 
 const SUPABASE_URL = process.env.SUPABASE_URL;

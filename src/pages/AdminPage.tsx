@@ -811,6 +811,8 @@ function ApiConfigPanel({ onClose }: { onClose: () => void }) {
   const [liApp, setLiApp] = useState("");
   const [liApi, setLiApi] = useState("");
   const [mpToken, setMpToken] = useState("");
+  const [ytKey, setYtKey] = useState("");
+  const [ytChannel, setYtChannel] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -824,9 +826,11 @@ function ApiConfigPanel({ onClose }: { onClose: () => void }) {
         ...(liApp ? { LI_APP_KEY: liApp } : {}),
         ...(liApi ? { LI_API_KEY: liApi } : {}),
         ...(mpToken ? { MP_ACCESS_TOKEN: mpToken } : {}),
+        ...(ytKey ? { YT_API_KEY: ytKey } : {}),
+        ...(ytChannel ? { YT_CHANNEL_ID: ytChannel } : {}),
       });
       setMsg("Chaves salvas com sucesso.");
-      setLiApp(""); setLiApi(""); setMpToken("");
+      setLiApp(""); setLiApi(""); setMpToken(""); setYtKey(""); setYtChannel("");
     } catch (e: any) {
       setErro(e.message || "Falha ao salvar.");
     } finally {
@@ -834,11 +838,11 @@ function ApiConfigPanel({ onClose }: { onClose: () => void }) {
     }
   };
 
-  const field = (label: string, value: string, set: (v: string) => void, ph: string) => (
+  const field = (label: string, value: string, set: (v: string) => void, ph: string, type = "password") => (
     <div>
       <p className="text-[11px] font-semibold text-luxury-black mb-1">{label}</p>
       <input
-        type="password"
+        type={type}
         value={value}
         onChange={(e) => set(e.target.value)}
         placeholder={ph}
@@ -858,6 +862,12 @@ function ApiConfigPanel({ onClose }: { onClose: () => void }) {
       {field("Loja Integrada — Chave de Aplicação", liApp, setLiApp, "APP_KEY da Loja Integrada")}
       {field("Loja Integrada — Chave de API", liApi, setLiApi, "API_KEY da Loja Integrada")}
       {field("Mercado Pago — Access Token", mpToken, setMpToken, "Access Token do Mercado Pago")}
+
+      <div className="pt-1 border-t border-gray-100">
+        <p className="text-[10px] font-semibold text-gold-dark mt-1 mb-1">YouTube (seção "D'Griffe no YouTube")</p>
+        {field("YouTube — API Key (Data API v3)", ytKey, setYtKey, "Chave da YouTube Data API v3")}
+        {field("YouTube — Channel ID", ytChannel, setYtChannel, "Ex.: UCiJZLyvcFQPxSxZaK2PynWg", "text")}
+      </div>
 
       <button
         onClick={salvar}

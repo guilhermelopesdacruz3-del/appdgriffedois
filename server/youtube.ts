@@ -1,18 +1,18 @@
-// Busca os vídeos mais recentes do canal do YouTube da D'Griffe via RSS público
-// (não exige API key). O app consome /api/youtube/latest e cai no array
-// estático do front se isto falhar.
+// Busca os vídeos mais recentes do canal do YouTube da D'Griffe.
 //
-// ROBUSTEZ: o RSS do YouTube rate-limita se chamado demais. Estratégia:
-//   1) Cache em ARQUIVO (.youtube-cache.json) — sobrevive a reinícios do server
-//      e persiste entre deploys, então nunca ficamos sem vídeos.
-//   2) TTL de 10min em memória para não bater no YouTube a toda requisição.
-//   3) FALLBACK: se o RSS falhar mas temos cache (mesmo expirado), usamos ele
-//      (com warning) — a seção NUNCA fica vazia por culpa de rate-limit.
-//   4) Só retorna erro se nunca tivermos conseguido nenhum vídeo.
+// FONTE PRIMÁRIA: YouTube Data API v3 (exige YT_API_KEY). Estável e sem os
+// bloqueios do RSS público (que o YouTube passou a barrar, retornando 404/429).
+// FALLBACK: RSS público (quando não há API key configurada).
+// CACHE: arquivo .youtube-cache.json (persiste entre reinícios/deploys) +
+// TTL 10min em memória. Se tudo falhar mas houver cache (mesmo expirado),
+// usamos ele — a seção NUNCA fica vazia por culpa de bloqueio.
+//
+// Configuração (admin, aba APIs, ou env var): YT_API_KEY e YT_CHANNEL_ID.
 
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { getSecret } from "./db.ts";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CACHE_PATH = path.join(__dirname, ".youtube-cache.json");
@@ -69,7 +69,30 @@ function getCache(): CacheData | null {
   return f; // pode ser expirado — usado como fallback
 }
 
-// Parser mínimo de Atom (sem dependências): extrai cada <entry>.
+// --- Fonte 1: YouTube Data API v3 (estável) ---
+async function buscarAPI(apiKey: string): Promise<YouTubeItem[]> {
+  const url = `https://www.googleapis.com/youtube/v3/search?key=${encodeURIComponent(
+    apiKey
+  )}&channelId=${CHANNEL_ID}&part=snippet&order=date&maxResults=6&type=video`;
+  const r = await fetch(url, { signal: AbortSignal.timeout(12000) });
+  if (!r.ok) throw new Error(`YouTube API ${r.status}`);
+  const json = (await r.json()) as any;
+  if (!Array.isArray(json.items)) throw new Error("YouTube API: sem items");
+  const items: YouTubeItem[] = json.items
+    .filter((it: any) => it?.id?.videoId)
+    .map((it: any) => ({
+      videoId: it.id.videoId,
+      title: dec(it.snippet?.title || ""),
+      publishedAt: it.snippet?.publishedAt || "",
+      thumb:
+        it.snippet?.thumbnails?.medium?.url ||
+        `https://i.ytimg.com/vi/${it.id.videoId}/mqdefault.jpg`,
+    }));
+  if (items.length === 0) throw new Error("YouTube API: nenhum vídeo");
+  return items;
+}
+
+// --- Fonte 2: RSS público (fallback, sujeito a bloqueio) ---
 async function buscarRSS(): Promise<YouTubeItem[]> {
   const r = await fetch(RSS_URL, {
     headers: {
@@ -86,7 +109,6 @@ async function buscarRSS(): Promise<YouTubeItem[]> {
   const items: YouTubeItem[] = [];
   for (const e of entries) {
     const videoId = e.match(/<yt:videoId>([^<]+)<\/yt:videoId>/)?.[1]?.trim();
-    // O RSS do YouTube usa <title> dentro de <entry> (não <media:title>).
     const title = dec(e.match(/<title>([^<]*)<\/title>/)?.[1] || "");
     const publishedAt = e.match(/<published>([^<]+)<\/published>/)?.[1]?.trim() || "";
     if (!videoId) continue;
@@ -103,21 +125,36 @@ async function buscarRSS(): Promise<YouTubeItem[]> {
 }
 
 export async function listarVideosRecentes(limit = 6): Promise<YouTubeItem[]> {
-  // Cache fresco em memória/arquivo?
+  // Cache fresco?
   const fresco = getCache();
   if (fresco && fresco.expira > Date.now()) return fresco.itens.slice(0, limit);
 
-  try {
-    const itens = await buscarRSS();
+  const tentar = async (fn: () => Promise<YouTubeItem[]>) => {
+    const itens = await fn();
     const c: CacheData = { itens, expira: Date.now() + CACHE_TTL_MS, salvoEm: Date.now() };
     memCache = c;
     salvarArquivo(c);
-    return itens.slice(0, limit);
+    return itens;
+  };
+
+  // 1) API oficial (se houver chave)
+  const apiKey = (await getSecret("YT_API_KEY").catch(() => null)) || process.env.YT_API_KEY || "";
+  if (apiKey) {
+    try {
+      return (await tentar(() => buscarAPI(apiKey))).slice(0, limit);
+    } catch (e: any) {
+      console.warn("[youtube] API falhou, tentando RSS:", e?.message || e);
+    }
+  }
+
+  // 2) RSS (fallback)
+  try {
+    return (await tentar(() => buscarRSS())).slice(0, limit);
   } catch (e: any) {
-    // Fallback: usa cache expirado se existir (evita seção vazia por rate-limit).
+    // 3) Cache expirado (nunca ficar vazio)
     const stale = getCache();
     if (stale && stale.itens.length > 0) {
-      console.warn("[youtube] RSS falhou, usando cache expirado:", e?.message || e);
+      console.warn("[youtube] todas as fontes falharam, usando cache expirado:", e?.message || e);
       return stale.itens.slice(0, limit);
     }
     throw e; // nunca tivemos nenhum vídeo
