@@ -12,7 +12,7 @@ import { formatPrice } from "../utils";
 import type { Product } from "../data";
 import ProductCard from "../components/ProductCard";
 
-type SubTela = "favoritos" | "cupons" | "dados" | "editar-perfil" | "seguranca" | "config" | "embreve";
+type SubTela = "favoritos" | "cupons" | "dados" | "editar-perfil" | "seguranca" | "config" | "embreve" | "meus-pedidos";
 
 export default function ProfilePage({ onNavigate }: { onNavigate?: (page: string) => void }) {
   const { cliente, loading: loadingCliente, error: erroCliente, entrarComEmail, sair, atualizarCliente } = useCliente();
@@ -46,7 +46,7 @@ export default function ProfilePage({ onNavigate }: { onNavigate?: (page: string
       ),
       label: "Meus Pedidos",
       subtitle: "Acompanhe suas entregas",
-      action: null,
+      action: "meus-pedidos",
     },
     {
       icon: (
@@ -180,6 +180,54 @@ export default function ProfilePage({ onNavigate }: { onNavigate?: (page: string
         Voltar
       </button>
     );
+
+    if (subTela === "meus-pedidos") {
+      return (
+        <div className="px-4 pt-6 pb-4">
+          {voltar}
+          <h3 className="text-base font-bold text-luxury-black mb-4">Meus Pedidos</h3>
+          {loadingPedidos && (
+            <div className="bg-white rounded-2xl p-4 shadow-sm text-center text-xs text-gray-400">
+              Carregando pedidos...
+            </div>
+          )}
+          {erroPedidos && !loadingPedidos && (
+            <div className="bg-red-50 border border-red-100 rounded-2xl p-4 text-center text-xs text-red-500">
+              Não foi possível carregar seus pedidos agora.
+            </div>
+          )}
+          {!loadingPedidos && !erroPedidos && pedidos.length === 0 && (
+            <div className="bg-white rounded-2xl p-4 shadow-sm text-center text-xs text-gray-400">
+              Você ainda não tem pedidos nessa loja.
+            </div>
+          )}
+          <div className="space-y-2">
+            {pedidos.map((order) => (
+              <button
+                key={order.id}
+                onClick={() => setPedidoSelecionado(order.id)}
+                className="w-full text-left bg-white rounded-2xl p-4 shadow-sm active:scale-[0.99] transition-all"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-luxury-black">Pedido #{order.id}</span>
+                  <span className="px-2 py-0.5 bg-green-50 text-green-600 text-[9px] font-bold rounded-full">
+                    {order.status}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-gray-400">
+                    {order.date} • {order.items} {order.items === 1 ? "item" : "itens"}
+                  </span>
+                  <span className="text-xs font-bold text-luxury-black">
+                    {order.total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                  </span>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
 
     if (subTela === "favoritos") {
       const favs = todosProdutos.filter((p: Product) => favoriteIds.includes(p.id));
