@@ -10,7 +10,7 @@
 
 import crypto from "node:crypto";
 import { getSecret, creditarPontos, resgatarPontos, getRegrasFidelidade, getPontos, upsertPedidoMP } from "./db.ts";
-import { criarPedidoLI } from "./liClient.ts";
+import { criarPedidoLI, buscarPrecoLI } from "./liClient.ts";
 
 const MP_API = "https://api.mercadopago.com";
 
@@ -35,10 +35,17 @@ async function obterValorAutorizado(items: { price: number; qty: number; sku?: s
     if (!Number.isFinite(p) || p <= 0 || !Number.isFinite(q) || q <= 0 || q > 99) {
       return { ok: false, total: 0, erro: "Item de carrinho inválido (preço/quantidade)." };
     }
-    total += p * q;
+    // Anti-fraude: se as chaves da LI estiverem configuradas, o preço REAL vem da
+    // Loja Integrada (por SKU) — nunca confiamos no valor enviado pelo front.
+    // Se a LI não responder / não houver chaves (demo), mantém o preço do front
+    // (com a sanitização acima) para não quebrar o fluxo.
+    const precoReal = await buscarPrecoLI(it.sku).catch(() => null);
+    const preco = precoReal != null ? precoReal : p;
+    if (precoReal != null && Math.abs(precoReal - p) > 0.01) {
+      console.warn(`[checkout] preço divergente sku=${it.sku}: front=${p} LI=${precoReal} — usando LI.`);
+    }
+    total += preco * q;
   }
-  // Em produção, re-buscaríamos o preço na LI por sku para não confiar no front.
-  // TODO(prod): const precoLI = await buscarPrecoLI(it.sku); validar p === precoLI.
   if (total <= 0 || total > 1_000_000) {
     return { ok: false, total: 0, erro: "Total fora da faixa permitida." };
   }

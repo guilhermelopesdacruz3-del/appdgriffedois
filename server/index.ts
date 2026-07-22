@@ -63,6 +63,7 @@ const MOCK = ADMIN_MOCK === "1" || ADMIN_MOCK === "true";
 // Em PRODUÇÃO (DEMO_MODE != true), exige senha de admin forte. Nunca aceita a
 // senha de demo nem senha curta — falha visivelmente no log se estiver errado.
 const SENHA_MIN_PROD = 8;
+const SECRET_DEFAULT = "altere-este-segredo-admin-num-environment";
 let senhaProducaoFraca = false;
 if (!DEMO) {
   if (!ADMIN_PASSWORD || ADMIN_PASSWORD === "demo123" || ADMIN_PASSWORD.length < SENHA_MIN_PROD) {
@@ -71,6 +72,18 @@ if (!DEMO) {
       "=========================================================================\n" +
       "[SEGURANÇA] ADMIN_PASSWORD ausente ou fraca em PRODUÇÃO (DEMO_MODE!=true).\n" +
       "Defina ADMIN_PASSWORD com >= 8 caracteres (e nunca 'demo123') no ambiente.\n" +
+      "O login de admin ficará BLOQUEADO até corrigir.\n" +
+      "========================================================================="
+    );
+  }
+  // ADMIN_SECRET é a CHAVE HMAC dos tokens de admin. Se ficar no default, qualquer
+  // um forja um token válido → acesso total. Bloqueia o login até configurar.
+  if (!ADMIN_SECRET || ADMIN_SECRET === SECRET_DEFAULT || ADMIN_SECRET.length < 16) {
+    senhaProducaoFraca = true;
+    console.error(
+      "=========================================================================\n" +
+      "[SEGURANÇA] ADMIN_SECRET ausente/fraco em PRODUÇÃO. Tokens de admin seriam\n" +
+      "forjáveis. Defina ADMIN_SECRET com >= 16 caracteres aleatórios no ambiente.\n" +
       "O login de admin ficará BLOQUEADO até corrigir.\n" +
       "========================================================================="
     );
@@ -693,7 +706,7 @@ app.get("/api/mp-public-key", async (_req, res) => {
 // Saldo de fidelidade do cliente (por e-mail) + regras para o front calcular desconto.
 app.get("/api/fidelidade", async (req, res) => {
   const email = String(req.query.email || "").trim().toLowerCase();
-  if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ erro: "E-mail inválido." });
   }
   try {
@@ -712,7 +725,7 @@ app.get("/api/fidelidade", async (req, res) => {
 // Histórico de fidelidade (créditos/resgates) do cliente.
 app.get("/api/fidelidade/historico", async (req, res) => {
   const email = String(req.query.email || "").trim().toLowerCase();
-  if (!email || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email)) {
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ erro: "E-mail inválido." });
   }
   try {

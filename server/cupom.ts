@@ -1,6 +1,37 @@
 // Cupons: criar, listar, enviar para usuários/grupos, validar, usar.
 import express from "express";
+import crypto from "node:crypto";
 import { supabaseClient } from "./db.ts";
+
+// Verificação do token de admin (mesmo HMAC do index.ts, mesma ADMIN_SECRET).
+// Necessário aqui porque as rotas /api/admin/cupons vivem neste router.
+const ADMIN_SECRET = process.env.ADMIN_SECRET || "altere-este-segredo-admin-num-environment";
+
+function b64urlToBuf(s: string): Buffer {
+  return Buffer.from(s.replace(/-/g, "+").replace(/_/g, "/"), "base64");
+}
+
+function verifyAdminToken(token: string): boolean {
+  if (!token || !token.includes(".")) return false;
+  const [payload, sig] = token.split(".");
+  try {
+    const expected = crypto.createHmac("sha256", ADMIN_SECRET).update(payload).digest();
+    const got = b64urlToBuf(sig);
+    if (expected.length !== got.length || !crypto.timingSafeEqual(expected, got)) return false;
+    const data = JSON.parse(Buffer.from(payload.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8"));
+    return typeof data.exp === "number" && data.exp >= Date.now();
+  } catch {
+    return false;
+  }
+}
+
+function requireAdmin(req: any, res: any, next: any) {
+  const auth = req.headers.authorization || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  if (!verifyAdminToken(token)) return res.status(401).json({ erro: "Não autorizado." });
+  next();
+}
+
 
 export interface Cupom {
   id: string;
@@ -39,7 +70,7 @@ function app() {
   const sb = supabaseClient();
 
   // Admin: criar cupom
-  r.post("/api/admin/cupons", async (req: any, res: any) => {
+  r.post("/api/admin/cupons", requireAdmin, async (req: any, res: any) => {
     try {
       const { codigo, tipo, valor, valor_minimo, max_usos, data_inicio, data_fim, destinatarios } = req.body || {};
       const creator = (req as any).admin?.email || null;
@@ -78,7 +109,7 @@ function app() {
   });
 
   // Admin: listar cupons
-  r.get("/api/admin/cupons", async (_req: any, res: any) => {
+  r.get("/api/admin/cupons", requireAdmin, async (_req: any, res: any) => {
     try {
       const { data, error } = await sb
         .from("cupons")
@@ -97,7 +128,7 @@ function app() {
   });
 
   // Admin: enviar cupom a selecionados/grupo
-  r.post("/api/admin/cupons/:id/enviar", async (req: any, res: any) => {
+  r.post("/api/admin/cupons/:id/enviar", requireAdmin, async (req: any, res: any) => {
     try {
       const { id } = req.params;
       const { user_ids, grupo } = req.body || {};

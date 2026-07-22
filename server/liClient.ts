@@ -131,3 +131,19 @@ export async function atualizarPedidoLI(id: number | string, situacaoNome: strin
     return false;
   }
 }
+
+// Busca o preço REAL de um produto na LI por SKU. Retorna null se não houver
+// chaves, o produto não existir, ou a LI não responder — nesses casos o chamador
+// deve manter o comportamento anterior (não quebra o checkout).
+export async function buscarPrecoLI(sku?: string): Promise<number | null> {
+  if (!sku) return null;
+  try {
+    const { status, payload } = await chamarLI("GET", "produto", undefined, { sku: String(sku), limit: "1" });
+    if (status !== 200) return null;
+    const p = Array.isArray(payload?.objects) ? payload.objects[0] : null;
+    const preco = Number(p?.preco_promocional || p?.preco_cheio || p?.preco || 0);
+    return Number.isFinite(preco) && preco > 0 ? Number(preco.toFixed(2)) : null;
+  } catch {
+    return null;
+  }
+}
