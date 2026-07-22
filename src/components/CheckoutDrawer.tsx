@@ -187,7 +187,7 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: Ch
               <CartaoForm
                 total={total}
                 onVoltar={() => setPasso("escolher")}
-                onPagar={async (dados) => {
+                onPagar={async (cardToken: string) => {
                   setPasso("processando");
                   setErro(null);
                   try {
@@ -195,7 +195,7 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: Ch
                       items: items.map((it) => ({ price: it.product.price, qty: it.quantity, sku: String(it.product.id), li_uri: it.product.li_uri })),
                       meio: "cartao",
                       email: email || undefined,
-                      card_token: JSON.stringify(dados),
+                      card_token: cardToken,
                     });
                     onSuccess?.(resultado);
                   } catch (e: any) {
@@ -220,15 +220,23 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: Ch
 }
 
 // Formulário de cartão de crédito (Checkout Transparente MP).
-// Coleta os dados e os envia ao servidor, que processa via Mercado Pago.
-// A tokenização real exige a MP_PUBLIC_KEY no front (SDK do MP) — quando
-// ausente, o servidor retorna erro claro e o app mostra a mensagem.
-interface CartaoDados {
-  numero: string;
-  nome: string;
-  validade: string;
-  cvv: string;
+// Os dados do cartão são TOKENIZADOS no navegador pelo SDK do Mercado Pago
+// (usando a MP_PUBLIC_KEY) — o número NUNCA passa pelo nosso servidor.
+// O servidor recebe apenas o `card_token` (id do token gerado pelo MP).
+async function carregarMP(publicKey: string): Promise<any> {
+  const w = window as any;
+  if (w.MercadoPago) return new w.MercadoPago(publicKey, { locale: "pt-BR" });
+  await new Promise<void>((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = "https://sdk.mercadopago.com/js/v2";
+    s.async = true;
+    s.onload = () => (w.MercadoPago ? resolve() : reject(new Error("SDK do Mercado Pago não carregou.")));
+    s.onerror = () => reject(new Error("Falha ao carregar o SDK do Mercado Pago."));
+    document.body.appendChild(s);
+  });
+  return new w.MercadoPago(publicKey, { locale: "pt-BR" });
 }
+
 function CartaoForm({
   total,
   onVoltar,
@@ -236,15 +244,17 @@ function CartaoForm({
 }: {
   total: number;
   onVoltar: () => void;
-  onPagar: (dados: CartaoDados) => void;
+  onPagar: (cardToken: string) => void;
 }) {
   const [numero, setNumero] = useState("");
   const [nome, setNome] = useState("");
   const [validade, setValidade] = useState("");
   const [cvv, setCvv] = useState("");
   const [erroF, setErroF] = useState<string | null>(null);
+  const [tokenizando, setTokenizando] = useState(false);
 
   const limpo = numero.replace(/\D/g, "");
+  const [mes, ano] = validade.split("/");
   const valido =
     limpo.length >= 13 &&
     limpo.length <= 19 &&
@@ -252,12 +262,37 @@ function CartaoForm({
     /^\d{2}\/\d{2}$/.test(validade) &&
     /^\d{3,4}$/.test(cvv);
 
-  const enviar = () => {
+  const enviar = async () => {
     if (!valido) {
       setErroF("Confira os dados do cartão.");
       return;
     }
-    onPagar({ numero: limpo, nome: nome.trim(), validade, cvv });
+    setTokenizando(true);
+    setErroF(null);
+    try {
+      // 1) Busca a chave PÚBLICA do MP (nunca a access_token).
+      const cfg = await fetch("/api/mp-public-key").then((r) => r.json()).catch(() => ({ public_key: null }));
+      const publicKey = cfg?.public_key || null;
+      if (!publicKey) throw new Error("Pagamento por cartão indisponível (configure a chave do Mercado Pago no admin).");
+
+      // 2) Tokeniza no navegador (sem o número sair do cliente).
+      const mp = await carregarMP(publicKey);
+      const tokenResp: any = await mp.createCardToken({
+        cardNumber: limpo,
+        cardholderName: nome.trim(),
+        cardExpirationMonth: mes,
+        cardExpirationYear: `20${ano}`,
+        securityCode: cvv,
+      });
+      const cardToken = tokenResp?.id;
+      if (!cardToken) throw new Error("Não foi possível gerar o token do cartão.");
+
+      // 3) Envia SÓ o token para o servidor.
+      onPagar(String(cardToken));
+    } catch (e: any) {
+      setErroF(e?.message || "Falha ao tokenizar o cartão.");
+      setTokenizando(false);
+    }
   };
 
   return (
@@ -300,12 +335,14 @@ function CartaoForm({
       </p>
       <button
         onClick={enviar}
-        className="w-full h-14 bg-luxury-black text-white font-bold rounded-2xl active:scale-[0.98] transition-all"
+        disabled={tokenizando}
+        className="w-full h-14 bg-luxury-black text-white font-bold rounded-2xl active:scale-[0.98] transition-all disabled:opacity-60"
       >
-        Pagar {total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+        {tokenizando ? "Processando..." : `Pagar ${total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}`}
       </button>
       <button
         onClick={onVoltar}
+        disabled={tokenizando}
         className="w-full h-10 text-xs font-bold text-gray-400"
       >
         Voltar
