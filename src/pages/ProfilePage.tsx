@@ -1,21 +1,19 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { useCliente } from "../hooks/useCliente";
 import { usePedidos } from "../hooks/usePedidos";
 import { useFavorites } from "../hooks/useUserLists";
-import { useProdutos } from "../hooks/useProdutos";
 import { useFidelidade } from "../hooks/useFidelidade";
 import { usePedidoDetalhe } from "../hooks/usePedidoDetalhe";
 import OrderDetail from "../components/cliente/OrderDetail";
 import MeusCupons from "./MeusCupons";
 import { formatPrice } from "../utils";
-import type { Product } from "../data";
-import ProductCard from "../components/ProductCard";
-import { getReceitas, criarReceita, atualizarReceita, apagarReceita } from "../services/receitas";
-import type { Receita } from "../types";
-import { useState, useEffect } from "react";
 
-import { getFavoritos, type Favorito } from "../services/favoritos";
+import { getReceitas, criarReceita, apagarReceita } from "../services/receitas";
+import type { Receita } from "../types";
+
+import { getFavoritos, apagarFavorito } from "../services/favoritos";
+import type { Favorito } from "../types";
 
 function ReceitasSalvas({ email }: { email: string }) {
   const [itens, setItens] = useState<Receita[]>([]);
@@ -208,8 +206,7 @@ export default function ProfilePage({ onNavigate }: { onNavigate?: (page: string
   const { cliente, loading: loadingCliente, error: erroCliente, entrarComEmail, sair, atualizarCliente } = useCliente();
   const [email, setEmail] = useState("");
   const { pedidos, loading: loadingPedidos, error: erroPedidos } = usePedidos(cliente?.id ?? null);
-  const { favoriteIds, isFavorite, toggleFavorite } = useFavorites();
-  const { produtos: todosProdutos } = useProdutos({ limit: 100 });
+  const { favoriteIds, toggleFavorite } = useFavorites();
   const { info: fidInfo } = useFidelidade(cliente?.email);
   const [subTela, setSubTela] = useState<SubTela | null>(null);
   const [pedidoSelecionado, setPedidoSelecionado] = useState<string | number | null>(null);
