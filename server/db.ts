@@ -191,6 +191,7 @@ export interface PedidoMP {
   status: string;
   external_reference?: string | null;
   pontos_creditados?: boolean;
+  li_pedido?: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -200,6 +201,13 @@ export async function jaProcessadoMP(mpPaymentId: string): Promise<boolean> {
   if (!sb) return false;
   const { data } = await sb.from("pedidos").select("mp_payment_id").eq("mp_payment_id", mpPaymentId).single();
   return Boolean(data);
+}
+
+// Busca o pedido espelhado pelo mp_payment_id (para recuperar o li_pedido).
+export async function buscarPedidoMP(mpPaymentId: string): Promise<{ li_pedido: number | null } | null> {
+  if (!sb) return null;
+  const { data } = await sb.from("pedidos").select("li_pedido").eq("mp_payment_id", mpPaymentId).single();
+  return data ? { li_pedido: data.li_pedido ?? null } : null;
 }
 
 // Insere/atualiza o espelho do pedido MP. Se não houver Supabase, vira no-op.
@@ -214,6 +222,7 @@ export async function upsertPedidoMP(p: PedidoMP): Promise<void> {
       status: p.status,
       external_reference: p.external_reference ?? null,
       pontos_creditados: p.pontos_creditados ?? false,
+      li_pedido: p.li_pedido ?? null,
       updated_at: agora,
     },
     { onConflict: "mp_payment_id" }

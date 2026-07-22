@@ -9,7 +9,8 @@
 // - Em DEMO (sem MP_ACCESS_TOKEN), devolve PIX/cartão SIMULADO para o fluxo funcionar.
 
 import crypto from "node:crypto";
-import { getSecret, creditarPontos, resgatarPontos, getRegrasFidelidade, getPontos } from "./db.ts";
+import { getSecret, creditarPontos, resgatarPontos, getRegrasFidelidade, getPontos, upsertPedidoMP } from "./db.ts";
+import { criarPedidoLI } from "./liClient.ts";
 
 const MP_API = "https://api.mercadopago.com";
 
@@ -138,7 +139,7 @@ export interface CheckoutResult {
 }
 
 export async function processarCheckout(params: {
-  items: { price: number; qty: number; sku?: string }[];
+  items: { price: number; qty: number; sku?: string; li_uri?: string; nome?: string }[];
   meio: "pix" | "cartao";
   email?: string;
   card_token?: string;
@@ -216,6 +217,29 @@ export async function processarCheckout(params: {
       throw new Error("Token de cartão inválido (deve ser gerado pelo SDK do Mercado Pago no cliente).");
     }
     resultado = await criarCartaoMP(mpToken, total, card_token, email);
+  }
+  // Cria o pedido na Loja Integrada (site) com status "Em aberto". Não-bloqueante:
+  // se a LI falhar, a compra no app continua funcionando normalmente.
+  try {
+    const liPedido = await criarPedidoLI({
+      email: email || "",
+      itens: items.map((it) => ({ li_uri: it.li_uri, sku: it.sku, nome: it.nome, preco: it.price, quantidade: it.qty })),
+      valor: total,
+      meio,
+    });
+    if (liPedido) {
+      resultado.li_pedido = liPedido;
+      // Espelha no Supabase já com o li_pedido, para o webhook saber o que atualizar.
+      await upsertPedidoMP({
+        mp_payment_id: String(resultado.id),
+        email: email || null,
+        valor: total,
+        status: "pendente",
+        li_pedido: liPedido,
+      }).catch(() => {});
+    }
+  } catch (e: any) {
+    console.warn("[checkout] pedido LI não criado:", e?.message || e);
   }
   // Crédito de pontos ocorre quando o MP confirmar (webhook). Aqui registramos
   // a intenção; o webhook/poll chamará creditarPontos após status "approved".

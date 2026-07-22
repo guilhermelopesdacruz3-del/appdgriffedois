@@ -11,7 +11,8 @@
 // assinatura impede que qualquer um forje uma confirmação de pagamento.
 
 import crypto from "node:crypto";
-import { getSecret, creditarPontos, jaProcessadoMP, upsertPedidoMP, confirmarPagamentoMP } from "./db.ts";
+import { getSecret, creditarPontos, jaProcessadoMP, upsertPedidoMP, confirmarPagamentoMP, buscarPedidoMP } from "./db.ts";
+import { atualizarPedidoLI } from "./liClient.ts";
 
 const MP_API = "https://api.mercadopago.com";
 
@@ -108,6 +109,16 @@ export async function processarWebhookMP(bodyRaw: string, xSignature: string | u
     pontos = await creditarPontos(email, valor, `mp-${paymentId}`);
   }
   await confirmarPagamentoMP(String(paymentId), pontos > 0);
+
+  // Atualiza o pedido na Loja Integrada (site) para "Pago", se criamos um.
+  try {
+    const espelho = await buscarPedidoMP(String(paymentId));
+    if (espelho?.li_pedido) {
+      await atualizarPedidoLI(espelho.li_pedido, "pago");
+    }
+  } catch (e: any) {
+    console.warn("[webhook-mp] falha ao atualizar pedido LI:", e?.message || e);
+  }
 
   console.log(`[webhook-mp] pagamento ${paymentId} APROVADO email=${email} valor=${valor} pontos=${pontos}`);
   return { status: "ok", pontos };

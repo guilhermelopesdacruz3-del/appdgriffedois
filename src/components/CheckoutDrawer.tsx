@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { formatPrice, isValidEmail } from "../utils";
-import { iniciarCheckout } from "../services/apiConfig";
 import { useFidelidade } from "../hooks/useFidelidade";
 import { validarCupom, usarCupom } from "../services/cupomApp";
+import { iniciarCheckout } from "../services/apiConfig";
+import type { Product } from "../data";
 
 interface CartItem {
-  product: { id: number; name: string; brand: string; price: number; image: string; colors: string[]; colorNames: string[] };
+  product: Product;
   colorIndex: number;
   quantity: number;
 }
@@ -59,7 +60,7 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: Ch
     setErro(null);
     try {
       const resultado = await iniciarCheckout({
-        items: items.map((it) => ({ price: it.product.price, qty: it.quantity, sku: String(it.product.id) })),
+        items: items.map((it) => ({ price: it.product.price, qty: it.quantity, sku: String(it.product.id), li_uri: it.product.li_uri })),
         meio,
         email: email || undefined,
         pontosResgate: pontosResgate > 0 ? pontosResgate : undefined,
@@ -191,7 +192,7 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: Ch
                   setErro(null);
                   try {
                     const resultado = await iniciarCheckout({
-                      items: items.map((it) => ({ price: it.product.price, qty: it.quantity, sku: String(it.product.id) })),
+                      items: items.map((it) => ({ price: it.product.price, qty: it.quantity, sku: String(it.product.id), li_uri: it.product.li_uri })),
                       meio: "cartao",
                       email: email || undefined,
                       card_token: JSON.stringify(dados),

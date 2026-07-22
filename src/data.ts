@@ -18,6 +18,7 @@ export interface Product {
   reviews: number;
   installmentCount: number;
   installmentValue: number;
+  li_uri?: string;
 }
 
 /**

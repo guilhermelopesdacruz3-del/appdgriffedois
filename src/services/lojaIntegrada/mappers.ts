@@ -188,6 +188,7 @@ export function mapProdutoParaProduct(
     rating: 0,
     reviews: 0,
     ...calcularParcelamento(price),
+    li_uri: produto.resource_uri,
   };
 }
 
