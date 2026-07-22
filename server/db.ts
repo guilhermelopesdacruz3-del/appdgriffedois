@@ -94,6 +94,7 @@ export async function saveConfig(cfg: Partial<Record<ConfigKey, string>>): Promi
     const rows = entradas.map(([key, value]) => ({ key, value: value.trim(), is_secret: true, updated_at: new Date().toISOString() }));
     const { error } = await sb.from("store_config").upsert(rows, { onConflict: "key" });
     if (error) throw new Error(`Supabase: ${error.message}`);
+    entradas.forEach(([key]) => secretCache.delete(key)); // nova chave vale na hora
     return rows.length;
   }
 
@@ -105,14 +106,30 @@ export async function saveConfig(cfg: Partial<Record<ConfigKey, string>>): Promi
   return entradas.length;
 }
 
+// Cache em memória das chaves (TTL 60s). Sob concorrência, evita 1 query de
+// Supabase por requisição — corta a carga no banco em picos (ex.: 100 usuários
+// comprando ao mesmo tempo). Invalidado em saveConfig para a nova chave valer na hora.
+const SECRET_TTL_MS = 60_000;
+const secretCache = new Map<ConfigKey, { value: string | null; expira: number }>();
+
+function lerValor(key: ConfigKey): string | null {
+  return lerLocal()[key]?.value || null;
+}
+
 // Lê o valor de uma chave (uso interno do servidor, ex.: Mercado Pago em produção).
 export async function getSecret(key: ConfigKey): Promise<string | null> {
+  const cached = secretCache.get(key);
+  if (cached && cached.expira > Date.now()) return cached.value;
+  let value: string | null;
   if (sb) {
     const { data, error } = await sb.from("store_config").select("value").eq("key", key).single();
-    if (error) return null;
-    return data?.value || null;
+    if (error) value = null;
+    else value = data?.value || null;
+  } else {
+    value = lerValor(key);
   }
-  return lerLocal()[key]?.value || null;
+  secretCache.set(key, { value, expira: Date.now() + SECRET_TTL_MS });
+  return value;
 }
 
 // ---------------------------------------------------------------------------
