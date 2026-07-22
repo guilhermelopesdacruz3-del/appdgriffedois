@@ -1,12 +1,22 @@
 import { useState } from "react";
 import { cadastrarCliente, verificarOtp } from "../services/cliente";
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  import.meta.env.VITE_SUPABASE_URL as string,
-  import.meta.env.VITE_SUPABASE_ANON as string,
-  { auth: { persistSession: true, autoRefreshToken: true } }
-);
+// Lazy + defensivo: o app NÃO pode quebrar no bootstrap só porque falta a
+// env var da Supabase. Criamos o client só na hora de usar (no fluxo OTP),
+// e se a URL estiver ausente lançamos um erro tratável em vez de explodir
+// o módulo inteiro (que deixava a tela em branco silenciosa).
+let _sb: SupabaseClient | null = null;
+function getSupabase(): SupabaseClient {
+  if (_sb) return _sb;
+  const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
+  const anon = import.meta.env.VITE_SUPABASE_ANON as string | undefined;
+  if (!url || !anon) {
+    throw new Error("Configuração do app incompleta (Supabase). Verifique as variáveis de ambiente do deploy.");
+  }
+  _sb = createClient(url, anon, { auth: { persistSession: true, autoRefreshToken: true } });
+  return _sb;
+}
 
 type Etapa = "dados" | "codigo";
 
@@ -47,7 +57,7 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
       if (r.ok && r.session) {
         // Salva a sessão no cliente do Supabase (persistSession já está ativo).
         const sess = r.session as any;
-        await supabase.auth.setSession({
+        await getSupabase().auth.setSession({
           access_token: sess.access_token,
           refresh_token: sess.refresh_token,
         });

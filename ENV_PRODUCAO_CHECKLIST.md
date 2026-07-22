@@ -18,7 +18,11 @@ PORT=10000                   # o Render injeta em runtime
 
 # ---- Netlify (front) ----
 # Painel: Site settings > Environment variables
-VITE_LOJA_INTEGRADA_PROXY_URL=https://dgriffe-proxy.onrender.com/api/loja-integrada
+# OBRIGATÓRIAS (sem elas o app abre em branco: "supabaseUrl is required"):
+VITE_SUPABASE_URL=https://unpbvztvscuisqnzofqp.supabase.co
+VITE_SUPABASE_ANON=sb_publishable_olC8FxBz8o2jlTNgQmT9vw_Q_UhfDOY
+VITE_SUPABASE_FUNCTIONS=https://unpbvztvscuisqnzofqp.supabase.co/functions/v1
+VITE_LOJA_INTEGRADA_PROXY_URL=https://appdgriffedois.onrender.com/api/loja-integrada
 
 # ---- Mercado Pago ----
 # Vão pelo PAINEL ADMIN do app (aba APIs) -> gravados no Supabase (store_config):
