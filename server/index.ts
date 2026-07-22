@@ -36,6 +36,7 @@ import {
 import * as segredos from "./db.ts";
 import { processarCheckout } from "./pagamento.ts";
 import { processarWebhookMP } from "./webhook.ts";
+import { listarVideosRecentes } from "./youtube.ts";
 import { getHistoricoFidelidade, registrarLog, supabaseClient } from "./db.ts";
 import cupomApp from "./cupom.ts";
 
@@ -329,6 +330,18 @@ app.use((req, res, next) => {
 });
 
 app.get("/health", (_req, res) => res.json({ ok: true }));
+
+// Vídeos mais recentes do canal D'Griffe (YouTube RSS, sem API key).
+// Usado pela seção "D'Griffe no YouTube" do app — sempre os últimos vídeos.
+app.get("/api/youtube/latest", async (_req, res) => {
+  try {
+    const videos = await listarVideosRecentes(6);
+    res.json({ videos });
+  } catch (e: any) {
+    console.warn("[youtube] falha ao buscar vídeos:", e?.message || e);
+    res.status(502).json({ erro: "Não foi possível carregar os vídeos do YouTube." });
+  }
+});
 
 
 

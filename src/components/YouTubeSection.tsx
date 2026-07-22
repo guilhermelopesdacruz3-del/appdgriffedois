@@ -1,32 +1,81 @@
+import { useEffect, useState } from "react";
+
 interface YouTubeVideoProps {
   videoId: string;
   title: string;
-  description: string;
-  date: string;
+  description?: string;
+  date?: string;
+  publishedAt?: string;
 }
 
-const videos: YouTubeVideoProps[] = [
+// Fallback caso a API do YouTube falhe (mantém a seção funcionando offline).
+const FALLBACK: YouTubeVideoProps[] = [
   {
     videoId: "kvRBUpvzow0",
     title: "Desvio Ocular Latente / Manifesto",
-    description: "Um desvio ocular pode começar de forma quase imperceptível… Mas quando não tratado, pode evoluir e causar consequências sérias.",
+    description:
+      "Um desvio ocular pode começar de forma quase imperceptível… Mas quando não tratado, pode evoluir e causar consequências sérias.",
     date: "21 Mai 2026",
   },
   {
     videoId: "wR1fuFuFjrk",
     title: "Como Curar O Desvio Ocular",
-    description: "Nem todo desvio ocular é visível. Muitas pessoas convivem com o estrabismo sem entender os sinais.",
+    description:
+      "Nem todo desvio ocular é visível. Muitas pessoas convivem com o estrabismo sem entender os sinais.",
     date: "14 Mai 2026",
   },
   {
     videoId: "4Bep6dEmx50",
     title: "Ambliopia / Olho Preguiçoso",
-    description: "Você sabia que pode perder a visão de um dos olhos de forma irreversível se não tratado a tempo?",
+    description:
+      "Você sabia que pode perder a visão de um dos olhos de forma irreversível se não tratado a tempo?",
     date: "12 Mar 2026",
   },
 ];
 
+function formatarData(iso?: string): string {
+  if (!iso) return "";
+  try {
+    return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+  } catch {
+    return "";
+  }
+}
+
+// Mescla os dados da API com descrições do fallback (a API não devolve descrição).
+function mesclar(api: YouTubeVideoProps[]): YouTubeVideoProps[] {
+  return api.map((v) => {
+    const fb = FALLBACK.find((f) => f.videoId === v.videoId);
+    return {
+      ...v,
+      description: fb?.description,
+      date: formatarData(v.publishedAt),
+    };
+  });
+}
+
 export default function YouTubeSection() {
+  const [videos, setVideos] = useState<YouTubeVideoProps[]>(FALLBACK);
+
+  useEffect(() => {
+    let ativo = true;
+    fetch("/api/youtube/latest")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d) => {
+        const lista = Array.isArray(d?.videos) ? d.videos : [];
+        if (ativo && lista.length > 0) setVideos(mesclar(lista));
+      })
+      .catch(() => {
+        /* mantém o fallback */
+      })
+      .finally(() => {
+        ativo = false;
+      });
+    return () => {
+      ativo = false;
+    };
+  }, []);
+
   const latestVideo = videos[0];
 
   return (
