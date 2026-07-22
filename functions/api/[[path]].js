@@ -4,9 +4,9 @@
 export async function onRequest(context) {
   const { request, params } = context;
   const path = Array.isArray(params.path) ? params.path.join("/") : (params.path || "");
-  const target = "https://appdgriffedois.onrender.com/api/" + path;
+  const url = new URL(request.url);
+  const target = "https://appdgriffedois.onrender.com/api/" + path + url.search;
 
-  // Preserva o corpo (POST/PUT) e os headers relevantes.
   const headers = new Headers(request.headers);
   headers.delete("host");
   headers.delete("cf-connecting-ip");
@@ -18,15 +18,13 @@ export async function onRequest(context) {
   };
   if (request.method !== "GET" && request.method !== "HEAD") {
     init.body = request.body;
-    // Cloudflare streaming do body original
     init.duplex = "half";
   }
 
   try {
     const resp = await fetch(target, init);
-    // Retorna a resposta do backend, removendo headers que conflitam.
     const out = new Headers(resp.headers);
-    out.delete("content-encoding"); // o CF re-comprime
+    out.delete("content-encoding");
     out.delete("transfer-encoding");
     return new Response(resp.body, {
       status: resp.status,
