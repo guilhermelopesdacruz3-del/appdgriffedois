@@ -188,11 +188,24 @@ export async function processarCheckout(params: {
     const idPedido = `DEMO-${Date.now().toString().slice(-8)}`;
     // No demo, creditamos pontos imediatamente (simula pagamento aprovado).
     const pontos = e ? await creditarPontos(e, total, idPedido) : 0;
+    // Cria o pedido na Loja Integrada (site) também em demo — garante que o
+    // fluxo de sincronia é exercitado e o admin reflete a venda.
+    let liPedido: number | string | null = null;
+    try {
+      liPedido = await criarPedidoLI({
+        email: email || "",
+        itens: items.map((it) => ({ li_uri: it.li_uri, sku: it.sku, nome: it.nome, preco: it.price, quantidade: it.qty })),
+        valor: total,
+        meio,
+      });
+    } catch (liErr: any) {
+      console.warn("[checkout-demo] pedido LI não criado:", liErr?.message || liErr);
+    }
     if (meio === "pix") {
       return {
         meio,
         id: idPedido,
-        li_pedido: null,
+        li_pedido: liPedido,
         status: "pendente",
         valor_total: total,
         valor_original: autorizado.total,
@@ -205,7 +218,7 @@ export async function processarCheckout(params: {
         demo: true,
       };
     }
-    return { meio, id: idPedido, status: "aprovado", valor_total: total, valor_original: autorizado.total, desconto_aplicado: desconto, pontos_creditados: pontos, email: email || null, demo: true };
+    return { meio, id: idPedido, li_pedido: liPedido, status: "aprovado", valor_total: total, valor_original: autorizado.total, desconto_aplicado: desconto, pontos_creditados: pontos, email: email || null, demo: true };
   }
 
   // Produção: chama a API real do Mercado Pago.

@@ -12,11 +12,19 @@
 import { getSecret } from "./db.ts";
 
 const LI_API_BASE = "https://api.awsli.com.br/api/v1";
+const DEMO = process.env.DEMO_MODE === "true";
 
 async function chamarLI(method: string, resource: string, id?: string | number, query?: Record<string, string>, body?: unknown) {
   const APP_KEY = (await getSecret("LI_APP_KEY").catch(() => null)) || process.env.LOJA_INTEGRADA_APP_KEY || "";
   const API_KEY = (await getSecret("LI_API_KEY").catch(() => null)) || process.env.LOJA_INTEGRADA_API_KEY || "";
   if (!APP_KEY || !API_KEY) {
+    if (DEMO) {
+      // Em modo demo, simula respostas da LI sem chamar a API real.
+      if (method === "POST" && resource === "cliente") return { status: 200, payload: { id: 1, email: (body as any)?.email } };
+      if (method === "POST" && resource === "pedido") return { status: 200, payload: { pedido: { id: Math.floor(Math.random() * 900000) + 100000 } } };
+      if (method === "PUT" && resource === "pedido") return { status: 200, payload: {} };
+      if (method === "GET") return { status: 200, payload: { objects: [] } };
+    }
     throw new Error("Chaves da Loja Integrada não configuradas.");
   }
   const upstream = new URL(`${LI_API_BASE}/${resource}/${id ? `${id}/` : ""}`);
@@ -49,6 +57,22 @@ async function buscarUri(recurso: string, nomes: string[]): Promise<string | nul
   }
 }
 
+export async function criarClienteLI(email: string, dados: { nome?: string; telefone?: string; cpf?: string }): Promise<boolean> {
+  if (!email) return false;
+  try {
+    // Se já existe, a LI retorna o cliente (não duplica).
+    const { status } = await chamarLI("POST", "cliente", undefined, undefined, {
+      email,
+      nome: dados.nome || email.split("@")[0],
+      telefone: dados.telefone || "",
+      cpf: dados.cpf || "",
+    });
+    return status === 200 || status === 201;
+  } catch {
+    return false;
+  }
+}
+
 export interface ItemPedidoLI {
   li_uri?: string; // resource_uri do produto na LI (ex.: /api/v1/produto/123/)
   sku?: string;
@@ -76,6 +100,10 @@ export async function criarPedidoLI(opts: {
     }));
 
   if (itens.length === 0) return null; // sem itens válidos, não cria
+
+  // Garante que o cliente exista na LI antes de criar o pedido (idempotente:
+  // se já existe, a LI apenas retorna o cliente). Evita erro de "cliente inexistente".
+  await criarClienteLI(opts.email, {});
 
   const body: any = {
     cliente: { email: opts.email },
