@@ -11,8 +11,127 @@ import MeusCupons from "./MeusCupons";
 import { formatPrice } from "../utils";
 import type { Product } from "../data";
 import ProductCard from "../components/ProductCard";
+import { getReceitas, criarReceita, atualizarReceita, apagarReceita } from "../services/receitas";
+import type { Receita } from "../types";
+import { useState, useEffect } from "react";
 
-type SubTela = "favoritos" | "cupons" | "dados" | "editar-perfil" | "seguranca" | "config" | "embreve" | "meus-pedidos";
+import { getReceitas, criarReceita, atualizarReceita, apagarReceita } from "../services/receitas";
+import type { Receita } from "../types";
+import { useState, useEffect } from "react";
+
+function ReceitasSalvas({ email }: { email: string }) {
+  const [itens, setItens] = useState<Receita[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+  const [texto, setTexto] = useState("");
+  const [tipo, setTipo] = useState<Receita["tipo"]>("grau");
+
+  const carregar = async () => {
+    setLoading(true);
+    setErro(null);
+    try {
+      const lista = await getReceitas(email);
+      setItens(lista);
+    } catch (e) {
+      setErro((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!email) return;
+    carregar();
+  }, [email]);
+
+  const salvar = async () => {
+    if (!texto.trim()) return;
+    try {
+      const criada = await criarReceita(email, { tipo, descricao: texto.trim() });
+      setItens((prev) => [criada, ...prev]);
+      setTexto("");
+    } catch (e) {
+      setErro((e as Error).message);
+    }
+  };
+
+  const apagar = async (id: string) => {
+    try {
+      await apagarReceita(id, email);
+      setItens((prev) => prev.filter((x) => x.id !== id));
+    } catch (e) {
+      setErro((e as Error).message);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      {erro && <p className="text-[11px] text-red-500">{erro}</p>}
+
+      <div className="bg-white rounded-2xl p-4 shadow-sm space-y-2">
+        <div className="flex gap-2">
+          <select
+            value={tipo}
+            onChange={(e) => setTipo(e.target.value as Receita["tipo"])}
+            className="h-10 px-3 rounded-xl border border-gray-200 text-xs"
+          >
+            <option value="grau">Grau</option>
+            <option value="lente">Lente</option>
+          </select>
+          <input
+            value={texto}
+            onChange={(e) => setTexto(e.target.value)}
+            placeholder="Cole ou digite a receita"
+            className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-xs"
+          />
+        </div>
+        <button
+          onClick={salvar}
+          disabled={!texto.trim()}
+          className="w-full h-10 bg-luxury-black text-white text-xs font-bold rounded-xl disabled:opacity-50"
+        >
+          Salvar receita
+        </button>
+      </div>
+
+      {loading && (
+        <div className="bg-white rounded-2xl p-4 shadow-sm text-center text-xs text-gray-400">
+          Carregando receitas...
+        </div>
+      )}
+
+      {!loading && itens.length === 0 && (
+        <div className="bg-white rounded-2xl p-4 shadow-sm text-center text-xs text-gray-400">
+          Nenhuma receita salva.
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {itens.map((r) => (
+          <div key={r.id} className="bg-white rounded-2xl p-4 shadow-sm space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] uppercase tracking-wider text-gray-400">
+                {r.tipo}
+              </span>
+              <button
+                onClick={() => apagar(r.id)}
+                className="text-[10px] font-bold text-red-500"
+              >
+                Apagar
+              </button>
+            </div>
+            <p className="text-xs text-luxury-black whitespace-pre-wrap">{r.descricao}</p>
+            <p className="text-[10px] text-gray-400">
+              {new Date(r.created_at).toLocaleString("pt-BR")}
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+type SubTela = "favoritos" | "cupons" | "dados" | "editar-perfil" | "seguranca" | "config" | "embreve" | "meus-pedidos" | "receitas";
 
 export default function ProfilePage({ onNavigate }: { onNavigate?: (page: string) => void }) {
   const { cliente, loading: loadingCliente, error: erroCliente, entrarComEmail, sair, atualizarCliente } = useCliente();
@@ -60,7 +179,7 @@ export default function ProfilePage({ onNavigate }: { onNavigate?: (page: string
       ),
       label: "Receitas Salvas",
       subtitle: "Óculos de grau e lentes",
-      action: "embreve",
+      action: "receitas",
     },
     {
       icon: (
@@ -394,6 +513,16 @@ export default function ProfilePage({ onNavigate }: { onNavigate?: (page: string
               </button>
             </div>
           </div>
+        </div>
+      );
+    }
+
+    if (subTela === "receitas") {
+      return (
+        <div className="px-5 pt-6 pb-4">
+          {voltar}
+          <h3 className="text-base font-bold text-luxury-black mb-4">Receitas Salvas</h3>
+          <ReceitasSalvas email={cliente?.email || email} />
         </div>
       );
     }

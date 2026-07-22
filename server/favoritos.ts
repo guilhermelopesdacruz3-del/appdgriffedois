@@ -2,7 +2,7 @@
 // FAVORITOS — CRUD por cliente (user_id do Supabase Auth)
 // ---------------------------------------------------------------------------
 import { Router, type Request, type Response } from "express";
-import { supabaseClient, getAuthUserByEmail } from "./db";
+import { supabaseClient } from "./db";
 
 export const favoritosApp = Router();
 

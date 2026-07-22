@@ -2,8 +2,7 @@
 // RECEITAS SALVAS — CRUD por cliente (user_id do Supabase Auth)
 // ---------------------------------------------------------------------------
 import { Router, type Request, type Response } from "express";
-import { supabaseClient, getAuthUserByEmail } from "./db";
-import { DEMO, MOCK } from "./demo";
+import { supabaseClient } from "./db";
 
 export const receitasApp = Router();
 
@@ -21,13 +20,9 @@ async function resolveUserId(email: string): Promise<string | null> {
 }
 
 // GET /api/cliente/receitas?email=...
-receitasApp.get("/", async (req: Request, res: Response) => {
+receitasApp.get("/", async (req, res) => {
   const email = String(req.query.email || "").trim().toLowerCase();
   if (!email) return res.status(400).json({ erro: "E-mail obrigatório." });
-
-  if (DEMO || MOCK) {
-    return res.json({ ok: true, receitas: [] });
-  }
 
   const userId = await resolveUserId(email);
   if (!userId) return res.json({ ok: true, receitas: [] });
@@ -50,16 +45,12 @@ receitasApp.get("/", async (req: Request, res: Response) => {
 });
 
 // POST /api/cliente/receitas
-receitasApp.post("/", async (req: Request, res: Response) => {
+receitasApp.post("/", async (req, res) => {
   const { email, tipo, descricao, arquivo_url } = req.body || {};
   const e = String(email || "").trim().toLowerCase();
   if (!e) return res.status(400).json({ erro: "E-mail obrigatório." });
   const desc = String(descricao || "").trim();
   if (!desc) return res.status(400).json({ erro: "Descrição obrigatória." });
-
-  if (DEMO || MOCK) {
-    return res.status(201).json({ ok: true, receita: { id: "demo", user_id: "demo", email: e, tipo: tipo || "grau", descricao: desc, arquivo_url: arquivo_url || null, created_at: new Date().toISOString() } });
-  }
 
   const userId = await resolveUserId(e);
   if (!userId) return res.status(404).json({ erro: "Cliente não encontrado." });
@@ -82,14 +73,10 @@ receitasApp.post("/", async (req: Request, res: Response) => {
 });
 
 // PUT /api/cliente/receitas/:id
-receitasApp.put("/:id", async (req: Request, res: Response) => {
+receitasApp.put("/:id", async (req, res) => {
   const { email, tipo, descricao, arquivo_url } = req.body || {};
   const e = String(email || "").trim().toLowerCase();
   if (!e) return res.status(400).json({ erro: "E-mail obrigatório." });
-
-  if (DEMO || MOCK) {
-    return res.json({ ok: true });
-  }
 
   const userId = await resolveUserId(e);
   if (!userId) return res.status(404).json({ erro: "Cliente não encontrado." });
