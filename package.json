@@ -6,8 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview",
-    "server": "tsx server/index.ts"
+    "preview": "npm run build && wrangler dev",
+    "server": "tsx server/index.ts",
+    "deploy": "npm run build && wrangler deploy"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",
@@ -24,6 +25,7 @@
     "tsx": "^4.23.1"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.46.0",
     "@tailwindcss/vite": "4.1.17",
     "@types/node": "22.19.17",
     "@types/react": "19.2.7",
@@ -32,6 +34,7 @@
     "tailwindcss": "4.1.17",
     "typescript": "5.9.3",
     "vite": "7.3.2",
-    "vite-plugin-singlefile": "2.3.0"
+    "vite-plugin-singlefile": "2.3.0",
+    "wrangler": "^4.113.0"
   }
 }
