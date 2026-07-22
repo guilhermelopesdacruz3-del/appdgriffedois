@@ -70,7 +70,9 @@ export default function App() {
   }
 
   // Produtos vindos em tempo real da Loja Integrada (veja src/services/lojaIntegrada).
-  const { produtos: products, loading: loadingProducts, error: productsError, reload: reloadProducts } = useProdutos({ limit: 40 });
+  // limit alto cobre o catálogo inteiro da ótica; as imagens usam loading="lazy"
+  // (ProductCard) então só as visíveis carregam — sem peso no 1º render.
+  const { produtos: products, loading: loadingProducts, error: productsError, reload: reloadProducts } = useProdutos({ limit: 120 });
 
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 

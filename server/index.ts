@@ -560,17 +560,21 @@ function agregarPedidos(objects) {
   };
 }
 
-// Busca paginada de TODOS os pedidos da loja (até o limite) para agregar.
+// Busca paginada de pedidos da loja para agregar no relatório.
+// Teto de páginas (MAX_PAGINAS x limit) para não estourar memória/tempo com
+// lojas de histórico grande — 4x200 = 800 pedidos recentes cobrem o relatório
+// sem travar o servidor (evita o antigo loop de até 4000 pedidos por clique).
 async function buscarTodosPedidos() {
   const todos = [];
   let offset = 0;
   const limit = 200;
+  const MAX_PAGINAS = 4;
   // Em demo, retorna os pedidos demo direto.
   if (DEMO || MOCK) {
     const base = DEMO ? demoAdminPedidos().objects : mockListPedidos().objects;
     return base;
   }
-  for (let i = 0; i < 20; i++) {
+  for (let i = 0; i < MAX_PAGINAS; i++) {
     const { status, payload } = await chamarLI("GET", "pedido", undefined, { limit, offset });
     if (status !== 200) break;
     const objs = payload.objects || [];
