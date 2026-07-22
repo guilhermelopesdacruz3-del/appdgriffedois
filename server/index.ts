@@ -39,6 +39,8 @@ import { processarWebhookMP } from "./webhook.ts";
 import { listarVideosRecentes } from "./youtube.ts";
 import { getHistoricoFidelidade, registrarLog, supabaseClient } from "./db.ts";
 import cupomApp from "./cupom.ts";
+import { receitasApp } from "./receitas";
+import { favoritosApp } from "./favoritos";
 
 const {
   LOJA_INTEGRADA_API_KEY,
@@ -994,6 +996,8 @@ app.post("/api/cliente/verificar", async (req, res) => {
   }
 });
 
+app.use("/api/cliente/receitas", receitasApp);
+app.use("/api/cliente/favoritos", favoritosApp);
 app.use("/api/loja-integrada", cupomApp);
 
 app.listen(PORT, () => {
