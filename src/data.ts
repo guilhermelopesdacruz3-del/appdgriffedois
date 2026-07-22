@@ -33,12 +33,12 @@ export interface Product {
  */
 
 export const categories = [
-  { id: 1, name: "Sol", icon: "☀️", count: 24 },
-  { id: 2, name: "Grau", icon: "👓", count: 18 },
-  { id: 3, name: "Ray-Ban", icon: "🕶️", count: 12 },
-  { id: 4, name: "Grazi", icon: "✨", count: 8 },
-  { id: 5, name: "Michael Kors", icon: "💎", count: 6 },
-  { id: 6, name: "Infantil", icon: "🧒", count: 10 },
+  { id: 1, name: "Sol", icon: "sol", count: 24 },
+  { id: 2, name: "Grau", icon: "grau", count: 18 },
+  { id: 3, name: "Ray-Ban", icon: "rayban", count: 12 },
+  { id: 4, name: "Grazi", icon: "grazi", count: 8 },
+  { id: 5, name: "Michael Kors", icon: "mk", count: 6 },
+  { id: 6, name: "Infantil", icon: "infantil", count: 10 },
 ];
 
 export const benefits = [

@@ -2,6 +2,7 @@ import { Product } from "../data";
 import { categories } from "../data";
 import ProductCard from "../components/ProductCard";
 import YouTubeSection from "../components/YouTubeSection";
+import CategoryIcon from "../components/CategoryIcon";
 
 interface HomePageProps {
   products: Product[];
@@ -74,11 +75,11 @@ export default function HomePage({ products, onSelectProduct, onAddToCart, onNav
         </div>
         <div className="flex gap-3 px-5 overflow-x-auto no-scrollbar">
           {categories.map((cat) => (
-            <button key={cat.id} onClick={() => onNavigate("catalog")} className="flex flex-col items-center gap-1.5 flex-shrink-0 min-w-[72px]">
-              <div className="w-14 h-14 rounded-2xl bg-white shadow-sm flex items-center justify-center text-xl hover:shadow-md hover:scale-105 transition-all duration-200 border border-ice-dark/50">
-                {cat.icon}
+            <button key={cat.id} onClick={() => onNavigate("catalog")} className="group flex flex-col items-center gap-2 flex-shrink-0 min-w-[68px]">
+              <div className="w-16 h-16 rounded-2xl bg-white border border-ice-dark/60 shadow-sm flex items-center justify-center overflow-hidden text-gold-dark group-hover:shadow-md group-hover:border-gold/50 group-hover:-translate-y-0.5 transition-all duration-300">
+                <CategoryIcon name={cat.icon} className="w-11 h-11 object-contain" />
               </div>
-              <span className="text-[10px] font-medium text-luxury-black whitespace-nowrap">{cat.name}</span>
+              <span className="text-[10px] font-semibold text-luxury-black whitespace-nowrap group-hover:text-gold-dark transition-colors">{cat.name}</span>
             </button>
           ))}
         </div>
