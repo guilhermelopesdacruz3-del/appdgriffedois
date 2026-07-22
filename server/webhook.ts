@@ -15,6 +15,7 @@ import { getSecret, creditarPontos, jaProcessadoMP, upsertPedidoMP, confirmarPag
 import { atualizarPedidoLI } from "./liClient.ts";
 
 const MP_API = "https://api.mercadopago.com";
+const DEMO = process.env.DEMO_MODE === "true";
 
 // Valida a assinatura do webhook MP (header x-signature).
 // Formato MP: "ts=TIMESTAMP,v1=HMAC_SHA256(concat(ts, body), secret)" onde
@@ -52,8 +53,26 @@ export async function processarWebhookMP(bodyRaw: string, xSignature: string | u
   { status: string; pontos?: number; erro?: string }
 > {
   const mpToken = await getSecret("MP_ACCESS_TOKEN").catch(() => null);
+
+  // DEMO: exercita o fluxo de ponta a ponta (crédito de pontos + pedido LI)
+  // sem validar assinatura nem chamar a API real do MP. Só ativo com
+  // DEMO_MODE=true — em produção este bloco é ignorado sempre.
+  if (DEMO) {
+    let payload: any;
+    try {
+      payload = JSON.parse(bodyRaw);
+    } catch {
+      return { status: "erro", erro: "body inválido" };
+    }
+    const paymentId = payload?.data?.id ?? payload?.resource?.split("/").pop();
+    if (!paymentId) return { status: "ignored" };
+    const email = (payload?.payer?.email || "").toLowerCase() || "demo@dgriffe.com.br";
+    const valor = Number(payload?.transaction_amount || 0);
+    const demoPayment = { status: "approved", payer: { email }, transaction_amount: valor, external_reference: payload?.external_reference || null };
+    return await aplicarAprovacao(String(paymentId), demoPayment, payload?.li_pedido);
+  }
+
   if (!mpToken) {
-    // Sem token MP: não dá pra validar nem creditar. Em demo, ignora silenciosamente.
     return { status: "ignored", erro: "sem MP_ACCESS_TOKEN" };
   }
   if (!validarAssinaturaMP(bodyRaw, xSignature, mpToken)) {
@@ -84,6 +103,13 @@ export async function processarWebhookMP(bodyRaw: string, xSignature: string | u
     return { status: "erro", erro: e?.message || "falha ao buscar payment" };
   }
 
+  return await aplicarAprovacao(String(paymentId), payment);
+}
+
+// Extrai dados do payment e, se aprovado, credita pontos + espelha no Supabase
+// + atualiza o pedido na Loja Integrada para "Pago". Usado tanto em produção
+// quanto em DEMO (com payment fake).
+async function aplicarAprovacao(paymentId: string, payment: any, liPedidoFallback?: string | number): Promise<{ status: string; pontos?: number; erro?: string }> {
   const status = payment?.status;
   const email = (payment?.payer?.email || "").toLowerCase() || null;
   const valor = Number(payment?.transaction_amount || 0);
@@ -113,8 +139,9 @@ export async function processarWebhookMP(bodyRaw: string, xSignature: string | u
   // Atualiza o pedido na Loja Integrada (site) para "Pago", se criamos um.
   try {
     const espelho = await buscarPedidoMP(String(paymentId));
-    if (espelho?.li_pedido) {
-      await atualizarPedidoLI(espelho.li_pedido, "pago");
+    const liPedido = espelho?.li_pedido ?? liPedidoFallback;
+    if (liPedido) {
+      await atualizarPedidoLI(liPedido, "pago");
     }
   } catch (e: any) {
     console.warn("[webhook-mp] falha ao atualizar pedido LI:", e?.message || e);
