@@ -906,6 +906,19 @@ async function getSecretsLI(): Promise<{ LI_APP_KEY?: string; LI_API_KEY?: strin
 async function criarClienteLI(email: string, dados: { nome?: string; telefone?: string; cpf?: string }) {
   const { LI_APP_KEY, LI_API_KEY } = await getSecretsLI();
   if (!LI_APP_KEY || !LI_API_KEY) return null;
+
+  // Se o cliente já existe na Loja Integrada (busca por e-mail dedicada),
+  // reaproveita o id em vez de tentar criar de novo (evita erro "já existe").
+  try {
+    const busca = await chamarLI("GET", "cliente", "busca", { email, limit: 1 });
+    const objs = (busca.payload && (busca.payload as any).objects) || [];
+    if (busca.status === 200 && objs[0]?.id) {
+      return objs[0];
+    }
+  } catch {
+    /* segue para criação */
+  }
+
   const body: any = { email };
   if (dados.nome) body.nome = dados.nome;
   if (dados.telefone) body.telefone_celular = dados.telefone;
