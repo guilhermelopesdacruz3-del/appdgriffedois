@@ -131,8 +131,17 @@ function app() {
   r.post("/api/admin/cupons/:id/enviar", requireAdmin, async (req: any, res: any) => {
     try {
       const { id } = req.params;
-      const { user_ids, grupo } = req.body || {};
+      const { user_ids, grupo, emails } = req.body || {};
       const alvo: string[] = Array.isArray(user_ids) ? [...user_ids] : [];
+
+      // Emails -> user_id (permite envio seletivo por e-mail do cliente)
+      if (Array.isArray(emails) && emails.length > 0) {
+        const { data: perfis } = await sb
+          .from("profiles")
+          .select("id,email")
+          .in("email", emails.map((e: string) => String(e).trim().toLowerCase()));
+        for (const p of perfis || []) alvo.push(p.id);
+      }
 
       if (grupo === "todos") {
         const { data: users } = await sb.from("profiles").select("id");

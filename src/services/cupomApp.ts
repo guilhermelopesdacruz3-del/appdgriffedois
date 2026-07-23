@@ -1,11 +1,10 @@
 const BASE_URL =
-  (import.meta.env.VITE_LOJA_INTEGRADA_PROXY_URL as string | undefined)?.replace(/\/$/, "") ||
-  "/api/loja-integrada";
+  (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, "") ||
+  "/api";
 
 async function request<T>(path: string, opts: { method?: string; body?: unknown; auth?: boolean } = {}): Promise<T> {
-  // O backend monta o router de cupons em /api/loja-integrada, e dentro dele as
-  // rotas começam com /api/cupons/... — então a URL final é
-  // /api/loja-integrada/api/cupons/... . Mantemos o prefixo completo do proxy.
+  // As rotas de cupom estão montadas na raiz do backend (/api/admin/cupons,
+  // /api/cupons/...), então a base é /api (não o proxy /api/loja-integrada).
   const token = opts.auth !== false ? sessionStorage.getItem("dg_admin_token") : null;
   const headers: Record<string, string> = { Accept: "application/json" };
   if (opts.body !== undefined) headers["Content-Type"] = "application/json";
@@ -71,7 +70,7 @@ export async function listarCupons(): Promise<Cupom[]> {
   return request<Cupom[]>("/api/admin/cupons");
 }
 
-export type EnviarCupomPayload = { user_ids?: string[]; grupo?: "todos" | "vip" };
+export type EnviarCupomPayload = { user_ids?: string[]; grupo?: "todos" | "vip"; emails?: string[] };
 export async function enviarCupom(id: string, dados: EnviarCupomPayload): Promise<{ atribuidos: number }> {
   return request<{ atribuidos: number }>(`/api/admin/cupons/${encodeURIComponent(id)}/enviar`, { method: "POST", body: dados });
 }

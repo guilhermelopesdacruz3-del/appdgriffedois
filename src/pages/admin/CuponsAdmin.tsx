@@ -1,8 +1,17 @@
 import { useEffect, useState } from "react";
-import { criarCupom, enviarCupom, listarCupons, type Cupom } from "../../services/cupomApp";
+import { useEffect, useState } from "react";
+import {
+  criarCupom,
+  enviarCupom,
+  listarCupons,
+  type Cupom,
+} from "../../services/cupomApp";
+import { listarClientesAdmin, type ClienteRelatorio } from "../../services/admin";
 
 export default function CuponsAdmin() {
   const [cupons, setCupons] = useState<Cupom[]>([]);
+  const [clientes, setClientes] = useState<ClienteRelatorio[]>([]);
+  const [selecionados, setSelecionados] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -18,8 +27,9 @@ export default function CuponsAdmin() {
   const carregar = async () => {
     setLoading(true);
     try {
-      const data = await listarCupons();
-      setCupons(data);
+      const [c, cl] = await Promise.all([listarCupons(), listarClientesAdmin()]);
+      setCupons(c);
+      setClientes(cl.clientes || []);
     } catch (e: any) {
       setErro(e.message);
     } finally {
@@ -58,14 +68,23 @@ export default function CuponsAdmin() {
     }
   };
 
-  const enviar = async (id: string, grupo?: string, uids?: string[]) => {
+  const enviar = async (id: string, grupo?: string, emails?: string[]) => {
     setErro(null);
     try {
-      await enviarCupom(id, { grupo: grupo as any, user_ids: uids });
+      await enviarCupom(id, { grupo: grupo as any, emails });
       await carregar();
     } catch (e: any) {
       setErro(e.message);
     }
+  };
+
+  const toggle = (email: string) => {
+    setSelecionados((prev) => {
+      const next = new Set(prev);
+      if (next.has(email)) next.delete(email);
+      else next.add(email);
+      return next;
+    });
   };
 
   return (
@@ -103,19 +122,46 @@ export default function CuponsAdmin() {
       <div className="space-y-2">
         {loading && <p className="text-xs text-gray-400">Carregando...</p>}
         {cupons.map((c) => (
-          <div key={c.id} className="bg-white rounded-2xl p-3 shadow-sm flex items-center justify-between gap-2">
-            <div className="min-w-0">
-              <p className="text-xs font-bold text-luxury-black">{c.codigo}</p>
-              <p className="text-[10px] text-gray-500">
-                {c.tipo === "percentual" ? `${c.valor}%` : `R$ ${Number(c.valor).toFixed(2)}`} · {c.usos}/{c.max_usos ?? "∞"} usos · {new Date(c.data_fim).toLocaleDateString("pt-BR")}
-              </p>
+          <div key={c.id} className="bg-white rounded-2xl p-3 shadow-sm">
+            <div className="flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-luxury-black">{c.codigo}</p>
+                <p className="text-[10px] text-gray-500">
+                  {c.tipo === "percentual" ? `${c.valor}%` : `R$ ${Number(c.valor).toFixed(2)}`} · {c.usos}/{c.max_usos ?? "∞"} usos · {new Date(c.data_fim).toLocaleDateString("pt-BR")}
+                </p>
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                <button onClick={() => enviar(c.id, "todos")} className="px-3 py-2 bg-ice text-luxury-black text-[10px] font-bold rounded-xl">Todos</button>
+                <button onClick={() => enviar(c.id, "vip")} className="px-3 py-2 bg-gold text-white text-[10px] font-bold rounded-xl">VIP</button>
+              </div>
             </div>
-            <div className="flex gap-2 flex-shrink-0">
-              <button onClick={() => enviar(c.id, "todos")} className="px-3 py-2 bg-ice text-luxury-black text-[10px] font-bold rounded-xl">Todos</button>
-              <button onClick={() => enviar(c.id, "vip")} className="px-3 py-2 bg-gold text-white text-[10px] font-bold rounded-xl">VIP</button>
-            </div>
+            {selecionados.size > 0 && (
+              <button
+                onClick={() => enviar(c.id, undefined, Array.from(selecionados))}
+                className="mt-2 w-full h-9 bg-luxury-black text-white text-[10px] font-bold rounded-xl"
+              >
+                Enviar para {selecionados.size} selecionado{selecionados.size > 1 ? "s" : ""}
+              </button>
+            )}
           </div>
         ))}
+      </div>
+
+      <div className="bg-white rounded-2xl p-4 space-y-2">
+        <p className="text-xs font-bold text-luxury-black">Clientes ({clientes.length})</p>
+        <p className="text-[10px] text-gray-400">Marque os clientes e use "Enviar para selecionados" acima.</p>
+        <div className="max-h-64 overflow-y-auto space-y-1">
+          {clientes.map((cl) => (
+            <label key={cl.email} className="flex items-center gap-2 py-1.5 px-2 rounded-xl hover:bg-gray-50 cursor-pointer">
+              <input type="checkbox" checked={selecionados.has(cl.email)} onChange={() => toggle(cl.email)} className="accent-luxury-black" />
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-semibold text-luxury-black truncate">{cl.nome}</p>
+                <p className="text-[9px] text-gray-500 truncate">{cl.email}</p>
+              </div>
+            </label>
+          ))}
+          {clientes.length === 0 && <p className="text-[10px] text-gray-400">Nenhum cliente encontrado.</p>}
+        </div>
       </div>
     </div>
   );
