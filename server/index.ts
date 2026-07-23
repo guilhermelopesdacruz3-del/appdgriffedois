@@ -43,6 +43,7 @@ import { receitasApp } from "./receitas";
 import { favoritosApp } from "./favoritos";
 
 const {
+  LOJA_INTEGRADA_APP_KEY,
   LOJA_INTEGRADA_API_KEY,
   LOJA_INTEGRADA_API_BASE_URL = "https://api.awsli.com.br/api/v1",
   FRONTEND_ORIGIN = "https://appdgriffedois-3xwz-hrxf1ru63.vercel.app",
