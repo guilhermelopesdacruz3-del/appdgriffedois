@@ -1041,7 +1041,9 @@ app.post("/api/cliente/verificar", async (req, res) => {
 
 app.use("/api/cliente/receitas", receitasApp);
 app.use("/api/cliente/favoritos", favoritosApp);
-app.use("/api/loja-integrada", cupomApp);
+// Cupons: rotas já incluem /api no próprio caminho (ex: /api/admin/cupons,
+// /api/cupons/meus), por isso montamos na raiz e não em /api/loja-integrada.
+app.use(cupomApp);
 
 app.listen(PORT, () => {
   console.log(`[loja-integrada-proxy] rodando em http://localhost:${PORT}`);
