@@ -10,6 +10,7 @@ interface UseClienteResult {
   sair: () => void;
   /** Atualiza nome/telefone/endereço do cliente na Loja Integrada. */
   atualizarCliente: (dados: {
+    email?: string;
     nome?: string;
     telefone?: string;
     cidade?: string;
@@ -78,6 +79,7 @@ export function useCliente(): UseClienteResult {
 
   const atualizarCliente = useCallback(
     async (dados: {
+      email?: string;
       nome?: string;
       telefone?: string;
       cidade?: string;
@@ -107,6 +109,7 @@ export function useCliente(): UseClienteResult {
         });
       }
       const body: any = {};
+      if (dados.email) body.email = dados.email;
       if (dados.nome) body.nome = dados.nome;
       if (dados.telefone) body.telefone_celular = dados.telefone;
       if (enderecos.length) body.enderecos = enderecos;

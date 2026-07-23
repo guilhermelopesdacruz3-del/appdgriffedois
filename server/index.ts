@@ -860,6 +860,24 @@ app.all("/api/loja-integrada/:resource/:id?", async (req, res) => {
     return res.status(404).json({ erro: `Recurso "${resource}" não tem dados de demo.` });
   }
 
+  // Segurança: PUT em cliente só se o email do body for dono do id (impede edição de terceiro).
+  if (req.method === "PUT" && resource === "cliente") {
+    const emailBody = (req.body && (req.body.email || (req.body.cliente && req.body.cliente.email))) || "";
+    if (!emailBody) {
+      return res.status(403).json({ erro: "Informe o email do cliente para confirmar a edição." });
+    }
+    try {
+      const { status, payload } = await chamarLI("GET", "cliente", id, {});
+      const atual = JSON.parse(payload || "{}");
+      const donoEmail = (atual.email || (atual.cliente && atual.cliente.email) || "").toString().trim().toLowerCase();
+      if (status !== 200 || donoEmail !== emailBody.toString().trim().toLowerCase()) {
+        return res.status(403).json({ erro: "Este cliente não pertence ao e-mail informado." });
+      }
+    } catch {
+      return res.status(502).json({ erro: "Falha ao validar a posse do cliente." });
+    }
+  }
+
   try {
     const query = Object.fromEntries(Object.entries(req.query).map(([k, v]) => [k, String(v)]));
     const { status, payload } = await chamarLI(req.method, resource, id, query);
