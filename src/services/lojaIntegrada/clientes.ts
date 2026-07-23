@@ -1,23 +1,28 @@
-import { getResource, listResource, postResource } from "./client";
+import { getResource, postResource, request } from "./client";
 import { mapClienteParaApp, type ClienteApp } from "./mappers";
 import type { LICliente } from "./types";
 
 /**
- * Busca um cliente pelo e-mail — usado, por exemplo, para autenticar a área
- * "Minha Conta" a partir do e-mail que a pessoa usou na loja (junto de uma
- * validação própria de posse do e-mail/CPF, já que a Loja Integrada não
- * expõe login/senha do cliente final via essa API).
+ * Busca um cliente pelo e-mail usando o endpoint DEDICADO da Loja Integrada
+ * (GET /cliente/busca/?email=...). O filtro em GET /cliente/?email= falha e
+ * sempre retorna o primeiro cliente — por isso usamos /busca/ (doc oficial).
  */
 export async function buscarClientePorEmail(email: string): Promise<ClienteApp | null> {
-  const resposta = await listResource<LICliente>("cliente", { email, limit: 1 });
-  const cliente = resposta.objects[0];
+  const resposta = await request<{ objects: LICliente[] }>("/cliente/busca/", {
+    email,
+    limit: 1,
+  });
+  const cliente = resposta.objects?.[0];
   return cliente ? mapClienteParaApp(cliente) : null;
 }
 
 export async function buscarClientePorCpf(cpf: string): Promise<ClienteApp | null> {
   const cpfLimpo = cpf.replace(/\D/g, "");
-  const resposta = await listResource<LICliente>("cliente", { cpf: cpfLimpo, limit: 1 });
-  const cliente = resposta.objects[0];
+  const resposta = await request<{ objects: LICliente[] }>("/cliente/busca/", {
+    cpf: cpfLimpo,
+    limit: 1,
+  });
+  const cliente = resposta.objects?.[0];
   return cliente ? mapClienteParaApp(cliente) : null;
 }
 

@@ -199,8 +199,12 @@ export interface ClienteApp {
   cpf: string | null;
   telefone: string | null;
   dataCriacao: string;
+  rua?: string;
+  numero?: string;
+  bairro?: string;
   cidade?: string;
   estado?: string;
+  cep?: string;
 }
 
 export function mapClienteParaApp(cliente: LICliente): ClienteApp {
@@ -212,8 +216,12 @@ export function mapClienteParaApp(cliente: LICliente): ClienteApp {
     cpf: cliente.cpf,
     telefone: cliente.telefone_celular || cliente.telefone_principal,
     dataCriacao: cliente.data_criacao,
+    rua: enderecoPrincipal?.logradouro,
+    numero: enderecoPrincipal?.numero,
+    bairro: enderecoPrincipal?.bairro,
     cidade: enderecoPrincipal?.cidade,
     estado: enderecoPrincipal?.estado,
+    cep: enderecoPrincipal?.cep,
   };
 }
 

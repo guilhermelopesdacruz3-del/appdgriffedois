@@ -469,6 +469,9 @@ export default function ProfilePage({ onNavigate }: { onNavigate?: (page: string
               </div>
             )}
             {linha("Cidade", cliente?.cidade ? `${cliente.cidade}${cliente.estado ? "/" + cliente.estado : ""}` : null)}
+            {cliente?.rua && linha("Endereço", `${cliente.rua}${cliente.numero ? ", " + cliente.numero : ""}`)}
+            {cliente?.bairro && linha("Bairro", cliente.bairro)}
+            {cliente?.cep && linha("CEP", cliente.cep)}
           </div>
         </div>
       );

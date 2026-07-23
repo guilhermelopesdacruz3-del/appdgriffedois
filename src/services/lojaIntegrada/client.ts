@@ -41,7 +41,7 @@ function buildQuery(params: Record<string, string | number | boolean | undefined
   return qs ? `?${qs}` : "";
 }
 
-async function request<T>(
+export async function request<T>(
   path: string,
   params: Record<string, string | number | boolean | undefined> = {},
   init: RequestInit = {}

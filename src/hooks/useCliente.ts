@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { buscarClientePorEmail, type ClienteApp } from "../services/lojaIntegrada";
+import {
+  buscarClientePorEmail,
+  buscarClientePorId,
+  type ClienteApp,
+} from "../services/lojaIntegrada";
 
 interface UseClienteResult {
   cliente: ClienteApp | null;
@@ -22,12 +26,9 @@ interface UseClienteResult {
   }) => Promise<void>;
 }
 
-/**
- * Este hook resolve o cliente pelo e-mail cadastrado na Loja Integrada.
- * A API da Loja Integrada não expõe login/senha do cliente final, então isso
- * NÃO é autenticação forte — combine com um passo de verificação (ex.: envio
- * de código por e-mail) antes de usar em produção.
- */
+const LS_EMAIL = "dgriffe:cliente_email";
+const LS_ID = "dgriffe:cliente_id";
+
 export function useCliente(): UseClienteResult {
   const [cliente, setCliente] = useState<ClienteApp | null>(null);
   const [loading, setLoading] = useState(false);
@@ -36,8 +37,18 @@ export function useCliente(): UseClienteResult {
   // Recupera o cliente logado de um reload anterior (persistência leve).
   useEffect(() => {
     try {
-      const email = window.localStorage.getItem("dgriffe:cliente_email");
-      if (email) entrarComEmail(email);
+      const id = window.localStorage.getItem(LS_ID);
+      const email = window.localStorage.getItem(LS_EMAIL);
+      if (id) {
+        buscarClientePorId(id)
+          .then(setCliente)
+          .catch(() => {
+            // id inválido (cliente apagado na LI) — tenta pelo email.
+            if (email) entrarComEmail(email);
+          });
+      } else if (email) {
+        entrarComEmail(email);
+      }
     } catch {
       /* ignora */
     }
@@ -56,7 +67,10 @@ export function useCliente(): UseClienteResult {
       }
       setCliente(encontrado);
       try {
-        window.localStorage.setItem("dgriffe:cliente_email", email.trim().toLowerCase());
+        window.localStorage.setItem(LS_EMAIL, email.trim().toLowerCase());
+        if (encontrado.id != null) {
+          window.localStorage.setItem(LS_ID, String(encontrado.id));
+        }
       } catch {
         /* ignora */
       }
@@ -71,7 +85,8 @@ export function useCliente(): UseClienteResult {
   const sair = useCallback(() => {
     setCliente(null);
     try {
-      window.localStorage.removeItem("dgriffe:cliente_email");
+      window.localStorage.removeItem(LS_EMAIL);
+      window.localStorage.removeItem(LS_ID);
     } catch {
       /* ignora */
     }
@@ -95,12 +110,12 @@ export function useCliente(): UseClienteResult {
           /\/api\/loja-integrada\/?$/,
           ""
         ) || "";
-      // Monta o corpo no formato da Loja Integrada (endereco é array).
+      // Monta o corpo no formato da Loja Integrada (enderecos é array, com "logradouro").
       const enderecos: any[] = [];
       if (dados.rua || dados.cidade || dados.cep) {
         enderecos.push({
           principal: true,
-          endereco: dados.rua || "",
+          logradouro: dados.rua || "",
           numero: dados.numero || "",
           bairro: dados.bairro || "",
           cidade: dados.cidade || "",
@@ -121,7 +136,7 @@ export function useCliente(): UseClienteResult {
       });
       if (!res.ok) throw new Error(`Falha ao atualizar (${res.status})`);
       // Atualiza o estado local para refletir imediatamente.
-      const atualizado = await buscarClientePorEmail(cliente.email);
+      const atualizado = await buscarClientePorId(cliente.id);
       if (atualizado) setCliente(atualizado);
     },
     [cliente]
