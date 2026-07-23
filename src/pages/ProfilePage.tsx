@@ -6,6 +6,7 @@ import { useFavorites } from "../hooks/useUserLists";
 import { useFidelidade } from "../hooks/useFidelidade";
 import { usePedidoDetalhe } from "../hooks/usePedidoDetalhe";
 import OrderDetail from "../components/cliente/OrderDetail";
+import EditarPerfil from "../components/cliente/EditarPerfil";
 import MeusCupons from "./MeusCupons";
 import { formatPrice } from "../utils";
 
@@ -436,59 +437,12 @@ export default function ProfilePage({ onNavigate }: { onNavigate?: (page: string
     }
 
     if (subTela === "editar-perfil") {
-      const nomeAtual = cliente?.nome || "";
-      const telefoneAtual = cliente?.telefone || "";
-      const [nome, setNome] = useState(nomeAtual);
-      const [telefone, setTelefone] = useState(telefoneAtual);
-      const [salvando, setSalvando] = useState(false);
-      const [salvo, setSalvo] = useState(false);
-
-      const salvar = async () => {
-        setSalvando(true);
-        setSalvo(false);
-        try {
-          await atualizarCliente({
-            nome: nome.trim() ? nome.trim() : undefined,
-            telefone: telefone.trim() ? telefone.trim() : undefined,
-          });
-          setSalvo(true);
-          setTimeout(() => setSubTela("dados"), 800);
-        } catch (e) {
-          console.error(e);
-        } finally {
-          setSalvando(false);
-        }
-      };
       return (
-        <div className="px-5 pt-6 pb-4">
-          {voltar}
-          <h3 className="text-base font-bold text-luxury-black mb-4">Editar dados</h3>
-          <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
-            <div>
-              <label className="text-[11px] font-semibold text-luxury-black mb-1 block">Nome</label>
-              <input
-                value={nome}
-                onChange={(e) => setNome(e.target.value)}
-                className="w-full h-11 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
-              />
-            </div>
-            <div>
-              <label className="text-[11px] font-semibold text-luxury-black mb-1 block">Telefone</label>
-              <input
-                value={telefone}
-                onChange={(e) => setTelefone(e.target.value)}
-                className="w-full h-11 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
-              />
-            </div>
-            <button
-              onClick={salvar}
-              disabled={salvando || (!nome.trim() && !telefone.trim())}
-              className="w-full h-11 bg-black text-white text-xs font-bold rounded-xl disabled:opacity-50 active:scale-95 transition-all"
-            >
-              {salvando ? "Salvando..." : salvo ? "Salvo!" : "Salvar"}
-            </button>
-          </div>
-        </div>
+        <EditarPerfil
+          cliente={cliente}
+          onVoltar={() => setSubTela("dados")}
+          onSalvar={atualizarCliente}
+        />
       );
     }
 

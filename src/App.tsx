@@ -13,6 +13,7 @@ import CatalogPage from "./pages/CatalogPage";
 import ProductPage from "./pages/ProductPage";
 import LoyaltyPage from "./pages/LoyaltyPage";
 import ProfilePage from "./pages/ProfilePage";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import ClienteCadastro from "./pages/ClienteCadastro";
 import AdminPage from "./pages/AdminPage";
 import { ProductGridSkeleton } from "./components/ProductSkeleton";
@@ -239,7 +240,11 @@ export default function App() {
           />
         )}
         {currentPage === "loyalty" && <LoyaltyPage />}
-        {currentPage === "profile" && <ProfilePage onNavigate={handleNavigate} />}
+        {currentPage === "profile" && (
+          <ErrorBoundary>
+            <ProfilePage onNavigate={handleNavigate} />
+          </ErrorBoundary>
+        )}
         {currentPage === "cadastro" && <ClienteCadastro onVoltar={() => setCurrentPage("profile")} />}
       </main>
 
