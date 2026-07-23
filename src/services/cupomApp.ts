@@ -1,10 +1,11 @@
 const BASE_URL =
   (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, "") ||
-  "/api";
+  "";
 
 async function request<T>(path: string, opts: { method?: string; body?: unknown; auth?: boolean } = {}): Promise<T> {
-  // As rotas de cupom estão montadas na raiz do backend (/api/admin/cupons,
-  // /api/cupons/...), então a base é /api (não o proxy /api/loja-integrada).
+  // As rotas de cupom JÁ incluem /api no próprio caminho (ex: /api/admin/cupons,
+  // /api/cupons/...), então a base é vazia — o proxy /api/* da Cloudflare
+  // repassa para o Render. Usar "/api" aqui geraria /api/api/... (404).
   const token = opts.auth !== false ? sessionStorage.getItem("dg_admin_token") : null;
   const headers: Record<string, string> = { Accept: "application/json" };
   if (opts.body !== undefined) headers["Content-Type"] = "application/json";
