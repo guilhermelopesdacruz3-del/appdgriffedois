@@ -479,11 +479,13 @@ app.put("/api/admin/pedidos/:id", requireAdmin, async (req, res) => {
     const body = req.body || {};
     const liBody = {};
     if (body.situacao !== undefined) liBody.situacao = body.situacao;
+    console.error(`[admin-put-pedido] id=${req.params.id} liBody=${JSON.stringify(liBody)}`);
     const { status, payload } = await chamarLI("PUT", "pedido", req.params.id, undefined, liBody);
     return res.status(status).json(payload);
   } catch (err) {
-    console.error("[admin] erro ao atualizar pedido:", err);
-    return res.status(502).json({ erro: "Falha ao se comunicar com a Loja Integrada." });
+    const detail = err && typeof err === "object" ? (err.stack || err.message || JSON.stringify(err)) : String(err);
+    console.error("[admin] erro ao atualizar pedido:", detail);
+    return res.status(502).json({ erro: "Falha ao se comunicar com a Loja Integrada.", detalhe: detail });
   }
 });
 

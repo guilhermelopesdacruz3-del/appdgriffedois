@@ -15,6 +15,9 @@ export async function onRequest(context) {
     method: request.method,
     headers,
     redirect: "follow",
+    // Timeout de 55s: dá margem para o Render (free) acordar do cold-start
+    // sem o Cloudflare abortar antes com 502.
+    signal: AbortSignal.timeout(55000),
   };
   if (request.method !== "GET" && request.method !== "HEAD") {
     init.body = request.body;
