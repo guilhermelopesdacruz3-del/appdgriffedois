@@ -285,12 +285,19 @@ async function chamarLI(method, resource, id, query, body) {
   upstreamUrl.searchParams.set("chave_api", LOJA_INTEGRADA_API_KEY ?? "");
   upstreamUrl.searchParams.set("format", "json");
 
-  const upstreamResponse = await fetch(upstreamUrl.toString(), {
-    method,
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
-    body: method === "POST" || method === "PUT" ? JSON.stringify(body) : undefined,
-    signal: AbortSignal.timeout(15000),
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  let upstreamResponse;
+  try {
+    upstreamResponse = await fetch(upstreamUrl.toString(), {
+      method,
+      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      body: method === "POST" || method === "PUT" ? JSON.stringify(body) : undefined,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timer);
+  }
 
   const contentType = upstreamResponse.headers.get("content-type") || "";
   const payload = contentType.includes("application/json")
@@ -479,7 +486,7 @@ app.put("/api/admin/pedidos/:id", requireAdmin, async (req, res) => {
     const body = req.body || {};
     const liBody = {};
     if (body.situacao !== undefined) liBody.situacao = body.situacao;
-    console.error(`[admin-put-pedido] id=${req.params.id} liBody=${JSON.stringify(liBody)}`);
+    console.error(`[admin-put-pedido] id=${req.params.id} body=${JSON.stringify(req.body)} liBody=${JSON.stringify(liBody)}`);
     const { status, payload } = await chamarLI("PUT", "pedido", req.params.id, undefined, liBody);
     return res.status(status).json(payload);
   } catch (err) {
