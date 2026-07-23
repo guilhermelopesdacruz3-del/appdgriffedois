@@ -869,7 +869,9 @@ app.all("/api/loja-integrada/:resource/:id?", async (req, res) => {
     try {
       const { status, payload } = await chamarLI("GET", "cliente", id, {});
       const atual = JSON.parse(payload || "{}");
-      const donoEmail = (atual.email || (atual.cliente && atual.cliente.email) || "").toString().trim().toLowerCase();
+      const obj = Array.isArray(atual.objects) ? atual.objects[0] : atual;
+      const donoEmail = (obj.email || (obj.cliente && obj.cliente.email) || "").toString().trim().toLowerCase();
+      console.error(`[seguranca-put] id=${id} status=${status} dono=${donoEmail} body=${emailBody}`);
       if (status !== 200 || donoEmail !== emailBody.toString().trim().toLowerCase()) {
         return res.status(403).json({ erro: "Este cliente não pertence ao e-mail informado." });
       }
