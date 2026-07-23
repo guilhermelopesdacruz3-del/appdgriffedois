@@ -1,0 +1,325 @@
+{
+  "total_count": 4,
+  "jobs": [
+    {
+      "id": 89086991163,
+      "run_id": 29969112029,
+      "workflow_name": "Deploy D'Griffe",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/guilhermelopesdacruz3-del/appdgriffedois/actions/runs/29969112029",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTZx-X88AAAAUvf-bOw",
+      "head_sha": "391c338a2439f615c745db90a52f0f08ecd1b8bd",
+      "url": "https://api.github.com/repos/guilhermelopesdacruz3-del/appdgriffedois/actions/jobs/89086991163",
+      "html_url": "https://github.com/guilhermelopesdacruz3-del/appdgriffedois/actions/runs/29969112029/job/89086991163",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-07-23T00:27:15Z",
+      "started_at": "2026-07-23T00:27:17Z",
+      "completed_at": "2026-07-23T00:27:34Z",
+      "name": "test",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-07-23T00:27:17Z",
+          "completed_at": "2026-07-23T00:27:19Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-07-23T00:27:19Z",
+          "completed_at": "2026-07-23T00:27:21Z"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-07-23T00:27:21Z",
+          "completed_at": "2026-07-23T00:27:23Z"
+        },
+        {
+          "name": "Run npm ci",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-07-23T00:27:23Z",
+          "completed_at": "2026-07-23T00:27:27Z"
+        },
+        {
+          "name": "Run npx tsc --noEmit",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-07-23T00:27:27Z",
+          "completed_at": "2026-07-23T00:27:30Z"
+        },
+        {
+          "name": "Run npm run build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-07-23T00:27:30Z",
+          "completed_at": "2026-07-23T00:27:32Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 11,
+          "started_at": "2026-07-23T00:27:32Z",
+          "completed_at": "2026-07-23T00:27:32Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-07-23T00:27:32Z",
+          "completed_at": "2026-07-23T00:27:32Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-07-23T00:27:32Z",
+          "completed_at": "2026-07-23T00:27:32Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/guilhermelopesdacruz3-del/appdgriffedois/check-runs/89086991163",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000000192,
+      "runner_name": "GitHub Actions 1000000192",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 89087039199,
+      "run_id": 29969112029,
+      "workflow_name": "Deploy D'Griffe",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/guilhermelopesdacruz3-del/appdgriffedois/actions/runs/29969112029",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTZx-X88AAAAUvgBW3w",
+      "head_sha": "391c338a2439f615c745db90a52f0f08ecd1b8bd",
+      "url": "https://api.github.com/repos/guilhermelopesdacruz3-del/appdgriffedois/actions/jobs/89087039199",
+      "html_url": "https://github.com/guilhermelopesdacruz3-del/appdgriffedois/actions/runs/29969112029/job/89087039199",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-07-23T00:27:34Z",
+      "started_at": "2026-07-23T00:27:38Z",
+      "completed_at": "2026-07-23T00:27:43Z",
+      "name": "sync-supabase",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-07-23T00:27:39Z",
+          "completed_at": "2026-07-23T00:27:40Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-07-23T00:27:40Z",
+          "completed_at": "2026-07-23T00:27:41Z"
+        },
+        {
+          "name": "Aplicar schema no Supabase",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-07-23T00:27:41Z",
+          "completed_at": "2026-07-23T00:27:41Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 6,
+          "started_at": "2026-07-23T00:27:41Z",
+          "completed_at": "2026-07-23T00:27:41Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 7,
+          "started_at": "2026-07-23T00:27:41Z",
+          "completed_at": "2026-07-23T00:27:41Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/guilhermelopesdacruz3-del/appdgriffedois/check-runs/89087039199",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000000193,
+      "runner_name": "GitHub Actions 1000000193",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 89087060821,
+      "run_id": 29969112029,
+      "workflow_name": "Deploy D'Griffe",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/guilhermelopesdacruz3-del/appdgriffedois/actions/runs/29969112029",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTZx-X88AAAAUvgCrVQ",
+      "head_sha": "391c338a2439f615c745db90a52f0f08ecd1b8bd",
+      "url": "https://api.github.com/repos/guilhermelopesdacruz3-del/appdgriffedois/actions/jobs/89087060821",
+      "html_url": "https://github.com/guilhermelopesdacruz3-del/appdgriffedois/actions/runs/29969112029/job/89087060821",
+      "status": "completed",
+      "conclusion": "failure",
+      "created_at": "2026-07-23T00:27:43Z",
+      "started_at": "2026-07-23T00:27:45Z",
+      "completed_at": "2026-07-23T00:27:58Z",
+      "name": "deploy-front",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-07-23T00:27:46Z",
+          "completed_at": "2026-07-23T00:27:47Z"
+        },
+        {
+          "name": "Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-07-23T00:27:47Z",
+          "completed_at": "2026-07-23T00:27:48Z"
+        },
+        {
+          "name": "Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-07-23T00:27:48Z",
+          "completed_at": "2026-07-23T00:27:50Z"
+        },
+        {
+          "name": "Run npm ci",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 4,
+          "started_at": "2026-07-23T00:27:50Z",
+          "completed_at": "2026-07-23T00:27:53Z"
+        },
+        {
+          "name": "Run npm run build",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 5,
+          "started_at": "2026-07-23T00:27:53Z",
+          "completed_at": "2026-07-23T00:27:56Z"
+        },
+        {
+          "name": "Deploy to Cloudflare Pages",
+          "status": "completed",
+          "conclusion": "failure",
+          "number": 6,
+          "started_at": "2026-07-23T00:27:56Z",
+          "completed_at": "2026-07-23T00:27:56Z"
+        },
+        {
+          "name": "Post Run actions/setup-node@v4",
+          "status": "completed",
+          "conclusion": "skipped",
+          "number": 11,
+          "started_at": "2026-07-23T00:27:56Z",
+          "completed_at": "2026-07-23T00:27:56Z"
+        },
+        {
+          "name": "Post Run actions/checkout@v4",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 12,
+          "started_at": "2026-07-23T00:27:56Z",
+          "completed_at": "2026-07-23T00:27:56Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 13,
+          "started_at": "2026-07-23T00:27:56Z",
+          "completed_at": "2026-07-23T00:27:56Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/guilhermelopesdacruz3-del/appdgriffedois/check-runs/89087060821",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000000195,
+      "runner_name": "GitHub Actions 1000000195",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    },
+    {
+      "id": 89087060822,
+      "run_id": 29969112029,
+      "workflow_name": "Deploy D'Griffe",
+      "head_branch": "main",
+      "run_url": "https://api.github.com/repos/guilhermelopesdacruz3-del/appdgriffedois/actions/runs/29969112029",
+      "run_attempt": 1,
+      "node_id": "CR_kwDOTZx-X88AAAAUvgCrVg",
+      "head_sha": "391c338a2439f615c745db90a52f0f08ecd1b8bd",
+      "url": "https://api.github.com/repos/guilhermelopesdacruz3-del/appdgriffedois/actions/jobs/89087060822",
+      "html_url": "https://github.com/guilhermelopesdacruz3-del/appdgriffedois/actions/runs/29969112029/job/89087060822",
+      "status": "completed",
+      "conclusion": "success",
+      "created_at": "2026-07-23T00:27:43Z",
+      "started_at": "2026-07-23T00:27:45Z",
+      "completed_at": "2026-07-23T00:27:48Z",
+      "name": "deploy-backend",
+      "steps": [
+        {
+          "name": "Set up job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 1,
+          "started_at": "2026-07-23T00:27:46Z",
+          "completed_at": "2026-07-23T00:27:46Z"
+        },
+        {
+          "name": "Trigger Render Deploy",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 2,
+          "started_at": "2026-07-23T00:27:46Z",
+          "completed_at": "2026-07-23T00:27:46Z"
+        },
+        {
+          "name": "Complete job",
+          "status": "completed",
+          "conclusion": "success",
+          "number": 3,
+          "started_at": "2026-07-23T00:27:46Z",
+          "completed_at": "2026-07-23T00:27:46Z"
+        }
+      ],
+      "check_run_url": "https://api.github.com/repos/guilhermelopesdacruz3-del/appdgriffedois/check-runs/89087060822",
+      "labels": [
+        "ubuntu-latest"
+      ],
+      "runner_id": 1000000194,
+      "runner_name": "GitHub Actions 1000000194",
+      "runner_group_id": 0,
+      "runner_group_name": "GitHub Actions"
+    }
+  ]
+}
