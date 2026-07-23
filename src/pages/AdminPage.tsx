@@ -329,13 +329,25 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
     <div className="min-h-screen bg-ice">
       <div className="max-w-5xl mx-auto min-h-screen bg-ice relative">
         <div className="sticky top-0 z-20 bg-luxury-black text-white px-5 py-3 flex items-center justify-between">
-          <div>
-            <h1 className="text-sm font-bold">Painel Admin</h1>
-            <p className="text-[10px] text-gold-dark font-semibold">{total} pedidos no total</p>
-          </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => setMostrarConfig((v) => !v)} className="text-[10px] font-bold text-gold-dark hover:text-gold">APIs</button>
-            <button onClick={sair} className="text-[10px] font-bold text-gray-300 hover:text-white">Sair</button>
+            <span className="w-2 h-2 rounded-full bg-green-400" />
+            <div>
+              <h1 className="text-sm font-bold leading-tight">Painel Admin</h1>
+              <p className="text-[10px] text-gold-dark font-semibold">{total} pedidos no total</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-white/90 bg-white/10 rounded-full pl-2 pr-2 py-1">
+              <span>👤</span>
+              <span>Admin</span>
+              <span className="text-[8px] opacity-60">▾</span>
+            </div>
+            <button onClick={() => setMostrarConfig((v) => !v)} className="text-[11px] font-bold text-gold-dark hover:text-gold flex items-center gap-1" title="APIs">
+              <span>⚙️</span><span className="hidden sm:inline">APIs</span>
+            </button>
+            <button onClick={sair} className="text-[11px] font-bold text-gray-300 hover:text-white flex items-center gap-1" title="Sair">
+              <span>🚪</span><span className="hidden sm:inline">Sair</span>
+            </button>
           </div>
         </div>
 
@@ -359,51 +371,51 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
           {aba === "dashboard" && <AdminDashboard token={token as string} />}
           {aba === "pedidos" && (
             <>
-              <div className="flex gap-2">
-                <input
-                  value={busca}
-                  onChange={(e) => setBusca(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && carregar()}
-                  placeholder="Buscar por nº ou e-mail"
-                  className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-gold"
-                />
-                <button
-                  onClick={carregar}
-                  className="h-10 px-3 bg-luxury-black text-white text-[11px] font-bold rounded-xl active:scale-95"
-                >
-                  Buscar
-                </button>
-              </div>
-
-              <div className="flex gap-2 items-center">
-                <select
-                  value={filtroStatus}
-                  onChange={(e) => setFiltroStatus(e.target.value)}
-                  className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-xs bg-white focus:outline-none focus:border-gold"
-                >
-                  <option value="todos">Todos os status</option>
-                  {situacoes.map((s) => (
-                    <option key={s.id} value={s.nome}>{s.nome}</option>
-                  ))}
-                </select>
-                <input
-                  type="date"
-                  value={filtroDataInicio}
-                  onChange={(e) => setFiltroDataInicio(e.target.value)}
-                  className="h-10 px-3 rounded-xl border border-gray-200 text-xs bg-white"
-                />
-                <input
-                  type="date"
-                  value={filtroDataFim}
-                  onChange={(e) => setFiltroDataFim(e.target.value)}
-                  className="h-10 px-3 rounded-xl border border-gray-200 text-xs bg-white"
-                />
-                <button
-                  onClick={exportarCSV}
-                  className="h-10 px-3 border border-gold/40 text-gold-dark text-[11px] font-bold rounded-xl active:scale-95 whitespace-nowrap"
-                >
-                  Exportar CSV
-                </button>
+              {/* Filtros em card */}
+              <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+                <div className="flex gap-2">
+                  <div className="flex-1 relative">
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                    <input
+                      value={busca}
+                      onChange={(e) => setBusca(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && carregar()}
+                      placeholder="Buscar por nº, nome ou e-mail..."
+                      className="w-full h-10 pl-9 pr-3 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-gold"
+                    />
+                  </div>
+                  <select
+                    value={filtroStatus}
+                    onChange={(e) => setFiltroStatus(e.target.value)}
+                    className="h-10 px-3 rounded-xl border border-gray-200 text-xs bg-white focus:outline-none focus:border-gold"
+                  >
+                    <option value="todos">Todos os status</option>
+                    {situacoes.map((s) => (
+                      <option key={s.id} value={s.nome}>{s.nome}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="flex gap-2 items-center flex-wrap">
+                  <input
+                    type="date"
+                    value={filtroDataInicio}
+                    onChange={(e) => setFiltroDataInicio(e.target.value)}
+                    className="h-10 px-3 rounded-xl border border-gray-200 text-xs bg-white"
+                  />
+                  <span className="text-[10px] text-gray-400">até</span>
+                  <input
+                    type="date"
+                    value={filtroDataFim}
+                    onChange={(e) => setFiltroDataFim(e.target.value)}
+                    className="h-10 px-3 rounded-xl border border-gray-200 text-xs bg-white"
+                  />
+                  <button
+                    onClick={exportarCSV}
+                    className="ml-auto h-10 px-3 border border-gold/40 text-gold-dark text-[11px] font-bold rounded-xl active:scale-95 whitespace-nowrap"
+                  >
+                    📥 Exportar CSV
+                  </button>
+                </div>
               </div>
 
               {erro && (
@@ -428,34 +440,64 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                 <div className="bg-white rounded-2xl p-6 py-10 shadow-sm text-center text-xs text-gray-400">Nenhum pedido encontrado.</div>
               )}
 
-              <div className="space-y-2">
-                {pedidosFiltrados.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => abrirDetalhe(p.id)}
-                    className="w-full bg-white rounded-2xl p-3 shadow-sm hover:shadow-md transition-all text-left flex items-center gap-3"
-                  >
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 ${p.verificado ? "bg-green-100" : "bg-gray-100"}`}>
-                      {p.verificado ? (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                      ) : (
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#9CA3AF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="9" /></svg>
-                      )}
+              {!loading && pedidosFiltrados.length > 0 && (
+                <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="text-[9px] uppercase tracking-wide text-gray-400 border-b border-gray-100">
+                          <th className="p-3 w-8"></th>
+                          <th className="p-3 font-semibold">Pedido Nº</th>
+                          <th className="p-3 font-semibold">Cliente</th>
+                          <th className="p-3 font-semibold">Data</th>
+                          <th className="p-3 font-semibold">Status</th>
+                          <th className="p-3 font-semibold text-right">Total</th>
+                          <th className="p-3 font-semibold text-right">Ação</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pedidosFiltrados.map((p) => (
+                          <tr key={p.id} className="border-b border-gray-50 last:border-0 hover:bg-ice/40 transition-colors">
+                            <td className="p-3">
+                              <input type="checkbox" className="accent-luxury-black" />
+                            </td>
+                            <td className="p-3">
+                              <span className="text-xs font-bold text-luxury-black">#{p.numero}</span>
+                              {p.verificado && <span className="ml-1 text-[9px] text-green-600 font-bold">• Verificado</span>}
+                            </td>
+                            <td className="p-3">
+                              <p className="text-[11px] font-semibold text-luxury-black truncate max-w-[140px]">{p.cliente_nome}</p>
+                              <p className="text-[9px] text-gray-400 truncate max-w-[140px]">{p.cliente_email}</p>
+                            </td>
+                            <td className="p-3 text-[11px] text-gray-500 whitespace-nowrap">{p.data}</td>
+                            <td className="p-3">
+                              <span className={`inline-block px-2 py-0.5 text-[9px] font-bold rounded-full ${p.status === "Entregue" ? "bg-green-100 text-green-700" : p.status === "Em produção" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>{p.status}</span>
+                            </td>
+                            <td className="p-3 text-right text-xs font-bold text-luxury-black whitespace-nowrap">{formatPrice(p.total)}</td>
+                            <td className="p-3 text-right">
+                              <button
+                                onClick={() => abrirDetalhe(p.id)}
+                                className="w-8 h-8 rounded-xl bg-ice text-luxury-black text-[10px] font-bold active:scale-95 inline-flex items-center justify-center"
+                                title="Ver"
+                              >
+                                👁️
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+                    <div className="flex items-center gap-2 text-[10px] text-gray-400">
+                      <button className="w-7 h-7 rounded-lg border border-gray-200 flex items-center justify-center disabled:opacity-40" disabled>◀</button>
+                      <span>Página 1 de 1</span>
+                      <button className="w-7 h-7 rounded-lg border border-gray-200 flex items-center justify-center disabled:opacity-40" disabled>▶</button>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs font-bold text-luxury-black">
-                        #{p.numero} {p.verificado && <span className="text-[9px] text-green-600 font-bold">• Verificado</span>}
-                      </p>
-                      <p className="text-[10px] text-gray-500 truncate">{p.cliente_nome} · {p.cliente_email}</p>
-                      <p className="text-[10px] text-gray-400">{p.data} · {p.items} {p.items === 1 ? "item" : "itens"}</p>
-                    </div>
-                    <div className="text-right flex-shrink-0">
-                      <p className="text-xs font-bold text-luxury-black">{formatPrice(p.total)}</p>
-                      <span className="inline-block mt-1 px-2 py-0.5 bg-ice text-gray-600 text-[9px] font-bold rounded-full">{p.status}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
+                    <span className="text-[10px] text-gray-400">Exibindo {pedidosFiltrados.length} de {total} pedidos</span>
+                  </div>
+                </div>
+              )}
             </>
           )}
 
