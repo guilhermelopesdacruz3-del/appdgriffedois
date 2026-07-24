@@ -182,7 +182,9 @@ export function mapProdutoParaProduct(
     colors,
     colorNames,
     has3D: tags.includes("3d"),
-    hasTryOn: tags.includes("try-on") || tags.includes("prova-virtual"),
+    // Prova Virtual é recurso do APP (projeto à parte), NÃO vem da Loja Integrada.
+    // A fonte do true/false será definida no app quando o módulo for integrado.
+    hasTryOn: false,
     image: imagem,
     badge: produto.destaque ? "Destaque" : undefined,
     rating: 0,
