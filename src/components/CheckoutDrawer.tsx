@@ -18,12 +18,13 @@ interface CheckoutDrawerProps {
   onSuccess?: (info: unknown) => void;
 }
 
-type Passo = "escolher" | "processando" | "pix" | "cartao" | "erro";
+type Passo = "escolher" | "processando" | "pix" | "cartao" | "sucesso" | "erro";
 
 export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: CheckoutDrawerProps) {
   const [passo, setPasso] = useState<Passo>("escolher");
   const [erro, setErro] = useState<string | null>(null);
   const [pix, setPix] = useState<{ qr: string; copia: string } | null>(null);
+  const [pontosC, setPontosC] = useState(0);
   const [email, setEmail] = useState("");
   const [pontosResgate, setPontosResgate] = useState(0);
   const [cupomCodigo, setCupomCodigo] = useState("");
@@ -68,9 +69,16 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: Ch
       });
       if (meio === "pix") {
         setPix({ qr: resultado.pix_qr_base64 || "", copia: resultado.pix_copia_cola || "" });
-        setPasso("pix");
+        // No demo o PIX é simulado e já confirma; em produção o webhook confirma depois.
+        if (resultado.demo) {
+          setPontosC(resultado.pontos_creditados || 0);
+          setPasso("sucesso");
+        } else {
+          setPasso("pix");
+        }
       } else {
-        setPasso("cartao");
+        setPontosC(resultado.pontos_creditados || 0);
+        setPasso("sucesso");
       }
       onSuccess?.(resultado);
     } catch (e: any) {
@@ -183,6 +191,29 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: Ch
               </div>
             )}
 
+            {passo === "sucesso" && (
+              <div className="flex flex-col items-center py-8 space-y-3">
+                <div className="w-16 h-16 rounded-full bg-green-50 flex items-center justify-center">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M20 6L9 17l-5-5" />
+                  </svg>
+                </div>
+                <p className="text-base font-bold text-luxury-black">Pagamento confirmado!</p>
+                <p className="text-xs text-gray-500 text-center px-6">
+                  Seu pedido foi enviado para a loja e o estoque foi atualizado.
+                </p>
+                {pontosC > 0 && (
+                  <div className="bg-ice rounded-2xl p-3 text-center">
+                    <p className="text-[11px] text-gray-500">Pontos de fidelidade creditados</p>
+                    <p className="text-lg font-bold text-gold">+{pontosC} pts</p>
+                  </div>
+                )}
+                <button onClick={onClose} className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl">
+                  Concluir
+                </button>
+              </div>
+            )}
+
             {passo === "cartao" && (
               <CartaoForm
                 total={total}
@@ -197,6 +228,8 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: Ch
                       email: email || undefined,
                       card_token: cardToken,
                     });
+                    setPontosC(resultado.pontos_creditados || 0);
+                    setPasso("sucesso");
                     onSuccess?.(resultado);
                   } catch (e: any) {
                     setErro(e.message || "Falha ao processar o cartão.");

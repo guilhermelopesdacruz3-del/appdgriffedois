@@ -10,7 +10,7 @@
 
 import crypto from "node:crypto";
 import { getSecret, creditarPontos, resgatarPontos, getRegrasFidelidade, getPontos, upsertPedidoMP } from "./db.ts";
-import { criarPedidoLI, buscarPrecoLI } from "./liClient.ts";
+import { criarPedidoLI, baixarEstoqueLI, atualizarPedidoLI, buscarPrecoLI } from "./liClient.ts";
 
 const MP_API = "https://api.mercadopago.com";
 
@@ -207,6 +207,21 @@ export async function processarCheckout(params: {
       });
     } catch (liErr: any) {
       console.warn("[checkout-demo] pedido LI não criado:", liErr?.message || liErr);
+    }
+    // Espelha no painel admin (Supabase) para o pedido aparecer na lista.
+    try {
+      await upsertPedidoMP({
+        mp_payment_id: idPedido,
+        email: email || null,
+        valor: total,
+        status: "aprovado",
+        li_pedido: liPedido ?? undefined,
+        pontos_creditados: pontos > 0,
+      });
+    } catch { /* ignora */ }
+    // Marca o pedido como pago na LI (se criamos um).
+    if (liPedido) {
+      try { await atualizarPedidoLI(liPedido, "pago"); } catch { /* ignora */ }
     }
     if (meio === "pix") {
       return {

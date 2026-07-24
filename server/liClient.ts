@@ -81,6 +81,37 @@ export interface ItemPedidoLI {
   quantidade: number;
 }
 
+// Extrai o ID numérico do produto a partir do li_uri ou sku.
+// O front manda sku = String(product.id) (id numérico da LI).
+function extrairIdProduto(item: ItemPedidoLI): number | null {
+  if (item.sku && /^\d+$/.test(String(item.sku).trim())) return Number(item.sku);
+  if (item.li_uri) {
+    const m = String(item.li_uri).match(/produto\/(\d+)/);
+    if (m) return Number(m[1]);
+  }
+  return null;
+}
+
+// Baixa o estoque de cada item na Loja Integrada (site). Não-bloqueante:
+// se a LI falhar, apenas avisa no log — a compra no app não pode quebrar.
+export async function baixarEstoqueLI(itens: ItemPedidoLI[]): Promise<void> {
+  for (const item of itens) {
+    const id = extrairIdProduto(item);
+    if (!id || !(item.quantidade > 0)) continue;
+    try {
+      // Lê a quantidade atual e decrementa (a LI aceita PUT com `quantidade`).
+      const { status, payload } = await chamarLI("GET", "produto", id, { limit: "1" });
+      if (status !== 200) continue;
+      const atual = payload?.produto?.quantidade ?? payload?.quantidade ?? null;
+      if (atual == null) continue;
+      const nova = Math.max(0, Number(atual) - item.quantidade);
+      await chamarLI("PUT", "produto", id, undefined, { quantidade: nova });
+    } catch (e: any) {
+      console.warn(`[LI] falha ao baixar estoque do produto ${id}:`, e?.message || e);
+    }
+  }
+}
+
 export async function criarPedidoLI(opts: {
   email: string;
   itens: ItemPedidoLI[];
@@ -118,6 +149,8 @@ export async function criarPedidoLI(opts: {
     console.warn(`[LI] falha ao criar pedido (${status}):`, JSON.stringify(payload).slice(0, 200));
     return null;
   }
+  // Baixa o estoque dos itens na LI (não-bloqueante).
+  await baixarEstoqueLI(opts.itens).catch(() => {});
   return Number(payload?.pedido?.id || payload?.id || null);
 }
 
