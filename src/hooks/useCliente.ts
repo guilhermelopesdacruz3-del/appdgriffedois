@@ -37,31 +37,35 @@ export function useCliente(): UseClienteResult {
 
   // Recupera o cliente logado de um reload anterior (persistência leve).
   useEffect(() => {
-    try {
-      // 1) Se temos o objeto completo persistido, usamos direto
-      //    (funciona mesmo sem a LI configurada — modo demo).
-      const raw = window.localStorage.getItem(LS_CLIENTE);
-      if (raw) {
-        const c = JSON.parse(raw) as ClienteApp;
-        setCliente(c);
+    const restaurar = async () => {
+      try {
+        // 1) Objeto completo persistido — mantém o usuário logado mesmo
+        //    sem a Loja Integrada configurada (modo demo).
+        const raw = window.localStorage.getItem(LS_CLIENTE);
+        const cached = raw ? (JSON.parse(raw) as ClienteApp) : null;
+        if (cached) setCliente(cached);
+
+        // 2) Tenta dados frescos da LI (se houver chaves reais). Se a LI
+        //    falhar/não achar, MANTÉM o cliente do cache (não zera).
+        const id = window.localStorage.getItem(LS_ID);
+        const email = window.localStorage.getItem(LS_EMAIL);
+        if (!id && !email) return;
+        try {
+          const atual = id
+            ? await buscarClientePorId(id)
+            : await buscarClientePorEmail(email!.trim());
+          if (atual) {
+            setCliente(atual);
+            salvarLocal(atual);
+          }
+        } catch {
+          /* LI indisponível ou sem cliente — mantém o cache local */
+        }
+      } catch {
+        /* ignora JSON inválido */
       }
-      // 2) Tenta atulizar a partir da LI (se houver chaves reais,
-      //    traz dados frescos: endereço, pedidos, etc).
-      const id = window.localStorage.getItem(LS_ID);
-      const email = window.localStorage.getItem(LS_EMAIL);
-      if (id) {
-        buscarClientePorId(id)
-          .then((c) => { setCliente(c); salvarLocal(c); })
-          .catch(() => {
-            // id inválido (cliente apagado na LI) — tenta pelo email.
-            if (email) entrarComEmail(email);
-          });
-      } else if (email) {
-        entrarComEmail(email);
-      }
-    } catch {
-      /* ignora */
-    }
+    };
+    restaurar();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
