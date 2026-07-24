@@ -82,8 +82,18 @@ export function ClienteProvider({ children }: { children: ReactNode }) {
     try {
       const encontrado = await buscarClientePorEmail(email.trim());
       if (!encontrado) {
-        setError("Não encontramos nenhum cliente com esse e-mail na loja.");
-        setCliente(null);
+        // LI não achou (modo demo ou loja sem esse cliente ainda).
+        // Não apagamos o login: criamos um cliente local mínimo pra segurar a
+        // sessão. Quando a LI tiver o cliente (produção), o bloco acima já
+        // setaria o cliente real e esses dados seriam preenchidos.
+        const cli: ClienteApp = {
+          email: email.trim().toLowerCase(),
+          nome: email.trim().split("@")[0] || email.trim(),
+          id: null,
+        };
+        setCliente(cli);
+        salvarLocal(cli);
+        try { window.localStorage.setItem(LS_EMAIL, cli.email); } catch { /* ignora */ }
         return;
       }
       setCliente(encontrado);
@@ -93,8 +103,16 @@ export function ClienteProvider({ children }: { children: ReactNode }) {
         if (encontrado.id != null) window.localStorage.setItem(LS_ID, String(encontrado.id));
       } catch { /* ignora */ }
     } catch (err) {
-      setError((err as Error).message);
-      setCliente(null);
+      // LI indisponível (modo demo / sem chaves) — mantemos o login com cliente
+      // local mínimo em vez de apagar a sessão.
+      const cli: ClienteApp = {
+        email: email.trim().toLowerCase(),
+        nome: email.trim().split("@")[0] || email.trim(),
+        id: null,
+      };
+      setCliente(cli);
+      salvarLocal(cli);
+      try { window.localStorage.setItem(LS_EMAIL, cli.email); } catch { /* ignora */ }
     } finally {
       setLoading(false);
     }
