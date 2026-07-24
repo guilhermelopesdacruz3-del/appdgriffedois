@@ -102,6 +102,8 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
         }
         // Objeto completo persistido — sobrevive ao reload mesmo sem LI.
         window.localStorage.setItem("dgriffe:cliente", JSON.stringify(cli));
+        // Avisa o ClienteProvider (já montado no App) para sincronizar o estado.
+        try { window.dispatchEvent(new Event("cliente-atualizado")); } catch { /* ignora */ }
         setMensagem("Conta confirmada! Redirecionando...");
         setTimeout(() => onVoltar(), 1200);
       } else {

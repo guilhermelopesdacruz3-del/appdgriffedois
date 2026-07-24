@@ -16,6 +16,7 @@ import ProfilePage from "./pages/ProfilePage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import ClienteCadastro from "./pages/ClienteCadastro";
 import AdminPage from "./pages/AdminPage";
+import { ClienteProvider } from "./hooks/useCliente";
 import { ProductGridSkeleton } from "./components/ProductSkeleton";
 import { useFavorites, useRecentlyViewed } from "./hooks/useUserLists";
 
@@ -178,7 +179,8 @@ export default function App() {
   const isProductPage = currentPage === "product";
 
   return (
-    <div className="max-w-lg mx-auto min-h-screen bg-ice relative">
+    <ClienteProvider>
+      <div className="max-w-lg mx-auto min-h-screen bg-ice relative">
       {/* Header */}
       <Header
         cartCount={cartCount}
@@ -324,6 +326,7 @@ export default function App() {
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </ClienteProvider>
   );
 }
