@@ -287,6 +287,34 @@ export interface HistoricoFidelidade {
 }
 
 // Histórico de créditos/resgates de um e-mail (tabela fidelidade_historico).
+// Define o saldo exato de pontos (admin ajusta manualmente).
+export async function setarPontos(email: string, pontos: number): Promise<number> {
+  const e = (email || "").trim().toLowerCase();
+  const p = Math.max(0, Math.floor(pontos || 0));
+  if (!e) return 0;
+  if (sb) {
+    await sb.from("fidelidade").upsert({ email: e, pontos: p, updated_at: new Date().toISOString() }, { onConflict: "email" });
+    await sb.from("fidelidade_historico").insert({ email: e, tipo: "credito", pontos: p, motivo: "ajuste manual", ref: null });
+    return p;
+  }
+  const store = lerFidelidadeLocal();
+  store[e] = p;
+  salvarFidelidadeLocal(store);
+  return p;
+}
+
+// Salva as regras de fidelidade (pontos por real / por desconto).
+export async function salvarRegrasFidelidade(pontosPorReal: number, pontosPorDesconto: number): Promise<void> {
+  if (!sb) return;
+  const mapa = [
+    { key: "FID_PONTOS_POR_REAL", value: String(pontosPorReal) },
+    { key: "FID_PONTOS_POR_DESC", value: String(pontosPorDesconto) },
+  ];
+  for (const r of mapa) {
+    await sb.from("store_config").upsert({ key: r.key, value: r.value }, { onConflict: "key" });
+  }
+}
+
 export async function getHistoricoFidelidade(email: string, limite = 50): Promise<HistoricoFidelidade[]> {
   const e = (email || "").trim().toLowerCase();
   if (!e || !sb) return [];

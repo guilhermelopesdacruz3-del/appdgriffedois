@@ -37,7 +37,7 @@ import * as segredos from "./db.ts";
 import { processarCheckout } from "./pagamento.ts";
 import { processarWebhookMP } from "./webhook.ts";
 import { listarVideosRecentes } from "./youtube.ts";
-import { getHistoricoFidelidade, registrarLog, supabaseClient } from "./db.ts";
+import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade } from "./db.ts";
 import cupomApp from "./cupom.ts";
 import { receitasApp } from "./receitas";
 import { favoritosApp } from "./favoritos";
@@ -750,6 +750,51 @@ app.get("/api/fidelidade/historico", async (req, res) => {
   } catch (e) {
     console.error("[fidelidade] falha histórico:", e?.message);
     return res.status(502).json({ erro: "Falha ao ler o histórico de fidelidade." });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// ADMIN — FIDELIDADE (ajustar saldo manualmente + regras)
+// ---------------------------------------------------------------------------
+// Ajusta os pontos de um cliente (creditar / resgatar / definir saldo).
+app.post("/api/admin/fidelidade/ajustar", requireAdmin, async (req, res) => {
+  const { email, pontos, operacao, motivo } = req.body || {};
+  const e = String(email || "").trim().toLowerCase();
+  const pts = Number(pontos);
+  const op = String(operacao || "creditar");
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) {
+    return res.status(400).json({ erro: "E-mail inválido." });
+  }
+  if (!Number.isFinite(pts) || pts <= 0) {
+    return res.status(400).json({ erro: "Informe uma quantidade de pontos maior que zero." });
+  }
+  try {
+    let saldo = 0;
+    if (op === "resgatar") saldo = await segredos.resgatarPontos(e, pts);
+    else if (op === "definir") saldo = await setarPontos(e, pts);
+    else saldo = await segredos.creditarPontos(e, pts / (await segredos.getRegrasFidelidade()).pontosPorReal, motivo || "ajuste admin");
+    await registrarLog({ admin_email: req.adminEmail || "admin", acao: "fidelidade_ajustar", detalhe: { email: e, operacao: op, pontos: pts, saldo } });
+    return res.json({ ok: true, email: e, operacao: op, saldo });
+  } catch (err) {
+    console.error("[fidelidade admin] falha:", err);
+    return res.status(500).json({ erro: "Falha ao ajustar pontos." });
+  }
+});
+
+// Salva as regras do programa de fidelidade.
+app.post("/api/admin/fidelidade/regras", requireAdmin, async (req, res) => {
+  const pontosPorReal = Number(req.body?.pontosPorReal);
+  const pontosPorDesconto = Number(req.body?.pontosPorDesconto);
+  if (!Number.isFinite(pontosPorReal) || pontosPorReal < 0 || !Number.isFinite(pontosPorDesconto) || pontosPorDesconto < 1) {
+    return res.status(400).json({ erro: "Regras inválidas." });
+  }
+  try {
+    await salvarRegrasFidelidade(pontosPorReal, pontosPorDesconto);
+    await registrarLog({ admin_email: req.adminEmail || "admin", acao: "fidelidade_regras", detalhe: { pontosPorReal, pontosPorDesconto } });
+    return res.json({ ok: true, regras: { pontosPorReal, pontosPorDesconto } });
+  } catch (err) {
+    console.error("[fidelidade admin] falha regras:", err);
+    return res.status(500).json({ erro: "Falha ao salvar regras." });
   }
 });
 
