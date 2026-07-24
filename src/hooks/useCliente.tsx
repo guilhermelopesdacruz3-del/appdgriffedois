@@ -49,6 +49,11 @@ export function ClienteProvider({ children }: { children: ReactNode }) {
       const cached = raw ? (JSON.parse(raw) as ClienteApp) : null;
       if (cached) setCliente(cached);
 
+      // Cliente local do modo demo (sem id da LI): não há o que buscar na LI,
+      // e a LI em modo demo devolve o cliente demo e sobrescreve o login real.
+      // Mantemos o cache e encerramos — o login persiste no reload.
+      if (cached && cached.id == null) return;
+
       const id = window.localStorage.getItem(LS_ID);
       const email = window.localStorage.getItem(LS_EMAIL);
       if (!id && !email) return;
