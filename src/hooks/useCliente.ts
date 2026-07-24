@@ -28,6 +28,7 @@ interface UseClienteResult {
 
 const LS_EMAIL = "dgriffe:cliente_email";
 const LS_ID = "dgriffe:cliente_id";
+const LS_CLIENTE = "dgriffe:cliente"; // objeto completo persistido (sobrevive ao reload)
 
 export function useCliente(): UseClienteResult {
   const [cliente, setCliente] = useState<ClienteApp | null>(null);
@@ -37,11 +38,20 @@ export function useCliente(): UseClienteResult {
   // Recupera o cliente logado de um reload anterior (persistência leve).
   useEffect(() => {
     try {
+      // 1) Se temos o objeto completo persistido, usamos direto
+      //    (funciona mesmo sem a LI configurada — modo demo).
+      const raw = window.localStorage.getItem(LS_CLIENTE);
+      if (raw) {
+        const c = JSON.parse(raw) as ClienteApp;
+        setCliente(c);
+      }
+      // 2) Tenta atulizar a partir da LI (se houver chaves reais,
+      //    traz dados frescos: endereço, pedidos, etc).
       const id = window.localStorage.getItem(LS_ID);
       const email = window.localStorage.getItem(LS_EMAIL);
       if (id) {
         buscarClientePorId(id)
-          .then(setCliente)
+          .then((c) => { setCliente(c); salvarLocal(c); })
           .catch(() => {
             // id inválido (cliente apagado na LI) — tenta pelo email.
             if (email) entrarComEmail(email);
@@ -55,6 +65,14 @@ export function useCliente(): UseClienteResult {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Persiste o objeto completo do cliente no localStorage.
+  function salvarLocal(c: ClienteApp | null) {
+    try {
+      if (c) window.localStorage.setItem(LS_CLIENTE, JSON.stringify(c));
+      else window.localStorage.removeItem(LS_CLIENTE);
+    } catch { /* ignora */ }
+  }
+
   const entrarComEmail = useCallback(async (email: string) => {
     setLoading(true);
     setError(null);
@@ -66,6 +84,7 @@ export function useCliente(): UseClienteResult {
         return;
       }
       setCliente(encontrado);
+      salvarLocal(encontrado);
       try {
         window.localStorage.setItem(LS_EMAIL, email.trim().toLowerCase());
         if (encontrado.id != null) {
@@ -84,6 +103,7 @@ export function useCliente(): UseClienteResult {
 
   const sair = useCallback(() => {
     setCliente(null);
+    salvarLocal(null);
     try {
       window.localStorage.removeItem(LS_EMAIL);
       window.localStorage.removeItem(LS_ID);
@@ -137,7 +157,10 @@ export function useCliente(): UseClienteResult {
       if (!res.ok) throw new Error(`Falha ao atualizar (${res.status})`);
       // Atualiza o estado local para refletir imediatamente.
       const atualizado = await buscarClientePorId(cliente.id);
-      if (atualizado) setCliente(atualizado);
+      if (atualizado) {
+        setCliente(atualizado);
+        salvarLocal(atualizado);
+      }
     },
     [cliente]
   );

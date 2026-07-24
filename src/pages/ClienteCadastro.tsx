@@ -82,19 +82,26 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
             /* Supabase não configurado no front — login pela LI segue válido */
           }
         }
-        // Salva o cliente da Loja Integrada (id + email) para a "Minha Conta"
-        // carregar os dados isolados deste usuário (e não o cliente demo).
+        // Salva o cliente para a "Minha Conta" sobreviver ao reload.
+        // Mesmo sem a LI configurada (modo demo), persistemos os dados
+        // locais (e-mail + nome do cadastro) para o perfil não esvaziar.
+        const emailL = email.trim().toLowerCase();
+        let cli: any = null;
         try {
-          const cli = await buscarClientePorEmail(email.trim());
-          if (cli) {
-            window.localStorage.setItem("dgriffe:cliente_email", email.trim().toLowerCase());
-            if (cli.id != null) {
-              window.localStorage.setItem("dgriffe:cliente_id", String(cli.id));
-            }
-          }
+          cli = await buscarClientePorEmail(emailL);
         } catch {
-          /* ignora falha de busca — o login Supabase já foi feito */
+          /* ignora falha de busca — prossegue com dados locais */
         }
+        if (!cli) {
+          // LI não achou (modo demo / loja sem esse cliente): monta objeto mínimo.
+          cli = { email: emailL, nome: (nome || emailL.split("@")[0] || ""), id: null };
+        }
+        window.localStorage.setItem("dgriffe:cliente_email", emailL);
+        if (cli.id != null) {
+          window.localStorage.setItem("dgriffe:cliente_id", String(cli.id));
+        }
+        // Objeto completo persistido — sobrevive ao reload mesmo sem LI.
+        window.localStorage.setItem("dgriffe:cliente", JSON.stringify(cli));
         setMensagem("Conta confirmada! Redirecionando...");
         setTimeout(() => onVoltar(), 1200);
       } else {
