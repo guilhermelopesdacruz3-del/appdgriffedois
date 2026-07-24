@@ -66,13 +66,22 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
     setLoading(true);
     try {
       const r = await verificarOtp(email, codigo);
-      if (r.ok && r.session) {
-        // Salva a sessão no cliente do Supabase (persistSession já está ativo).
-        const sess = r.session as any;
-        await getSupabase().auth.setSession({
-          access_token: sess.access_token,
-          refresh_token: sess.refresh_token,
-        });
+      if (r.ok) {
+        // Tenta salvar a sessão no cliente do Supabase (persistSession ativo).
+        // OPCIONAL: se as vars VITE_SUPABASE_* não estiverem no deploy, o
+        // getSupabase() lança — ignoramos, pois o login pela Loja Integrada
+        // (busca por e-mail + localStorage) já identifica o cliente na "Minha Conta".
+        if (r.session) {
+          try {
+            const sess = r.session as any;
+            await getSupabase().auth.setSession({
+              access_token: sess.access_token,
+              refresh_token: sess.refresh_token,
+            });
+          } catch {
+            /* Supabase não configurado no front — login pela LI segue válido */
+          }
+        }
         // Salva o cliente da Loja Integrada (id + email) para a "Minha Conta"
         // carregar os dados isolados deste usuário (e não o cliente demo).
         try {
