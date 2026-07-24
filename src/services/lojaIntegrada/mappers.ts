@@ -211,7 +211,7 @@ export function mapClienteParaApp(cliente: LICliente): ClienteApp {
   const enderecoPrincipal = cliente.enderecos?.find((e) => e.principal) || cliente.enderecos?.[0];
   return {
     id: cliente.id,
-    nome: cliente.nome,
+    nome: cliente.nome || "",
     email: cliente.email,
     cpf: cliente.cpf,
     telefone: cliente.telefone_celular || cliente.telefone_principal,

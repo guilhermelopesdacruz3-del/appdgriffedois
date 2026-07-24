@@ -556,7 +556,7 @@ export default function ProfilePage({ onNavigate }: { onNavigate?: (page: string
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-full bg-gradient-to-br from-gold to-gold-dark flex items-center justify-center shadow-lg shadow-gold/20">
             <span className="text-xl font-bold text-luxury-black">
-              {(cliente.nome.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((n) => n[0]?.toUpperCase() || "").join("") || "?")}
+              {(cliente.nome?.trim() || "").split(/\s+/).filter(Boolean).slice(0, 2).map((n) => n[0]?.toUpperCase() || "").join("") || "?"}
             </span>
           </div>
           <div className="flex-1 min-w-0">
