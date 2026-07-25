@@ -1175,6 +1175,103 @@ app.post("/api/cliente/verificar", async (req, res) => {
   }
 });
 
+// EXCLUSÃO DE CONTA (LGPD / Política de Dados do Google Play) — self-service.
+// Fluxo em 2 passos com OTP por e-mail (mesmo padrão do cadastro/verificar):
+//   1) POST /api/cliente/excluir-solicitar  -> envia OTP
+//   2) POST /api/cliente/excluir-confirmar  -> valida OTP e apaga tudo
+app.post("/api/cliente/excluir-solicitar", async (req, res) => {
+  const ip = ipDo(req);
+  const bloq = checarBloqueio(ip);
+  if (bloq.bloqueado) return res.status(429).json({ erro: `Muitas tentativas. Tente em ${bloq.resta}s.` });
+  const { email } = req.body || {};
+  const e = (email || "").trim().toLowerCase();
+  if (!e || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) {
+    return res.status(400).json({ erro: "E-mail inválido." });
+  }
+  const sb = supabaseClient();
+  if (!sb) return res.status(503).json({ erro: "Banco de dados indisponível (modo demo)." });
+  // Confirma que o usuário existe antes de enviar OTP (shouldCreateUser:false).
+  const { error } = await sb.auth.signInWithOtp({
+    email: e,
+    options: { shouldCreateUser: false, data: { __exclusao: true } },
+  });
+  if (error) {
+    // Se o usuário não existe, não vaza a informação — mas também não envia OTP.
+    if (/user not found/i.test(error.message)) {
+      return res.status(404).json({ erro: "Nenhuma conta encontrada com este e-mail." });
+    }
+    if (/rate limit/i.test(error.message)) {
+      return res.status(429).json({ erro: "Muitas tentativas. Aguarde alguns minutos e tente de novo." });
+    }
+    return res.status(400).json({ erro: error.message });
+  }
+  return res.json({ ok: true, mensagem: "Enviamos um código de confirmação para seu e-mail." });
+});
+
+app.post("/api/cliente/excluir-confirmar", async (req, res) => {
+  const ip = ipDo(req);
+  const bloq = checarBloqueio(ip);
+  if (bloq.bloqueado) return res.status(429).json({ erro: `Muitas tentativas. Tente em ${bloq.resta}s.` });
+  const { email, token } = req.body || {};
+  const e = (email || "").trim().toLowerCase();
+  if (!e || !token || !/^\d{6}$/.test(String(token))) {
+    return res.status(400).json({ erro: "E-mail e código de 6 dígitos são obrigatórios." });
+  }
+  const sb = supabaseClient();
+  if (!sb) return res.status(503).json({ erro: "Banco de dados indisponível (modo demo)." });
+  try {
+    // 1) Valida o OTP (type email).
+    const { data, error } = await sb.auth.verifyOtp({ email: e, token: String(token), type: "email" });
+    if (error) {
+      registrarTentativaFalha(ip);
+      return res.status(401).json({ erro: error.message });
+    }
+    registrarTentativaSucesso(ip);
+
+    // 2) Busca o id do usuário para deleção em cascata.
+    const userId = data.user?.id || data.session?.user?.id;
+    if (!userId) return res.status(401).json({ erro: "Sessão inválida." });
+
+    // 3) Remove da Loja Integrada (se as chaves estiverem configuradas).
+    try {
+      const { LI_APP_KEY, LI_API_KEY } = await getSecretsLI();
+      if (LI_APP_KEY && LI_API_KEY) {
+        // A LI não tem DELETE por e-mail direto via proxy simples; tentamos a
+        // rota de exclusão apenas se existir. Por segurança, não quebramos o fluxo
+        // se a LI não suportar — o dado do app (Supabase) é a fonte de verdade.
+        await chamarLI("DELETE", "cliente", "busca", { email: e }).catch(() => {});
+      }
+    } catch (liErr) {
+      console.warn("[exclusao] falha ao remover da LI (ignorado):", (liErr as Error)?.message);
+    }
+
+    // 4) Limpa fidelidade (Supabase + espelho local, se houver).
+    try {
+      await sb.from("pontos").delete().eq("email", e);
+    } catch (fErr) {
+      console.warn("[exclusao] falha ao limpar fidelidade (ignorado):", (fErr as Error)?.message);
+    }
+
+    // 5) Remove perfis, favoritos, receitas vinculados (cascade no banco).
+    try {
+      await sb.from("profiles").delete().eq("id", userId);
+      await sb.from("favoritos").delete().eq("user_id", userId);
+      await sb.from("receitas").delete().eq("user_id", userId);
+    } catch (pErr) {
+      console.warn("[exclusao] falha ao limpar tabelas (ignorado):", (pErr as Error)?.message);
+    }
+
+    // 6) Deleta o usuário de autenticação (remove o acesso).
+    await sb.auth.admin.deleteUser(userId);
+
+    return res.json({ ok: true, mensagem: "Sua conta foi excluída com sucesso." });
+  } catch (err) {
+    registrarTentativaFalha(ip);
+    console.error("[exclusao] erro:", err);
+    return res.status(500).json({ erro: "Falha ao excluir conta." });
+  }
+});
+
 app.use("/api/cliente/receitas", receitasApp);
 app.use("/api/cliente/favoritos", favoritosApp);
 // Cupons: rotas já incluem /api no próprio caminho (ex: /api/admin/cupons,

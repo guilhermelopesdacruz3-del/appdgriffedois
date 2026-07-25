@@ -211,6 +211,52 @@ export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNav
   const [pedidoSelecionado, setPedidoSelecionado] = useState<string | number | null>(null);
   const { pedido, loading: loadingPedidoDetalhe } = usePedidoDetalhe(pedidoSelecionado);
 
+  // Estado de exclusão de conta (LGPD / Política de Dados do Google Play).
+  const [excluindo, setExcluindo] = useState(false);
+  const [exOtp, setExOtp] = useState("");
+  const [exMsg, setExMsg] = useState<string | null>(null);
+  const [exErr, setExErr] = useState<string | null>(null);
+  const [exEnviado, setExEnviado] = useState(false);
+
+  const exSolicitar = async () => {
+    setExErr(null); setExMsg(null); setExcluindo(true);
+    try {
+      const r = await fetch("/api/cliente/excluir-solicitar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: cliente?.email }),
+      });
+      const j = await r.json();
+      if (!r.ok) { setExErr(j.erro || "Falha ao solicitar exclusão."); return; }
+      setExEnviado(true);
+      setExMsg(j.mensagem || "Código enviado para seu e-mail.");
+    } catch {
+      setExErr("Falha de conexão. Tente novamente.");
+    } finally {
+      setExcluindo(false);
+    }
+  };
+
+  const exConfirmar = async () => {
+    setExErr(null); setExMsg(null); setExcluindo(true);
+    try {
+      const r = await fetch("/api/cliente/excluir-confirmar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: cliente?.email, token: exOtp }),
+      });
+      const j = await r.json();
+      if (!r.ok) { setExErr(j.erro || "Falha ao excluir conta."); return; }
+      setExMsg(j.mensagem || "Conta excluída.");
+      await sair();
+      setSubTela(null);
+    } catch {
+      setExErr("Falha de conexão. Tente novamente.");
+    } finally {
+      setExcluindo(false);
+    }
+  };
+
   const menuItems: { icon: ReactNode; label: string; subtitle: string; action: SubTela | null }[] = [
     {
       icon: (
@@ -669,10 +715,78 @@ export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNav
             )}
           </button>
         ))}
+
       </div>
 
-      {/* Detalhe do pedido (Utilidade 1) */}
-      {pedidoSelecionado && (
+        {/* Excluir minha conta (LGPD / Política de Dados do Google Play) */}
+        <div className="px-4 mt-4 mb-8">
+        <button
+        onClick={() => { setExErr(null); setExMsg(null); setExEnviado(false); setExOtp(""); setExcluindo(true); }}
+        className="w-full h-11 bg-red-50 text-red-500 text-xs font-bold rounded-xl active:scale-95 transition-all"
+        >
+        Excluir minha conta
+        </button>
+        <p className="text-[10px] text-gray-400 text-center mt-2 px-2">
+        Remove seus dados de forma definitiva. Enviaremos um código de confirmação por e-mail.
+        </p>
+        </div>
+
+        {/* Modal de exclusão de conta */}
+        {excluindo && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center px-6" onClick={() => setExcluindo(false)}>
+        <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+          <h3 className="text-base font-bold text-luxury-black mb-1">Excluir conta</h3>
+          <p className="text-[11px] text-gray-500 mb-4">
+            Esta ação é irreversível e remove todos os seus dados (pedidos, favoritos, pontos e acesso).
+          </p>
+
+          {!exEnviado ? (
+            <button
+              onClick={exSolicitar}
+              className="w-full h-11 bg-red-500 text-white text-xs font-bold rounded-xl active:scale-95 transition-all mb-2"
+            >
+              Enviar código de confirmação
+            </button>
+          ) : (
+            <>
+              <input
+                value={exOtp}
+                onChange={(e) => setExOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                inputMode="numeric"
+                placeholder="Código de 6 dígitos"
+                className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm text-center tracking-widest mb-2"
+              />
+              <button
+                onClick={exConfirmar}
+                disabled={exOtp.length !== 6}
+                className="w-full h-11 bg-red-500 text-white text-xs font-bold rounded-xl active:scale-95 transition-all disabled:opacity-50 mb-2"
+              >
+                Confirmar exclusão
+              </button>
+              <button
+                onClick={() => setExEnviado(false)}
+                className="w-full h-10 text-gray-400 text-[11px] font-bold rounded-xl"
+              >
+                Reenviar código
+              </button>
+            </>
+          )}
+
+          {exMsg && <p className="text-[11px] text-green-600 text-center mt-2">{exMsg}</p>}
+          {exErr && <p className="text-[11px] text-red-500 text-center mt-2">{exErr}</p>}
+
+          <button
+            onClick={() => setExcluindo(false)}
+            className="w-full h-10 mt-2 text-gray-400 text-[11px] font-bold rounded-xl"
+          >
+            Cancelar
+          </button>
+        </div>
+        </div>
+        )}
+
+        {/* Detalhe do pedido (Utilidade 1) */}
+        {pedidoSelecionado && (
         <div className="fixed inset-0 z-40 bg-black/40 flex items-end justify-center">
           <div className="w-full max-w-lg bg-ice rounded-t-3xl max-h-[92vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             {loadingPedidoDetalhe && (
