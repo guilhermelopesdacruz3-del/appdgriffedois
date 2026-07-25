@@ -395,11 +395,15 @@ export async function salvarNotificacao(n: Omit<Notificacao, "id" | "lida" | "cr
   };
   if (!notif.email) return notif;
   if (sb) {
-    await sb.from("notificacoes").insert({
-      id: notif.id, email: notif.email, titulo: notif.titulo, corpo: notif.corpo,
-      tipo: notif.tipo, lida: notif.lida, created_at: notif.created_at,
-    }).catch(() => {});
-    return notif;
+    try {
+      await sb.from("notificacoes").insert({
+        id: notif.id, email: notif.email, titulo: notif.titulo, corpo: notif.corpo,
+        tipo: notif.tipo, lida: notif.lida, created_at: notif.created_at,
+      });
+      return notif;
+    } catch {
+      // Tabela pode não existir ainda — fallback para JSON local.
+    }
   }
   const lista = lerNotificacoesLocal();
   lista.push(notif);
@@ -410,20 +414,28 @@ export async function salvarNotificacao(n: Omit<Notificacao, "id" | "lida" | "cr
 export async function listarNotificacoes(email: string): Promise<Notificacao[]> {
   const e = (email || "").trim().toLowerCase();
   if (!e) return [];
+  let doSb: Notificacao[] = [];
   if (sb) {
-    const { data, error } = await sb
-      .from("notificacoes").select("*").eq("email", e).order("created_at", { ascending: false }).limit(50);
-    if (!error && data) return data as Notificacao[];
+    try {
+      const { data, error } = await sb
+        .from("notificacoes").select("*").eq("email", e).order("created_at", { ascending: false }).limit(50);
+      if (!error && data) doSb = data as Notificacao[];
+    } catch { /* ignora */ }
   }
-  return lerNotificacoesLocal().filter((n) => n.email === e);
+  // Mescla com o JSON local (fallback / histórico) e deduplica por id.
+  const local = lerNotificacoesLocal().filter((n) => n.email === e);
+  const mapa = new Map<string, Notificacao>();
+  for (const n of [...local, ...doSb]) mapa.set(n.id, n);
+  return Array.from(mapa.values()).sort((a, b) => (b.created_at < a.created_at ? -1 : 1));
 }
 
 export async function marcarNotificacaoLida(email: string, id: string): Promise<void> {
   const e = (email || "").trim().toLowerCase();
   if (!e) return;
   if (sb) {
-    await sb.from("notificacoes").update({ lida: true }).eq("email", e).eq("id", id).catch(() => {});
-    return;
+    try {
+      await sb.from("notificacoes").update({ lida: true }).eq("email", e).eq("id", id);
+    } catch { /* ignora */ }
   }
   const lista = lerNotificacoesLocal();
   const n = lista.find((x) => x.email === e && x.id === id);
