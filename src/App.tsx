@@ -17,6 +17,7 @@ import { ErrorBoundary } from "./components/ErrorBoundary";
 import ClienteCadastro from "./pages/ClienteCadastro";
 import AdminPage from "./pages/AdminPage";
 import { ClienteProvider, useCliente } from "./hooks/useCliente";
+import { useFidelidade } from "./hooks/useFidelidade";
 import { useNotificacoes } from "./hooks/useNotificacoes";
 import { ProductGridSkeleton } from "./components/ProductSkeleton";
 import { useFavorites, useRecentlyViewed } from "./hooks/useUserLists";
@@ -35,6 +36,7 @@ export default function App() {
 function AppInner() {
   const { cliente } = useCliente();
   const notif = useNotificacoes(cliente?.email);
+  const fid = useFidelidade(cliente?.email);
 
   const [currentPage, setCurrentPage] = useState("home");
   const [previousPage, setPreviousPage] = useState("home");
@@ -250,10 +252,10 @@ function AppInner() {
             onTryOn={handleTryOn}
           />
         )}
-        {currentPage === "loyalty" && <LoyaltyPage />}
+        {currentPage === "loyalty" && <LoyaltyPage fidelidade={fid.info} historicoFidelidade={fid.historico} fidelidadeLoading={fid.loading} />}
         {currentPage === "profile" && (
           <ErrorBoundary>
-            <ProfilePage onNavigate={handleNavigate} />
+            <ProfilePage onNavigate={handleNavigate} fidelidade={fid.info} />
           </ErrorBoundary>
         )}
         {currentPage === "cadastro" && <ClienteCadastro onVoltar={() => setCurrentPage("profile")} />}
@@ -293,6 +295,7 @@ function AppInner() {
         items={cartItems}
         isOpen={checkoutOpen}
         onClose={() => setCheckoutOpen(false)}
+        fidelidade={fid.info}
       />
 
       {/* Virtual Try-On */}

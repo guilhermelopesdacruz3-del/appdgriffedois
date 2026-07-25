@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { formatPrice, isValidEmail } from "../utils";
-import { useFidelidade } from "../hooks/useFidelidade";
+import { useCliente } from "../hooks/useCliente";
 import { validarCupom, usarCupom } from "../services/cupomApp";
 import { iniciarCheckout } from "../services/apiConfig";
 import type { Product } from "../data";
@@ -20,17 +20,17 @@ interface CheckoutDrawerProps {
 
 type Passo = "escolher" | "processando" | "pix" | "cartao" | "sucesso" | "erro";
 
-export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess }: CheckoutDrawerProps) {
+export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fidelidade: fid }: CheckoutDrawerProps & { fidelidade?: any }) {
+  const { cliente } = useCliente();
+  const email = cliente?.email || "";
   const [passo, setPasso] = useState<Passo>("escolher");
   const [erro, setErro] = useState<string | null>(null);
   const [pix, setPix] = useState<{ qr: string; copia: string } | null>(null);
   const [pontosC, setPontosC] = useState(0);
-  const [email, setEmail] = useState("");
   const [pontosResgate, setPontosResgate] = useState(0);
   const [cupomCodigo, setCupomCodigo] = useState("");
   const [cupomAplicado, setCupomAplicado] = useState<{ codigo: string; tipo: string; valor: number; id: string } | null>(null);
   const [cupomErro, setCupomErro] = useState<string | null>(null);
-  const { info: fid } = useFidelidade(email.trim().toLowerCase() || null);
 
   if (!isOpen) return null;
 

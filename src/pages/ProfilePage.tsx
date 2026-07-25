@@ -3,7 +3,6 @@ import type { ReactNode } from "react";
 import { useCliente } from "../hooks/useCliente";
 import { usePedidos } from "../hooks/usePedidos";
 import { useFavorites } from "../hooks/useUserLists";
-import { useFidelidade } from "../hooks/useFidelidade";
 import { usePedidoDetalhe } from "../hooks/usePedidoDetalhe";
 import OrderDetail from "../components/cliente/OrderDetail";
 import EditarPerfil from "../components/cliente/EditarPerfil";
@@ -203,12 +202,11 @@ function FavoritosSalvos({ email }: { email: string }) {
 
 type SubTela = "favoritos" | "cupons" | "dados" | "editar-perfil" | "seguranca" | "config" | "embreve" | "meus-pedidos" | "receitas";
 
-export default function ProfilePage({ onNavigate }: { onNavigate?: (page: string) => void }) {
+export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNavigate?: (page: string) => void; fidelidade?: any }) {
   const { cliente, loading: loadingCliente, error: erroCliente, entrarComEmail, sair, atualizarCliente } = useCliente();
   const [email, setEmail] = useState("");
   const { pedidos, loading: loadingPedidos, error: erroPedidos } = usePedidos(cliente?.id ?? null);
   const { favoriteIds, toggleFavorite } = useFavorites();
-  const { info: fidInfo } = useFidelidade(cliente?.email);
   const [subTela, setSubTela] = useState<SubTela | null>(null);
   const [pedidoSelecionado, setPedidoSelecionado] = useState<string | number | null>(null);
   const { pedido, loading: loadingPedidoDetalhe } = usePedidoDetalhe(pedidoSelecionado);

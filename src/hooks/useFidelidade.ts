@@ -1,5 +1,4 @@
-import { useEffect, useState } from "react";
-import { isValidEmail } from "../utils";
+import { useEffect, useRef, useState } from "react";
 
 const PROXY = (import.meta.env.VITE_LOJA_INTEGRADA_PROXY_URL as string | undefined)?.replace(/\/api\/loja-integrada\/?$/, "") || "";
 
@@ -26,15 +25,16 @@ export function useFidelidade(email: string | null | undefined) {
   const [historico, setHistorico] = useState<HistoricoItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const reqId = useRef(0);
 
   useEffect(() => {
     const e = (email || "").trim().toLowerCase();
-    if (!isValidEmail(e)) {
+    if (!e) {
       setInfo(null);
       setHistorico([]);
       return;
     }
-    let cancelado = false;
+    const id = ++reqId.current;
     setLoading(true);
     setErro(null);
     Promise.all([
@@ -42,15 +42,18 @@ export function useFidelidade(email: string | null | undefined) {
       fetch(`${PROXY}/api/fidelidade/historico?email=${encodeURIComponent(e)}`).then((r) => (r.ok ? r.json() : { historico: [] })),
     ])
       .then(([d, h]) => {
-        if (cancelado) return;
+        if (id !== reqId.current) return; // resposta de uma chamada anterior: descarta
         setInfo(d);
         setHistorico(Array.isArray(h.historico) ? h.historico : []);
       })
-      .catch((err) => !cancelado && setErro(err.message))
-      .finally(() => !cancelado && setLoading(false));
-    return () => {
-      cancelado = true;
-    };
+      .catch((err) => {
+        if (id !== reqId.current) return;
+        setErro(err.message);
+        // Em caso de falha de rede, mantém o que já tinha (não zera para 0).
+      })
+      .finally(() => {
+        if (id === reqId.current) setLoading(false);
+      });
   }, [email]);
 
   return { info, historico, loading, erro };

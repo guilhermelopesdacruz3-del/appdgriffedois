@@ -1,17 +1,14 @@
 import { benefits } from "../data";
 import { useCliente } from "../hooks/useCliente";
-import { useFidelidade } from "../hooks/useFidelidade";
-
 function formatarData(iso?: string): string {
   if (!iso) return "";
   const d = new Date(iso);
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
 }
 
-export default function LoyaltyPage() {
+export default function LoyaltyPage({ fidelidade: info, historicoFidelidade: historico, fidelidadeLoading: loading }: { fidelidade: any; historicoFidelidade?: any[]; fidelidadeLoading?: boolean }) {
   const { cliente } = useCliente();
   const email = cliente?.email || null;
-  const { info, historico, loading } = useFidelidade(email);
 
   const pontos = info?.pontos ?? 0;
   const regras = info?.regras ?? { pontosPorReal: 1, pontosPorDesconto: 100 };
