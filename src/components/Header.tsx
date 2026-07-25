@@ -7,9 +7,11 @@ interface HeaderProps {
   title?: string;
   dark?: boolean;
   onSearch?: (query: string) => void;
+  notifNaoLidas?: number;
+  onNotifClick?: () => void;
 }
 
-export default function Header({ cartCount, onCartClick, onBack, title, dark = false, onSearch }: HeaderProps) {
+export default function Header({ cartCount, onCartClick, onBack, title, dark = false, onSearch, notifNaoLidas = 0, onNotifClick }: HeaderProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -66,6 +68,24 @@ export default function Header({ cartCount, onCartClick, onBack, title, dark = f
               <circle cx="11" cy="11" r="8" />
               <path d="M21 21l-4.35-4.35" />
             </svg>
+          </button>
+
+          {/* Notificações */}
+          <button
+            onClick={onNotifClick}
+            className={`w-9 h-9 flex items-center justify-center rounded-full relative transition-all ${
+              dark ? 'bg-luxury-gray text-white' : 'bg-ice text-luxury-black hover:bg-ice-dark'
+            }`}
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8A6 6 0 006 8c0 7-3 9-3 9h18s-3-2-3-9" />
+              <path d="M13.73 21a2 2 0 01-3.46 0" />
+            </svg>
+            {notifNaoLidas > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-gold text-luxury-black text-[10px] font-bold rounded-full flex items-center justify-center animate-scale-in">
+                {notifNaoLidas > 9 ? "9+" : notifNaoLidas}
+              </span>
+            )}
           </button>
 
           {/* Cart */}

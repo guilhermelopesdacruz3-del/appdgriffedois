@@ -37,7 +37,7 @@ import * as segredos from "./db.ts";
 import { processarCheckout } from "./pagamento.ts";
 import { processarWebhookMP } from "./webhook.ts";
 import { listarVideosRecentes } from "./youtube.ts";
-import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade } from "./db.ts";
+import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade, salvarNotificacao, listarNotificacoes, marcarNotificacaoLida } from "./db.ts";
 import cupomApp from "./cupom.ts";
 import { receitasApp } from "./receitas";
 import { favoritosApp } from "./favoritos";
@@ -664,7 +664,13 @@ app.get("/api/admin/clientes", requireAdmin, async (_req, res) => {
       c.pedidos += 1;
       c.total += Number(p.valor_total || p.valor_subtotal || 0) || 0;
     }
-    const clientes = Array.from(mapa.values()).map((c) => ({ ...c, total: Number(c.total.toFixed(2)) }));
+    const clientes = await Promise.all(
+      Array.from(mapa.values()).map(async (c) => ({
+        ...c,
+        total: Number(c.total.toFixed(2)),
+        pontos: await segredos.getPontos(c.email),
+      }))
+    );
     clientes.sort((a, b) => b.total - a.total);
     return res.json({ total: clientes.length, clientes });
   } catch (err) {
@@ -803,6 +809,83 @@ app.post("/api/admin/fidelidade/regras", requireAdmin, async (req, res) => {
 // funcionar ponta a ponta. Em produção, cria o pedido na Loja Integrada primeiro,
 // usa o número do pedido como external_reference e depois chama o Mercado Pago.
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// NOTIFICAÇÕES IN-APP (fase 1: cupons/promoções via admin)
+// ---------------------------------------------------------------------------
+
+// Admin envia notificação para clientes filtrados (cupom/promoção/geral).
+app.post("/api/admin/notificar", requireAdmin, async (req, res) => {
+  try {
+    const { titulo, corpo, tipo, filtros } = req.body || {};
+    if (!titulo || !corpo) return res.status(400).json({ erro: "Informe título e corpo." });
+    const f = filtros || {};
+    // Busca a base de clientes e aplica filtros.
+    const { clientes } = await (async () => {
+      const objects = await buscarTodosPedidos();
+      const mapa = new Map();
+      for (const p of objects) {
+        const email = (p.cliente_email || "").toLowerCase();
+        if (!email) continue;
+        if (!mapa.has(email)) mapa.set(email, { email, nome: p.cliente_nome || "" });
+        const c = mapa.get(email);
+        c.pedidos = (c.pedidos || 0) + 1;
+      }
+      return { clientes: Array.from(mapa.values()) };
+    })();
+    const alvo = clientes.filter((c: any) => {
+      if (f.email && !c.email.includes(String(f.email).toLowerCase())) return false;
+      if (f.nome && !c.nome.toLowerCase().includes(String(f.nome).toLowerCase())) return false;
+      if (typeof f.pontosMin === "number" && f.pontosMin > 0) {
+        // Enriquecido com pontos sob demanda (só quem passou no filtro).
+        // Feito abaixo em duas etapas para não buscar pontos de todos.
+      }
+      return true;
+    });
+    // Filtro de pontos mínimos (busca pontos só dos já filtrados).
+    let final = alvo;
+    if (typeof f.pontosMin === "number" && f.pontosMin > 0) {
+      const comPontos = await Promise.all(alvo.map(async (c: any) => ({ ...c, pontos: await segredos.getPontos(c.email) })));
+      final = comPontos.filter((c: any) => (c.pontos || 0) >= f.pontosMin);
+    }
+    if (final.length === 0) return res.status(400).json({ erro: "Nenhum cliente corresponde aos filtros." });
+    let enviadas = 0;
+    for (const c of final) {
+      await salvarNotificacao({ email: c.email, titulo, corpo, tipo: tipo || "geral" });
+      enviadas++;
+    }
+    await registrarLog({ admin_email: (req as any).adminEmail || "admin", acao: "notificar", detalhe: { titulo, tipo, filtros, destinatarios: enviadas } }).catch(() => {});
+    return res.json({ ok: true, enviadas, destinatarios: final.length });
+  } catch (err: any) {
+    console.error("[notificar] falha:", err);
+    return res.status(502).json({ erro: "Falha ao enviar notificações." });
+  }
+});
+
+// Cliente logado lista suas notificações.
+app.get("/api/notificacoes", async (req, res) => {
+  const email = String((req.query.email as string) || "").trim().toLowerCase();
+  if (!email) return res.status(400).json({ erro: "Informe o e-mail." });
+  try {
+    const notifs = await listarNotificacoes(email);
+    const naoLidas = notifs.filter((n) => !n.lida).length;
+    return res.json({ notificacoes: notifs, naoLidas });
+  } catch (err) {
+    return res.status(500).json({ erro: "Falha ao listar notificações." });
+  }
+});
+
+// Cliente marca como lida.
+app.post("/api/notificacoes/:id/lida", async (req, res) => {
+  const email = String((req.query.email as string) || "").trim().toLowerCase();
+  if (!email) return res.status(400).json({ erro: "Informe o e-mail." });
+  try {
+    await marcarNotificacaoLida(email, req.params.id);
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ erro: "Falha ao marcar como lida." });
+  }
+});
+
 async function criarPedidoLI(email, items, total) {
   if (!email || !Array.isArray(items) || items.length === 0) return null;
   const clienteResp = await chamarLI("GET", "cliente", undefined, { email, limit: 1 });

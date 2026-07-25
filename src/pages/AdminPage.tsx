@@ -23,6 +23,7 @@ import { saveApiConfig } from "../services/apiConfig";
 import { BarChart, PieChart, KpiCard } from "../components/admin/AdminCharts";
 import CuponsAdmin from "./admin/CuponsAdmin";
 import FidelidadeAdmin from "./admin/FidelidadeAdmin";
+import NotificacoesAdmin from "./admin/NotificacoesAdmin";
 import AdminDashboard from "./AdminDashboard";
 
 function downloadCSV(csv: string, filename: string) {
@@ -35,7 +36,7 @@ function downloadCSV(csv: string, filename: string) {
   URL.revokeObjectURL(url);
 }
 
-type Aba = "pedidos" | "dashboard" | "cupons" | "fidelidade" | "relatorios" | "logs";
+type Aba = "pedidos" | "dashboard" | "cupons" | "fidelidade" | "notificacoes" | "relatorios" | "logs";
 
 export default function AdminPage({ onExit }: { onExit: () => void }) {
   const [token, setToken] = useState<string | null>(() => getAdminToken());
@@ -353,7 +354,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
         </div>
 
         <div className="flex gap-1 px-4 pt-3">
-          {(["pedidos", "dashboard", "cupons", "fidelidade", "relatorios", "logs"] as Aba[]).map((a) => (
+          {(["pedidos", "dashboard", "cupons", "fidelidade", "notificacoes", "relatorios", "logs"] as Aba[]).map((a) => (
             <button
               key={a}
               onClick={() => setAba(a)}
@@ -504,6 +505,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
 
           {aba === "cupons" && <CuponsAdmin />}
           {aba === "fidelidade" && <FidelidadeAdmin />}
+          {aba === "notificacoes" && <NotificacoesAdmin />}
           {aba === "relatorios" && (
             <>
               {relLoading && (

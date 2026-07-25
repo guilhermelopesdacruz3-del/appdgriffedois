@@ -353,6 +353,83 @@ export async function registrarLog(entry: AdminLog): Promise<void> {
   });
 }
 
+// ---------------------------------------------------------------------------
+// NOTIFICAÇÕES IN-APP (cliente) — fase 1: cupons/promoções via admin.
+// Fallback Supabase (tabela notificacoes) -> arquivo .notificacoes.json local.
+// ---------------------------------------------------------------------------
+export interface Notificacao {
+  id: string;
+  email: string;
+  titulo: string;
+  corpo: string;
+  tipo: "cupom" | "promocao" | "produto" | "carrinho" | "geral";
+  lida: boolean;
+  created_at: string;
+}
+
+const NOTIF_LOCAL_PATH = path.join(__dirname, ".notificacoes.json");
+
+function lerNotificacoesLocal(): Notificacao[] {
+  try {
+    const raw = fs.readFileSync(NOTIF_LOCAL_PATH, "utf8");
+    return JSON.parse(raw) as Notificacao[];
+  } catch {
+    return [];
+  }
+}
+function salvarNotificacoesLocal(lista: Notificacao[]): void {
+  try {
+    fs.writeFileSync(NOTIF_LOCAL_PATH, JSON.stringify(lista, null, 2));
+  } catch { /* ignora */ }
+}
+
+export async function salvarNotificacao(n: Omit<Notificacao, "id" | "lida" | "created_at"> & Partial<Notificacao>): Promise<Notificacao> {
+  const notif: Notificacao = {
+    id: n.id || `ntf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    email: (n.email || "").trim().toLowerCase(),
+    titulo: n.titulo || "",
+    corpo: n.corpo || "",
+    tipo: (n.tipo || "geral") as Notificacao["tipo"],
+    lida: n.lida ?? false,
+    created_at: n.created_at || new Date().toISOString(),
+  };
+  if (!notif.email) return notif;
+  if (sb) {
+    await sb.from("notificacoes").insert({
+      id: notif.id, email: notif.email, titulo: notif.titulo, corpo: notif.corpo,
+      tipo: notif.tipo, lida: notif.lida, created_at: notif.created_at,
+    }).catch(() => {});
+    return notif;
+  }
+  const lista = lerNotificacoesLocal();
+  lista.push(notif);
+  salvarNotificacoesLocal(lista);
+  return notif;
+}
+
+export async function listarNotificacoes(email: string): Promise<Notificacao[]> {
+  const e = (email || "").trim().toLowerCase();
+  if (!e) return [];
+  if (sb) {
+    const { data, error } = await sb
+      .from("notificacoes").select("*").eq("email", e).order("created_at", { ascending: false }).limit(50);
+    if (!error && data) return data as Notificacao[];
+  }
+  return lerNotificacoesLocal().filter((n) => n.email === e);
+}
+
+export async function marcarNotificacaoLida(email: string, id: string): Promise<void> {
+  const e = (email || "").trim().toLowerCase();
+  if (!e) return;
+  if (sb) {
+    await sb.from("notificacoes").update({ lida: true }).eq("email", e).eq("id", id).catch(() => {});
+    return;
+  }
+  const lista = lerNotificacoesLocal();
+  const n = lista.find((x) => x.email === e && x.id === id);
+  if (n) { n.lida = true; salvarNotificacoesLocal(lista); }
+}
+
 export function supabaseClient(): SupabaseClient | null {
   return sb;
 }

@@ -16,7 +16,8 @@ import ProfilePage from "./pages/ProfilePage";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import ClienteCadastro from "./pages/ClienteCadastro";
 import AdminPage from "./pages/AdminPage";
-import { ClienteProvider } from "./hooks/useCliente";
+import { ClienteProvider, useCliente } from "./hooks/useCliente";
+import { useNotificacoes } from "./hooks/useNotificacoes";
 import { ProductGridSkeleton } from "./components/ProductSkeleton";
 import { useFavorites, useRecentlyViewed } from "./hooks/useUserLists";
 
@@ -28,6 +29,13 @@ interface CartItem {
 }
 
 export default function App() {
+  return <ClienteProvider><AppInner /></ClienteProvider>;
+}
+
+function AppInner() {
+  const { cliente } = useCliente();
+  const notif = useNotificacoes(cliente?.email);
+
   const [currentPage, setCurrentPage] = useState("home");
   const [previousPage, setPreviousPage] = useState("home");
   const [selectedProduct, setSelectedProduct] = useState<Product | null>(null);
@@ -179,8 +187,7 @@ export default function App() {
   const isProductPage = currentPage === "product";
 
   return (
-    <ClienteProvider>
-      <div className="max-w-lg mx-auto min-h-screen bg-ice relative">
+    <div className="max-w-lg mx-auto min-h-screen bg-ice relative">
       {/* Header */}
       <Header
         cartCount={cartCount}
@@ -189,6 +196,8 @@ export default function App() {
         title={isProductPage ? "" : undefined}
         dark={false}
         onSearch={handleSearch}
+        notifNaoLidas={notif.naoLidas}
+        onNotifClick={() => notif.setAberto(true)}
       />
 
       {/* Page Content */}
@@ -296,6 +305,36 @@ export default function App() {
         />
       )}
 
+      {/* Painel de Notificações */}
+      {notif.aberto && (
+        <div className="fixed top-16 right-4 left-4 z-[80] max-w-lg mx-auto animate-slide-down">
+          <div className="bg-white rounded-2xl shadow-xl border border-gray-100 max-h-[70vh] overflow-y-auto">
+            <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+              <p className="text-sm font-bold text-luxury-black">Notificações</p>
+              <button onClick={() => notif.setAberto(false)} className="text-gray-400 text-xs">Fechar</button>
+            </div>
+            {notif.notificacoes.length === 0 ? (
+              <p className="text-xs text-gray-400 text-center py-8">Nenhuma notificação ainda.</p>
+            ) : (
+              notif.notificacoes.map((n) => (
+                <button
+                  key={n.id}
+                  onClick={() => notif.marcarLida(n.id)}
+                  className="w-full text-left px-4 py-3 border-b border-gray-50 flex gap-3 active:bg-ice"
+                >
+                  <div className="flex-1">
+                    <p className="text-xs font-bold text-luxury-black">{n.titulo}</p>
+                    <p className="text-[11px] text-gray-500 mt-0.5">{n.corpo}</p>
+                    <p className="text-[9px] text-gray-300 mt-1 uppercase">{n.tipo}</p>
+                  </div>
+                  {!n.lida && <span className="w-2 h-2 rounded-full bg-gold mt-1 flex-shrink-0" />}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Cart Notification */}
       {showCartNotification && (
         <div className="fixed top-16 left-4 right-4 z-[80] max-w-lg mx-auto animate-slide-down">
@@ -327,6 +366,7 @@ export default function App() {
         </div>
       )}
       </div>
-    </ClienteProvider>
   );
 }
+
+
