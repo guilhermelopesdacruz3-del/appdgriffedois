@@ -28,6 +28,10 @@ android_old/
 # Cache de vídeos do YouTube (gerado em runtime, não versionar)
 server/.youtube-cache.json
 
+# Estado local do servidor (fallback JSON — pode conter dados de runtime/teste; NUNCA comitar)
+server/.notificacoes.json
+server/.admin-state.json
+
 # Logs e lixo
 *.log
 npm-debug.log*
