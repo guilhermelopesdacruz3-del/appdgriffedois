@@ -779,6 +779,14 @@ app.post("/api/admin/fidelidade/ajustar", requireAdmin, async (req, res) => {
     if (op === "resgatar") saldo = await segredos.resgatarPontos(e, pts);
     else if (op === "definir") saldo = await setarPontos(e, pts);
     else saldo = await segredos.creditarPontos(e, pts / (await segredos.getRegrasFidelidade()).pontosPorReal, motivo || "ajuste admin");
+    // Avisa o cliente no app (sino de notificações) sobre a mudança de pontos.
+    const verbo = op === "resgatar" ? "resgatou" : op === "definir" ? "atualizou para" : "creditou";
+    await salvarNotificacao({
+      email: e,
+      titulo: "Pontos de fidelidade atualizados",
+      corpo: `O admin ${verbo} ${pts} ponto(s). Seu saldo agora é ${saldo} pts.`,
+      tipo: "geral",
+    }).catch(() => {});
     await registrarLog({ admin_email: req.adminEmail || "admin", acao: "fidelidade_ajustar", detalhe: { email: e, operacao: op, pontos: pts, saldo } });
     return res.json({ ok: true, email: e, operacao: op, saldo });
   } catch (err) {

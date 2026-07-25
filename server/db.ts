@@ -166,12 +166,16 @@ export async function getRegrasFidelidade(): Promise<{ pontosPorReal: number; po
 export async function getPontos(email: string): Promise<number> {
   const e = (email || "").trim().toLowerCase();
   if (!e) return 0;
+  let doSb = 0;
   if (sb) {
-    const { data, error } = await sb.from("fidelidade").select("pontos").eq("email", e).single();
-    if (error || !data) return 0;
-    return data.pontos || 0;
+    try {
+      const { data, error } = await sb.from("fidelidade").select("pontos").eq("email", e).single();
+      if (!error && data) doSb = data.pontos || 0;
+    } catch { /* ignora */ }
   }
-  return lerFidelidadeLocal()[e] || 0;
+  // Mescla com o espelho local (fonte de verdade quando o SB não persiste).
+  const local = lerFidelidadeLocal()[e] || 0;
+  return Math.max(doSb, local);
 }
 
 // Credita pontos após pagamento aprovado. valorGasto em reais.
@@ -182,16 +186,18 @@ export async function creditarPontos(email: string, valorGasto: number, ref?: st
   const pontos = Math.floor(valorGasto * pontosPorReal);
   if (pontos <= 0) return 0;
   if (sb) {
-    const { error } = await sb.rpc("creditar_pontos", { p_email: e, p_pontos: pontos, p_ref: ref || null });
-    // Se a RPC não existir, fazemos upsert manual:
-    if (error) {
-      const { data } = await sb.from("fidelidade").select("pontos").eq("email", e).single();
-      const atual = (data?.pontos || 0) + pontos;
-      await sb.from("fidelidade").upsert({ email: e, pontos: atual, updated_at: new Date().toISOString() }, { onConflict: "email" });
-      await sb.from("fidelidade_historico").insert({ email: e, tipo: "credito", pontos, motivo: "compra", ref: ref || null });
-    }
-    return pontos;
+    try {
+      const { error } = await sb.rpc("creditar_pontos", { p_email: e, p_pontos: pontos, p_ref: ref || null });
+      // Se a RPC não existir, fazemos upsert manual:
+      if (error) {
+        const { data } = await sb.from("fidelidade").select("pontos").eq("email", e).single();
+        const atual = (data?.pontos || 0) + pontos;
+        await sb.from("fidelidade").upsert({ email: e, pontos: atual, updated_at: new Date().toISOString() }, { onConflict: "email" });
+        await sb.from("fidelidade_historico").insert({ email: e, tipo: "credito", pontos, motivo: "compra", ref: ref || null });
+      }
+    } catch { /* ignora — espelho local abaixo garante */ }
   }
+  // Espelho local: sempre soma (fonte de verdade quando o SB não persiste).
   const store = lerFidelidadeLocal();
   store[e] = (store[e] || 0) + pontos;
   salvarFidelidadeLocal(store);
@@ -260,18 +266,26 @@ export async function confirmarPagamentoMP(mpPaymentId: string, creditouPontos: 
 export async function resgatarPontos(email: string, pontos: number): Promise<number> {
   const e = (email || "").trim().toLowerCase();
   if (!e || pontos <= 0) return 0;
+  // Saldo efetivo = máximo entre SB e espelho local.
+  const saldoLocal = lerFidelidadeLocal()[e] || 0;
+  let saldo = saldoLocal;
   if (sb) {
-    const { data } = await sb.from("fidelidade").select("pontos").eq("email", e).single();
-    const saldo = data?.pontos || 0;
-    if (saldo < pontos) return 0;
-    await sb.from("fidelidade").upsert({ email: e, pontos: saldo - pontos, updated_at: new Date().toISOString() }, { onConflict: "email" });
-    await sb.from("fidelidade_historico").insert({ email: e, tipo: "resgate", pontos, motivo: "desconto", ref: null });
-    return pontos;
+    try {
+      const { data } = await sb.from("fidelidade").select("pontos").eq("email", e).single();
+      saldo = Math.max(saldoLocal, data?.pontos || 0);
+    } catch { /* ignora */ }
   }
-  const store = lerFidelidadeLocal();
-  const saldo = store[e] || 0;
   if (saldo < pontos) return 0;
-  store[e] = saldo - pontos;
+  const novo = saldo - pontos;
+  if (sb) {
+    try {
+      await sb.from("fidelidade").upsert({ email: e, pontos: novo, updated_at: new Date().toISOString() }, { onConflict: "email" });
+      await sb.from("fidelidade_historico").insert({ email: e, tipo: "resgate", pontos, motivo: "desconto", ref: null });
+    } catch { /* ignora */ }
+  }
+  // Espelho local: sempre atualiza.
+  const store = lerFidelidadeLocal();
+  store[e] = novo;
   salvarFidelidadeLocal(store);
   return pontos;
 }
@@ -293,10 +307,12 @@ export async function setarPontos(email: string, pontos: number): Promise<number
   const p = Math.max(0, Math.floor(pontos || 0));
   if (!e) return 0;
   if (sb) {
-    await sb.from("fidelidade").upsert({ email: e, pontos: p, updated_at: new Date().toISOString() }, { onConflict: "email" });
-    await sb.from("fidelidade_historico").insert({ email: e, tipo: "credito", pontos: p, motivo: "ajuste manual", ref: null });
-    return p;
+    try {
+      await sb.from("fidelidade").upsert({ email: e, pontos: p, updated_at: new Date().toISOString() }, { onConflict: "email" });
+      await sb.from("fidelidade_historico").insert({ email: e, tipo: "credito", pontos: p, motivo: "ajuste manual", ref: null });
+    } catch { /* ignora — espelho local garante persistência */ }
   }
+  // Espelho local: sempre grava (fonte de verdade quando o SB não persiste).
   const store = lerFidelidadeLocal();
   store[e] = p;
   salvarFidelidadeLocal(store);
