@@ -166,16 +166,21 @@ export async function getRegrasFidelidade(): Promise<{ pontosPorReal: number; po
 export async function getPontos(email: string): Promise<number> {
   const e = (email || "").trim().toLowerCase();
   if (!e) return 0;
-  let doSb = 0;
+  // Se há Supabase, ele É a fonte de verdade (persiste entre reinícios do Render).
+  // O espelho local (arquivo) é efêmero no Render e só serve p/ dev sem banco.
   if (sb) {
     try {
       const { data, error } = await sb.from("fidelidade").select("pontos").eq("email", e).single();
-      if (!error && data) doSb = data.pontos || 0;
-    } catch { /* ignora */ }
+      if (!error && data) return data.pontos || 0;
+      if (error && /does not exist|relation/i.test(error.message)) {
+        console.warn("[fidelidade] tabela 'fidelidade' ausente no Supabase — retornando 0.");
+      }
+      return 0;
+    } catch {
+      return 0;
+    }
   }
-  // Mescla com o espelho local (fonte de verdade quando o SB não persiste).
-  const local = lerFidelidadeLocal()[e] || 0;
-  return Math.max(doSb, local);
+  return lerFidelidadeLocal()[e] || 0;
 }
 
 // Credita pontos após pagamento aprovado. valorGasto em reais.
@@ -186,18 +191,21 @@ export async function creditarPontos(email: string, valorGasto: number, ref?: st
   const pontos = Math.floor(valorGasto * pontosPorReal);
   if (pontos <= 0) return 0;
   if (sb) {
+    // Supabase é a fonte de verdade em produção — não usar espelho local efêmero.
     try {
       const { error } = await sb.rpc("creditar_pontos", { p_email: e, p_pontos: pontos, p_ref: ref || null });
-      // Se a RPC não existir, fazemos upsert manual:
       if (error) {
         const { data } = await sb.from("fidelidade").select("pontos").eq("email", e).single();
         const atual = (data?.pontos || 0) + pontos;
         await sb.from("fidelidade").upsert({ email: e, pontos: atual, updated_at: new Date().toISOString() }, { onConflict: "email" });
         await sb.from("fidelidade_historico").insert({ email: e, tipo: "credito", pontos, motivo: "compra", ref: ref || null });
       }
-    } catch { /* ignora — espelho local abaixo garante */ }
+      return pontos;
+    } catch {
+      return 0; // falha no SB não deve criar saldo fantasma no arquivo local
+    }
   }
-  // Espelho local: sempre soma (fonte de verdade quando o SB não persiste).
+  // Sem Supabase (dev/local): espelho em arquivo.
   const store = lerFidelidadeLocal();
   store[e] = (store[e] || 0) + pontos;
   salvarFidelidadeLocal(store);
@@ -266,24 +274,24 @@ export async function confirmarPagamentoMP(mpPaymentId: string, creditouPontos: 
 export async function resgatarPontos(email: string, pontos: number): Promise<number> {
   const e = (email || "").trim().toLowerCase();
   if (!e || pontos <= 0) return 0;
-  // Saldo efetivo = máximo entre SB e espelho local.
-  const saldoLocal = lerFidelidadeLocal()[e] || 0;
-  let saldo = saldoLocal;
+  // Saldo efetivo vindo do Supabase (fonte de verdade em produção).
   if (sb) {
     try {
       const { data } = await sb.from("fidelidade").select("pontos").eq("email", e).single();
-      saldo = Math.max(saldoLocal, data?.pontos || 0);
-    } catch { /* ignora */ }
-  }
-  if (saldo < pontos) return 0;
-  const novo = saldo - pontos;
-  if (sb) {
-    try {
+      const saldo = data?.pontos || 0;
+      if (saldo < pontos) return 0;
+      const novo = saldo - pontos;
       await sb.from("fidelidade").upsert({ email: e, pontos: novo, updated_at: new Date().toISOString() }, { onConflict: "email" });
       await sb.from("fidelidade_historico").insert({ email: e, tipo: "resgate", pontos, motivo: "desconto", ref: null });
-    } catch { /* ignora */ }
+      return pontos;
+    } catch {
+      return 0;
+    }
   }
-  // Espelho local: sempre atualiza.
+  // Sem Supabase (dev/local): espelho em arquivo.
+  const saldoLocal = lerFidelidadeLocal()[e] || 0;
+  if (saldoLocal < pontos) return 0;
+  const novo = saldoLocal - pontos;
   const store = lerFidelidadeLocal();
   store[e] = novo;
   salvarFidelidadeLocal(store);
@@ -307,12 +315,16 @@ export async function setarPontos(email: string, pontos: number): Promise<number
   const p = Math.max(0, Math.floor(pontos || 0));
   if (!e) return 0;
   if (sb) {
+    // Supabase é a fonte de verdade em produção.
     try {
       await sb.from("fidelidade").upsert({ email: e, pontos: p, updated_at: new Date().toISOString() }, { onConflict: "email" });
       await sb.from("fidelidade_historico").insert({ email: e, tipo: "credito", pontos: p, motivo: "ajuste manual", ref: null });
-    } catch { /* ignora — espelho local garante persistência */ }
+      return p;
+    } catch {
+      return 0;
+    }
   }
-  // Espelho local: sempre grava (fonte de verdade quando o SB não persiste).
+  // Sem Supabase (dev/local): espelho em arquivo.
   const store = lerFidelidadeLocal();
   store[e] = p;
   salvarFidelidadeLocal(store);

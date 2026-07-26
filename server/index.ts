@@ -345,9 +345,22 @@ app.use((req, res, next) => {
     res.setHeader("Strict-Transport-Security", "max-age=63072000; includeSubDomains; preload");
   }
   // CSP: permite estilos/imagens e fontes do app; bloqueia injects.
+  // Mantém 'unsafe-inline' porque o app é single-file (vite-plugin-singlefile
+  // injeta o JS/CSS inline). Próximo passo: migrar para nonce (requer reconfigurar
+  // o plugin de build). Enquanto isso, endurecemos as demais diretivas.
   res.setHeader(
     "Content-Security-Policy",
-    "default-src 'self'; img-src 'self' data: https:; style-src 'self' 'unsafe-inline'; font-src 'self' https:; connect-src 'self' https:; script-src 'self' 'unsafe-inline'; frame-ancestors 'none'"
+    "default-src 'self'; " +
+      "img-src 'self' data: https:; " +
+      "style-src 'self' 'unsafe-inline'; " +
+      "font-src 'self' https:; " +
+      "connect-src 'self' https:; " +
+      "script-src 'self' 'unsafe-inline'; " +
+      "object-src 'none'; " +
+      "base-uri 'self'; " +
+      "form-action 'self'; " +
+      "frame-ancestors 'none'; " +
+      "upgrade-insecure-requests"
   );
   next();
 });

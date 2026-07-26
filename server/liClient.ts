@@ -118,8 +118,19 @@ export async function criarPedidoLI(opts: {
   valor: number;
   meio: "pix" | "cartao";
 }): Promise<number | null> {
-  // Situação inicial: "Em aberto" / "Aguardando pagamento".
-  const situacao = await buscarUri("situacaopedido", ["em aberto", "aguardando", "aberto", "pendente"]);
+  // Situação inicial: "Em aberto" / "Aguardando pagamento". Se não achar nenhuma
+  // das esperadas, usa a PRIMEIRA situação disponível (fallback) para garantir
+  // que o pedido sempre tenha uma situação válida na LI.
+  let situacao = await buscarUri("situacaopedido", ["em aberto", "aguardando", "aberto", "pendente"]);
+  if (!situacao) {
+    try {
+      const { status, payload } = await chamarLI("GET", "situacaopedido", undefined, { limit: 100 });
+      if (status === 200 && Array.isArray(payload?.objects) && payload.objects[0]) {
+        const o = payload.objects[0];
+        situacao = o.resource_uri || (o.id ? `/api/v1/situacaopedido/${o.id}/` : null);
+      }
+    } catch { /* ignora */ }
+  }
   const pagamento = await buscarUri("formapagamento", [opts.meio === "pix" ? "pix" : "cartao", "cartão"]);
 
   const itens = opts.itens
