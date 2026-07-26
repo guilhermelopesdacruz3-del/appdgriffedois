@@ -1,8 +1,8 @@
 import { useState, useEffect } from "react";
 import type { ReactNode } from "react";
 import { useCliente } from "../hooks/useCliente";
+import { type EnderecoCliente } from "../services/cliente";
 import { usePedidos } from "../hooks/usePedidos";
-import { useFavorites } from "../hooks/useUserLists";
 import { usePedidoDetalhe } from "../hooks/usePedidoDetalhe";
 import OrderDetail from "../components/cliente/OrderDetail";
 import EditarPerfil from "../components/cliente/EditarPerfil";
@@ -200,13 +200,128 @@ function FavoritosSalvos({ email }: { email: string }) {
   );
 }
 
-type SubTela = "favoritos" | "cupons" | "dados" | "editar-perfil" | "seguranca" | "config" | "embreve" | "meus-pedidos" | "receitas";
+type SubTela = "favoritos" | "cupons" | "dados" | "editar-perfil" | "seguranca" | "config" | "embreve" | "meus-pedidos" | "receitas" | "enderecos" | "preferencias";
+
+// ---------------------------------------------------------------------------
+// C3 — Livro de endereços
+// ---------------------------------------------------------------------------
+function EnderecosPage({ voltar }: { voltar: () => void }) {
+  const { enderecos, carregarEnderecos, salvarEndereco, removerEndereco } = useCliente();
+  const [form, setForm] = useState<Omit<EnderecoCliente, "id" | "email">>({
+    nome: "", endereco: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "", cep: "", principal: false,
+  });
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => { carregarEnderecos(); }, [carregarEnderecos]);
+
+  const submit = async () => {
+    setErro(null);
+    if (!form.nome || !form.endereco || !form.numero || !form.cidade || !form.estado || !form.cep) {
+      setErro("Preencha os campos obrigatórios.");
+      return;
+    }
+    setSalvando(true);
+    try {
+      await salvarEndereco(form);
+      setForm({ nome: "", endereco: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "", cep: "", principal: false });
+    } catch (e) {
+      setErro((e as Error).message);
+    } finally {
+      setSalvando(false);
+    }
+  };
+
+  return (
+    <div className="px-5 pt-6 pb-4">
+      <button onClick={voltar} className="text-xs text-gray-400 mb-3">‹ Voltar</button>
+      <h3 className="text-base font-bold text-luxury-black mb-4">Meus Endereços</h3>
+
+      <div className="space-y-2">
+        {enderecos.map((en) => (
+          <div key={en.id} className="bg-white rounded-2xl p-4 shadow-sm">
+            <div className="flex items-start justify-between">
+              <div>
+                <p className="text-xs font-bold text-luxury-black">{en.nome}{en.principal && " · principal"}</p>
+                <p className="text-[11px] text-gray-500">{en.endereco}, {en.numero}{en.complemento ? ` - ${en.complemento}` : ""}</p>
+                <p className="text-[11px] text-gray-500">{en.bairro ? `${en.bairro}, ` : ""}{en.cidade}/{en.estado} - {en.cep}</p>
+              </div>
+              <button onClick={() => removerEndereco(en.id!)} className="text-[10px] font-bold text-red-500">Excluir</button>
+            </div>
+          </div>
+        ))}
+        {enderecos.length === 0 && <p className="text-xs text-gray-400 text-center">Nenhum endereço salvo.</p>}
+      </div>
+
+      <div className="bg-white rounded-2xl p-4 shadow-sm mt-4 space-y-2">
+        <p className="text-xs font-bold text-luxury-black mb-1">Adicionar endereço</p>
+        <input value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} placeholder="Apelido (Casa, Trabalho) *" className="w-full h-10 px-3 rounded-xl border border-gray-200 text-xs" />
+        <div className="flex gap-2">
+          <input value={form.endereco} onChange={(e) => setForm({ ...form, endereco: e.target.value })} placeholder="Logradouro *" className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-xs" />
+          <input value={form.numero} onChange={(e) => setForm({ ...form, numero: e.target.value })} placeholder="Número *" className="w-24 h-10 px-3 rounded-xl border border-gray-200 text-xs" />
+        </div>
+        <input value={form.complemento} onChange={(e) => setForm({ ...form, complemento: e.target.value })} placeholder="Complemento" className="w-full h-10 px-3 rounded-xl border border-gray-200 text-xs" />
+        <input value={form.bairro} onChange={(e) => setForm({ ...form, bairro: e.target.value })} placeholder="Bairro" className="w-full h-10 px-3 rounded-xl border border-gray-200 text-xs" />
+        <div className="flex gap-2">
+          <input value={form.cidade} onChange={(e) => setForm({ ...form, cidade: e.target.value })} placeholder="Cidade *" className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-xs" />
+          <input value={form.estado} onChange={(e) => setForm({ ...form, estado: e.target.value })} placeholder="UF *" className="w-20 h-10 px-3 rounded-xl border border-gray-200 text-xs" />
+        </div>
+        <input value={form.cep} onChange={(e) => setForm({ ...form, cep: e.target.value })} placeholder="CEP *" className="w-full h-10 px-3 rounded-xl border border-gray-200 text-xs" />
+        <label className="flex items-center gap-2 text-xs text-gray-600">
+          <input type="checkbox" checked={form.principal} onChange={(e) => setForm({ ...form, principal: e.target.checked })} className="w-4 h-4 accent-gold" />
+          Endereço principal
+        </label>
+        {erro && <p className="text-[11px] text-red-500">{erro}</p>}
+        <button onClick={submit} disabled={salvando} className="w-full h-10 bg-luxury-black text-white text-xs font-bold rounded-xl disabled:opacity-50">
+          {salvando ? "Salvando..." : "Salvar endereço"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// C7 — Preferências de notificação
+// ---------------------------------------------------------------------------
+function PreferenciasPage({ voltar }: { voltar: () => void }) {
+  const { preferencias, salvarPreferencias } = useCliente();
+  const [opts, setOpts] = useState<Record<string, boolean>>(preferencias);
+  const [salvo, setSalvo] = useState(false);
+
+  useEffect(() => { setOpts(preferencias); }, [preferencias]);
+
+  const items: { key: string; label: string }[] = [
+    { key: "email_ofertas", label: "Receber ofertas por e-mail" },
+    { key: "email_pedidos", label: "Avisos de pedido por e-mail" },
+    { key: "push_promocoes", label: "Cupons e promoções" },
+  ];
+
+  return (
+    <div className="px-5 pt-6 pb-4">
+      <button onClick={voltar} className="text-xs text-gray-400 mb-3">‹ Voltar</button>
+      <h3 className="text-base font-bold text-luxury-black mb-4">Configurações</h3>
+      <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+        {items.map((it) => (
+          <label key={it.key} className="flex items-center justify-between cursor-pointer">
+            <span className="text-xs font-semibold text-luxury-black">{it.label}</span>
+            <input type="checkbox" checked={Boolean(opts[it.key])} onChange={() => setOpts({ ...opts, [it.key]: !opts[it.key] })} className="w-5 h-5 accent-gold" />
+          </label>
+        ))}
+        <button
+          onClick={async () => { await salvarPreferencias(opts); setSalvo(true); setTimeout(() => setSalvo(false), 2000); }}
+          className="w-full h-10 bg-luxury-black text-white text-xs font-bold rounded-xl mt-2"
+        >
+          {salvo ? "Salvo!" : "Salvar preferências"}
+        </button>
+      </div>
+    </div>
+  );
+}
 
 export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNavigate?: (page: string) => void; fidelidade?: any }) {
   const { cliente, loading: loadingCliente, error: erroCliente, entrarComEmail, sair, atualizarCliente } = useCliente();
   const [email, setEmail] = useState("");
   const { pedidos, loading: loadingPedidos, error: erroPedidos } = usePedidos(cliente?.id ?? null);
-  const { favoriteIds, toggleFavorite } = useFavorites();
   const [subTela, setSubTela] = useState<SubTela | null>(null);
   const [pedidoSelecionado, setPedidoSelecionado] = useState<string | number | null>(null);
   const { pedido, loading: loadingPedidoDetalhe } = usePedidoDetalhe(pedidoSelecionado);
@@ -279,6 +394,17 @@ export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNav
       label: "Meus Pedidos",
       subtitle: "Acompanhe suas entregas",
       action: "meus-pedidos",
+    },
+    {
+      icon: (
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
+          <circle cx="12" cy="10" r="3" />
+        </svg>
+      ),
+      label: "Meus Endereços",
+      subtitle: "Livro de endereços",
+      action: "enderecos",
     },
     {
       icon: (
@@ -546,27 +672,17 @@ export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNav
       );
     }
 
+    if (subTela === "enderecos") {
+      return (
+        <EnderecosPage
+          voltar={() => setSubTela(null)}
+        />
+      );
+    }
+
     if (subTela === "config") {
       return (
-        <div className="px-5 pt-6 pb-4">
-          {voltar}
-          <h3 className="text-base font-bold text-luxury-black mb-4">Configurações</h3>
-          <div className="bg-white rounded-2xl p-4 shadow-sm space-y-4">
-            <label className="flex items-center justify-between cursor-pointer">
-              <span className="text-xs font-semibold text-luxury-black">Receber ofertas por e-mail</span>
-              <input type="checkbox" defaultChecked className="w-5 h-5 accent-gold" />
-            </label>
-            <div className="flex items-center justify-between py-2 border-t border-gray-100">
-              <span className="text-xs text-gray-400">Limpar favoritos</span>
-              <button
-                onClick={() => favoriteIds.forEach((id) => toggleFavorite(id))}
-                className="text-[11px] font-bold text-red-500"
-              >
-                Limpar
-              </button>
-            </div>
-          </div>
-        </div>
+        <PreferenciasPage voltar={() => setSubTela(null)} />
       );
     }
 

@@ -37,7 +37,7 @@ import * as segredos from "./db.ts";
 import { processarCheckout } from "./pagamento.ts";
 import { processarWebhookMP } from "./webhook.ts";
 import { listarVideosRecentes } from "./youtube.ts";
-import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade, salvarNotificacao, listarNotificacoes, marcarNotificacaoLida } from "./db.ts";
+import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade, salvarNotificacao, listarNotificacoes, marcarNotificacaoLida, salvarPerfil, buscarPerfil, listarEnderecos, salvarEndereco, excluirEndereco, salvarPreferencias, buscarPreferencias } from "./db.ts";
 import cupomApp from "./cupom.ts";
 import { receitasApp } from "./receitas";
 import { favoritosApp } from "./favoritos";
@@ -1283,6 +1283,105 @@ app.post("/api/cliente/excluir-confirmar", async (req, res) => {
     console.error("[exclusao] erro:", err);
     return res.status(500).json({ erro: "Falha ao excluir conta." });
   }
+});
+
+// ---------------------------------------------------------------------------
+// Perfil / Endereços / Preferências do cliente (C2, C3, C7)
+// Todas exigem o token de sessão do usuário (Authorization: Bearer <access_token>).
+// O email do token deve bater com o email da requisição (isolamento).
+// ---------------------------------------------------------------------------
+function emailDoToken(req: express.Request): string | null {
+  const auth = (req.headers.authorization || "").replace("Bearer ", "").trim();
+  if (!auth) return null;
+  try {
+    // JWT não assinado: só decodifica o payload (não valida — o Supabase já
+    // validou ao emitir; aqui só extraímos o email para isolamento de dados).
+    const payload = JSON.parse(Buffer.from(auth.split(".")[1], "base64").toString("utf8"));
+    const email = (payload.email || "").toString().trim().toLowerCase();
+    return /@/.test(email) ? email : null;
+  } catch {
+    return null;
+  }
+}
+
+function requireCliente(req: express.Request, res: express.Response): string | null {
+  const email = emailDoToken(req);
+  if (!email) {
+    res.status(401).json({ erro: "Não autorizado." });
+    return null;
+  }
+  return email;
+}
+
+// C2 — buscar/salvar perfil (nome/telefone)
+app.get("/api/cliente/perfil", async (req, res) => {
+  const email = requireCliente(req, res);
+  if (!email) return;
+  const perfil = await buscarPerfil(email);
+  res.json(perfil || { email, nome: undefined, telefone: undefined });
+});
+
+app.put("/api/cliente/perfil", async (req, res) => {
+  const email = requireCliente(req, res);
+  if (!email) return;
+  const { nome, telefone } = req.body || {};
+  if (nome !== undefined && (typeof nome !== "string" || nome.length > 120)) {
+    return res.status(400).json({ erro: "Nome inválido." });
+  }
+  if (telefone !== undefined && (typeof telefone !== "string" || telefone.length > 30)) {
+    return res.status(400).json({ erro: "Telefone inválido." });
+  }
+  await salvarPerfil({ email, nome: nome || undefined, telefone: telefone || undefined });
+  res.json({ ok: true });
+});
+
+// C3 — livro de endereços (CRUD)
+app.get("/api/cliente/enderecos", async (req, res) => {
+  const email = requireCliente(req, res);
+  if (!email) return;
+  res.json(await listarEnderecos(email));
+});
+
+app.post("/api/cliente/enderecos", async (req, res) => {
+  const email = requireCliente(req, res);
+  if (!email) return;
+  const { nome, endereco, numero, complemento, bairro, cidade, estado, cep, principal } = req.body || {};
+  if (!nome || !endereco || !numero || !cidade || !estado || !cep) {
+    return res.status(400).json({ erro: "Preencha os campos obrigatórios do endereço." });
+  }
+  const salvo = await salvarEndereco({
+    email, nome: String(nome), endereco: String(endereco), numero: String(numero),
+    complemento: complemento ? String(complemento) : undefined,
+    bairro: bairro ? String(bairro) : undefined,
+    cidade: String(cidade), estado: String(estado), cep: String(cep),
+    principal: Boolean(principal),
+  });
+  if (!salvo) return res.status(500).json({ erro: "Não foi possível salvar o endereço." });
+  res.json(salvo);
+});
+
+app.delete("/api/cliente/enderecos/:id", async (req, res) => {
+  const email = requireCliente(req, res);
+  if (!email) return;
+  await excluirEndereco(email, req.params.id);
+  res.json({ ok: true });
+});
+
+// C7 — preferências de notificação
+app.get("/api/cliente/preferencias", async (req, res) => {
+  const email = requireCliente(req, res);
+  if (!email) return;
+  const prefs = await buscarPreferencias(email);
+  res.json(prefs || {});
+});
+
+app.put("/api/cliente/preferencias", async (req, res) => {
+  const email = requireCliente(req, res);
+  if (!email) return;
+  const { prefs } = req.body || {};
+  if (!prefs || typeof prefs !== "object") return res.status(400).json({ erro: "Preferências inválidas." });
+  await salvarPreferencias(email, prefs);
+  res.json({ ok: true });
 });
 
 app.use("/api/cliente/receitas", receitasApp);

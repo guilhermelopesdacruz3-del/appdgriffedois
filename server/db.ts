@@ -473,3 +473,106 @@ export async function marcarNotificacaoLida(email: string, id: string): Promise<
 export function supabaseClient(): SupabaseClient | null {
   return sb;
 }
+
+// ---------------------------------------------------------------------------
+// PERFIL DO CLIENTE (nome/telefone) — C2
+// ---------------------------------------------------------------------------
+export interface PerfilCliente {
+  email: string;
+  nome?: string;
+  telefone?: string;
+}
+
+// Atualiza nome/telefone na tabela `perfis` (e no Auth user, se possível).
+export async function salvarPerfil(p: PerfilCliente): Promise<void> {
+  const e = (p.email || "").trim().toLowerCase();
+  if (!e || !sb) return;
+  const row = {
+    email: e,
+    nome: p.nome || null,
+    telefone: p.telefone || null,
+    updated_at: new Date().toISOString(),
+  };
+  await sb.from("profiles").upsert(row, { onConflict: "email" });
+  // Espelha no Auth metadata (para o nome aparecer no login futuro).
+  try {
+    const { data } = await sb.auth.admin.listUsers();
+    const user = data.users.find((u) => u.email?.toLowerCase() === e);
+    if (user) {
+      await sb.auth.admin.updateUserById(user.id, { user_metadata: { nome: p.nome || "", telefone: p.telefone || "" } });
+    }
+  } catch { /* ignora — perfil já salvo */ }
+}
+
+export async function buscarPerfil(email: string): Promise<PerfilCliente | null> {
+  const e = (email || "").trim().toLowerCase();
+  if (!e || !sb) return null;
+  const { data, error } = await sb.from("profiles").select("email,nome,telefone").eq("email", e).single();
+  if (error || !data) return null;
+  return { email: e, nome: data.nome || undefined, telefone: data.telefone || undefined };
+}
+
+// ---------------------------------------------------------------------------
+// ENDEREÇOS DO CLIENTE (livro de endereços) — C3
+// ---------------------------------------------------------------------------
+export interface EnderecoCliente {
+  id?: string;
+  email: string;
+  nome: string; // apelido: "Casa", "Trabalho"
+  endereco: string;
+  numero: string;
+  complemento?: string;
+  bairro?: string;
+  cidade: string;
+  estado: string;
+  cep: string;
+  principal?: boolean;
+}
+
+export async function listarEnderecos(email: string): Promise<EnderecoCliente[]> {
+  const e = (email || "").trim().toLowerCase();
+  if (!e || !sb) return [];
+  const { data, error } = await sb
+    .from("enderecos").select("*").eq("email", e).order("principal", { ascending: false });
+  if (error) return [];
+  return (data || []) as EnderecoCliente[];
+}
+
+export async function salvarEndereco(end: EnderecoCliente): Promise<EnderecoCliente | null> {
+  const e = (end.email || "").trim().toLowerCase();
+  if (!e || !sb) return null;
+  const row = { ...end, email: e, updated_at: new Date().toISOString() };
+  // Se for o primeiro ou marcado principal, desmarca os outros.
+  if (end.principal) {
+    await sb.from("enderecos").update({ principal: false }).eq("email", e);
+  }
+  const { data, error } = await sb.from("enderecos").upsert(row, { onConflict: "id" }).select().single();
+  if (error) return null;
+  return data as EnderecoCliente;
+}
+
+export async function excluirEndereco(email: string, id: string): Promise<void> {
+  const e = (email || "").trim().toLowerCase();
+  if (!e || !sb) return;
+  await sb.from("enderecos").delete().eq("email", e).eq("id", id);
+}
+
+// ---------------------------------------------------------------------------
+// PREFERÊNCIAS DE NOTIFICAÇÃO — C7
+// ---------------------------------------------------------------------------
+export async function salvarPreferencias(email: string, prefs: Record<string, boolean>): Promise<void> {
+  const e = (email || "").trim().toLowerCase();
+  if (!e || !sb) return;
+  await sb.from("profiles").upsert(
+    { email: e, preferencias: prefs, updated_at: new Date().toISOString() },
+    { onConflict: "email" }
+  );
+}
+
+export async function buscarPreferencias(email: string): Promise<Record<string, boolean> | null> {
+  const e = (email || "").trim().toLowerCase();
+  if (!e || !sb) return null;
+  const { data, error } = await sb.from("profiles").select("preferencias").eq("email", e).single();
+  if (error || !data) return null;
+  return (data.preferencias as Record<string, boolean>) || null;
+}

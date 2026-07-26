@@ -4,6 +4,7 @@ import {
   buscarClientePorId,
   type ClienteApp,
 } from "../services/lojaIntegrada";
+import { clienteApi, type PerfilCliente, type EnderecoCliente } from "../services/cliente";
 
 interface UseClienteResult {
   cliente: ClienteApp | null;
@@ -22,6 +23,17 @@ interface UseClienteResult {
     numero?: string;
     bairro?: string;
   }) => Promise<void>;
+  // C2/C3/C7 — perfil, endereços e preferências (via Supabase, isolados por email)
+  perfil: PerfilCliente | null;
+  enderecos: EnderecoCliente[];
+  preferencias: Record<string, boolean>;
+  carregarPerfil: () => Promise<void>;
+  carregarEnderecos: () => Promise<void>;
+  carregarPreferencias: () => Promise<void>;
+  salvarPerfil: (nome?: string, telefone?: string) => Promise<void>;
+  salvarEndereco: (e: Omit<EnderecoCliente, "id" | "email">) => Promise<void>;
+  removerEndereco: (id: string) => Promise<void>;
+  salvarPreferencias: (prefs: Record<string, boolean>) => Promise<void>;
 }
 
 const LS_EMAIL = "dgriffe:cliente_email";
@@ -94,7 +106,10 @@ export function ClienteProvider({ children }: { children: ReactNode }) {
         const cli: ClienteApp = {
           email: email.trim().toLowerCase(),
           nome: email.trim().split("@")[0] || email.trim(),
-          id: null,
+          id: 0,
+          cpf: null,
+          telefone: null,
+          dataCriacao: "",
         };
         setCliente(cli);
         salvarLocal(cli);
@@ -113,7 +128,10 @@ export function ClienteProvider({ children }: { children: ReactNode }) {
       const cli: ClienteApp = {
         email: email.trim().toLowerCase(),
         nome: email.trim().split("@")[0] || email.trim(),
-        id: null,
+        id: 0,
+        cpf: null,
+        telefone: null,
+        dataCriacao: "",
       };
       setCliente(cli);
       salvarLocal(cli);
@@ -126,11 +144,60 @@ export function ClienteProvider({ children }: { children: ReactNode }) {
   const sair = useCallback(() => {
     setCliente(null);
     salvarLocal(null);
+    setPerfil(null);
+    setEnderecos([]);
+    setPreferencias({});
     try {
       window.localStorage.removeItem(LS_EMAIL);
       window.localStorage.removeItem(LS_ID);
+      window.localStorage.removeItem("dgriffe:cliente_token");
     } catch { /* ignora */ }
   }, []);
+
+  // ---- C2/C3/C7: perfil, endereços e preferências (Supabase) ----
+  const [perfil, setPerfil] = useState<PerfilCliente | null>(null);
+  const [enderecos, setEnderecos] = useState<EnderecoCliente[]>([]);
+  const [preferencias, setPreferencias] = useState<Record<string, boolean>>({});
+
+  const carregarPerfil = useCallback(async () => {
+    try { setPerfil(await clienteApi.getPerfil()); } catch { /* ignora */ }
+  }, []);
+  const carregarEnderecos = useCallback(async () => {
+    try { setEnderecos(await clienteApi.getEnderecos()); } catch { /* ignora */ }
+  }, []);
+  const carregarPreferencias = useCallback(async () => {
+    try { setPreferencias(await clienteApi.getPreferencias()); } catch { /* ignora */ }
+  }, []);
+
+  const salvarPerfil = useCallback(async (nome?: string, telefone?: string) => {
+    await clienteApi.putPerfil(nome, telefone);
+    await carregarPerfil();
+  }, [carregarPerfil]);
+
+  const salvarEndereco = useCallback(async (e: Omit<EnderecoCliente, "id" | "email">) => {
+    await clienteApi.postEndereco(e);
+    await carregarEnderecos();
+  }, [carregarEnderecos]);
+
+  const removerEndereco = useCallback(async (id: string) => {
+    await clienteApi.deleteEndereco(id);
+    await carregarEnderecos();
+  }, [carregarEnderecos]);
+
+  const salvarPreferencias = useCallback(async (prefs: Record<string, boolean>) => {
+    await clienteApi.putPreferencias(prefs);
+    setPreferencias(prefs);
+  }, []);
+
+  // Ao logar/restaurar, carrega perfil/endereços/preferências se houver token.
+  useEffect(() => {
+    const t = (() => { try { return window.localStorage.getItem("dgriffe:cliente_token"); } catch { return null; } })();
+    if (t) {
+      carregarPerfil();
+      carregarEnderecos();
+      carregarPreferencias();
+    }
+  }, [carregarPerfil, carregarEnderecos, carregarPreferencias]);
 
   const atualizarCliente = useCallback(
     async (dados: {
@@ -185,7 +252,7 @@ export function ClienteProvider({ children }: { children: ReactNode }) {
   );
 
   return (
-    <ClienteContext.Provider value={{ cliente, loading, error, entrarComEmail, sair, atualizarCliente }}>
+    <ClienteContext.Provider value={{ cliente, loading, error, entrarComEmail, sair, atualizarCliente, perfil, enderecos, preferencias, carregarPerfil, carregarEnderecos, carregarPreferencias, salvarPerfil, salvarEndereco, removerEndereco, salvarPreferencias }}>
       {children}
     </ClienteContext.Provider>
   );
@@ -203,6 +270,16 @@ export function useCliente(): UseClienteResult {
       entrarComEmail: async () => {},
       sair: () => {},
       atualizarCliente: async () => { throw new Error("ClienteProvider ausente"); },
+      perfil: null,
+      enderecos: [],
+      preferencias: {},
+      carregarPerfil: async () => {},
+      carregarEnderecos: async () => {},
+      carregarPreferencias: async () => {},
+      salvarPerfil: async () => {},
+      salvarEndereco: async () => {},
+      removerEndereco: async () => {},
+      salvarPreferencias: async () => {},
     };
   }
   return ctx;

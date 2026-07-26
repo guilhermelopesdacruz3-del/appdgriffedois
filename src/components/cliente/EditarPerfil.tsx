@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useCliente } from "../../hooks/useCliente";
 
 interface Props {
   cliente: {
@@ -26,6 +27,7 @@ interface Props {
 }
 
 export default function EditarPerfil({ cliente, onVoltar, onSalvar }: Props) {
+  const { salvarPerfil } = useCliente();
   const [nome, setNome] = useState(cliente.nome || "");
   const [telefone, setTelefone] = useState(cliente.telefone || "");
   const [rua, setRua] = useState(cliente.rua || "");
@@ -43,6 +45,7 @@ export default function EditarPerfil({ cliente, onVoltar, onSalvar }: Props) {
     setSalvo(false);
     setErro(null);
     try {
+      // Salva na Loja Integrada (se houver chaves) e no Supabase (perfil app).
       await onSalvar({
         nome: nome.trim() ? nome.trim() : undefined,
         telefone: telefone.trim() ? telefone.trim() : undefined,
@@ -53,6 +56,8 @@ export default function EditarPerfil({ cliente, onVoltar, onSalvar }: Props) {
         estado: estado.trim() ? estado.trim() : undefined,
         cep: cep.trim() ? cep.trim() : undefined,
       });
+      // C2 — persiste nome/telefone no Supabase (fonte de verdade do app).
+      await salvarPerfil(nome.trim() || undefined, telefone.trim() || undefined).catch(() => {});
       setSalvo(true);
       setTimeout(() => onVoltar(), 800);
     } catch (e) {
