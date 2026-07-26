@@ -1203,10 +1203,13 @@ app.post("/api/cliente/excluir-solicitar", async (req, res) => {
   }
   const sb = supabaseClient();
   if (!sb) return res.status(503).json({ erro: "Banco de dados indisponível (modo demo)." });
-  // Confirma que o usuário existe antes de enviar OTP (shouldCreateUser:false).
+  // Envia o OTP de exclusão. Usa shouldCreateUser:true para cobrir clientes que
+  // se cadastraram só pela Loja Integrada (sem conta no Supabase Auth) — o
+  // usuario sera criado e imediatamente deletado no confirmar. Sem isso, o
+  // Supabase barra com "Signups not allowed" e a exclusao nunca acontece (P1).
   const { error } = await sb.auth.signInWithOtp({
     email: e,
-    options: { shouldCreateUser: false, data: { __exclusao: true } },
+    options: { shouldCreateUser: true, data: { __exclusao: true } },
   });
   if (error) {
     // Se o usuário não existe, não vaza a informação — mas também não envia OTP.
@@ -1265,11 +1268,16 @@ app.post("/api/cliente/excluir-confirmar", async (req, res) => {
       console.warn("[exclusao] falha ao limpar fidelidade (ignorado):", (fErr as Error)?.message);
     }
 
-    // 5) Remove perfis, favoritos, receitas vinculados (cascade no banco).
+    // 5) Remove perfis, favoritos, receitas, enderecos, notificacoes vinculados.
+    // Deleta por userId (Auth) E por email (clientes via LI sem Auth, onde o
+    // profiles.enderecos.fidelidade usam email como chave e id pode ser nulo).
     try {
       await sb.from("profiles").delete().eq("id", userId);
+      await sb.from("profiles").delete().eq("email", e);
+      await sb.from("enderecos").delete().eq("email", e);
       await sb.from("favoritos").delete().eq("user_id", userId);
       await sb.from("receitas").delete().eq("user_id", userId);
+      await sb.from("notificacoes").delete().eq("email", e);
     } catch (pErr) {
       console.warn("[exclusao] falha ao limpar tabelas (ignorado):", (pErr as Error)?.message);
     }
