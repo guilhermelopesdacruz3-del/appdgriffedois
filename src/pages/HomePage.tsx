@@ -300,7 +300,7 @@ export default function HomePage({ products, onSelectProduct, onAddToCart, onNav
       </div>
 
       {/* Floating WhatsApp Button */}
-      <div className="fixed bottom-[25px] right-3 z-30">
+      <div className="fixed bottom-8 right-3 z-30">
         <a
           href="https://wa.me/5551992809229"
           target="_blank"
