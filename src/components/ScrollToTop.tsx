@@ -18,7 +18,7 @@ export default function ScrollToTop() {
   return (
     <button
       onClick={scrollToTop}
-      className={`fixed bottom-8 left-3 z-30 w-10 h-10 bg-luxury-black/80 backdrop-blur-sm text-white rounded-full shadow-md flex items-center justify-center transition-all duration-300 hover:bg-luxury-black hover:shadow-lg active:scale-90 ${
+      className={`fixed bottom-20 left-3 z-30 w-10 h-10 bg-luxury-black/80 backdrop-blur-sm text-white rounded-full shadow-md flex items-center justify-center transition-all duration-300 hover:bg-luxury-black hover:shadow-lg active:scale-90 ${
         visible
           ? "opacity-100 translate-y-0"
           : "opacity-0 translate-y-4 pointer-events-none"
