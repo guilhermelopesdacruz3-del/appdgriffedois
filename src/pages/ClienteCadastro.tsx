@@ -78,6 +78,9 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
               access_token: sess.access_token,
               refresh_token: sess.refresh_token,
             });
+            // Persiste o access_token para chamadas autenticadas da API
+            // (cupons/meus, perfil, enderecos, etc.) que exigem Authorization.
+            try { window.localStorage.setItem("dgriffe:cliente_token", sess.access_token); } catch { /* ignora */ }
           } catch {
             /* Supabase não configurado no front — login pela LI segue válido */
           }
