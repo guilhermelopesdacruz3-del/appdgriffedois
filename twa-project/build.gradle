@@ -1,0 +1,2 @@
+// Root build file — repositórios são gerenciados em settings.gradle
+// (pluginManagement + dependencyResolutionManagement).

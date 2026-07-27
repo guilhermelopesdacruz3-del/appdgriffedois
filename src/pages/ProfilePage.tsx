@@ -601,7 +601,7 @@ export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNav
       return (
         <div className="px-4 pt-6 pb-4">
           {voltar}
-          <MeusCupons />
+          <MeusCupons onLogin={() => onNavigate?.("cadastro")} />
         </div>
       );
     }

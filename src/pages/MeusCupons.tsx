@@ -1,18 +1,26 @@
 import { useEffect, useState } from "react";
 import { meusCupons, type CupomUsuario } from "../services/cupomApp";
 
-export default function MeusCupons() {
+export default function MeusCupons({ onLogin }: { onLogin?: () => void }) {
   const [cupons, setCupons] = useState<CupomUsuario[]>([]);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [precisaLogin, setPrecisaLogin] = useState(false);
 
   const carregar = async () => {
     setLoading(true);
+    setErro(null);
+    setPrecisaLogin(false);
     try {
       const data = await meusCupons();
       setCupons(data);
     } catch (e: any) {
-      setErro(e.message);
+      // 401 = token ausente/expirado -> pede login em vez de mostrar erro técnico
+      if (/\(401\)/.test(e.message)) {
+        setPrecisaLogin(true);
+      } else {
+        setErro(e.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -25,11 +33,28 @@ export default function MeusCupons() {
   return (
     <div className="space-y-3">
       <h3 className="text-sm font-bold text-luxury-black">Meus Cupons</h3>
-      {erro && <p className="text-[11px] text-red-500">{erro}</p>}
+
+      {precisaLogin && (
+        <div className="bg-white rounded-2xl p-4 shadow-sm text-center">
+          <p className="text-xs text-gray-500 mb-3">
+            Faça login para ver seus cupons exclusivos.
+          </p>
+          <button
+            onClick={onLogin}
+            className="w-full h-10 bg-luxury-black text-white text-xs font-bold rounded-2xl active:scale-[0.98] transition-all"
+          >
+            Entrar na minha conta
+          </button>
+        </div>
+      )}
+
+      {erro && !precisaLogin && <p className="text-[11px] text-red-500">{erro}</p>}
       {loading && <p className="text-xs text-gray-400">Carregando...</p>}
-      {!loading && cupons.length === 0 && (
+
+      {!loading && !precisaLogin && cupons.length === 0 && (
         <p className="text-xs text-gray-400">Você ainda não tem cupons.</p>
       )}
+
       <div className="space-y-2">
         {cupons.map((c) => (
           <div key={c.id} className="bg-white rounded-2xl p-3 shadow-sm flex items-center justify-between gap-2">
