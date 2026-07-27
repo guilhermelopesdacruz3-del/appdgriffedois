@@ -134,13 +134,43 @@ function app() {
       const { user_ids, grupo, emails } = req.body || {};
       const alvo: string[] = Array.isArray(user_ids) ? [...user_ids] : [];
 
-      // Emails -> user_id (permite envio seletivo por e-mail do cliente)
+      // Emails -> user_id (permite envio seletivo por e-mail do cliente).
+      // Se o perfil ainda nao existir (cliente veio da Loja Integrada), criamos
+      // o profiles + o Auth user para conseguir atribuir o cupom (opcao A).
       if (Array.isArray(emails) && emails.length > 0) {
+        const norm = emails.map((e: string) => String(e).trim().toLowerCase()).filter(Boolean);
         const { data: perfis } = await sb
           .from("profiles")
           .select("id,email")
-          .in("email", emails.map((e: string) => String(e).trim().toLowerCase()));
-        for (const p of perfis || []) alvo.push(p.id);
+          .in("email", norm);
+        const existentes = new Map((perfis || []).map((p: any) => [p.email, p.id]));
+        for (const email of norm) {
+          const existente = existentes.get(email);
+          if (existente) { alvo.push(existente); continue; }
+          // Cria o Auth user (sem senha, email ja confirmado) e o profiles.
+          try {
+            const { data: novoUser, error: uErr } = await sb.auth.admin.createUser({
+              email,
+              email_confirm: true,
+              // Nao exige senha: o cliente faz login via OTP depois.
+            });
+            const uid = novoUser?.user?.id;
+            if (uid && !uErr) {
+              await sb.from("profiles").upsert({ id: uid, email, created_at: new Date().toISOString() });
+              alvo.push(uid);
+            } else if (uErr && /already been registered/i.test(uErr.message)) {
+              // Usuario ja existe no Auth mas sem profiles — busca o id.
+              const { data: list } = await sb.auth.admin.listUsers();
+              const u = (list?.users || []).find((x: any) => x.email === email);
+              if (u?.id) {
+                await sb.from("profiles").upsert({ id: u.id, email, created_at: new Date().toISOString() });
+                alvo.push(u.id);
+              }
+            }
+          } catch (e) {
+            console.warn("[cupons] falha ao criar usuario para", email, (e as Error)?.message);
+          }
+        }
       }
 
       if (grupo === "todos") {
