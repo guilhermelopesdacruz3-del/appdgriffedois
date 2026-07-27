@@ -78,13 +78,13 @@ export async function enviarCupom(id: string, dados: EnviarCupomPayload): Promis
 
 export async function meusCupons(): Promise<CupomUsuario[]> {
   // Tela do CLIENTE (nao admin): usa o token de sessao do cliente
-  // (dgriffe:cliente_token), nao o token de admin (dg_admin_token).
-  const token = window.localStorage.getItem("dgriffe:cliente_token") || sessionStorage.getItem("dgriffe:cliente_token") || "";
+  // (dgriffe:cliente_token), salvo no login OTP. Nao depende do cliente
+  // Supabase do front (que pode nao estar configurado no deploy).
+  const token = window.localStorage.getItem("dgriffe:cliente_token") || "";
   const headers: Record<string, string> = { Accept: "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`${BASE_URL}/api/cupons/meus`, { method: "GET", headers });
   if (res.status === 401) {
-    // sessao do cliente expirou — limpa para forcar re-login
     try { window.localStorage.removeItem("dgriffe:cliente_token"); } catch { /* ignora */ }
   }
   if (!res.ok) {

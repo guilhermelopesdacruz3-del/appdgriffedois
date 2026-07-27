@@ -1,24 +1,7 @@
 import { useState } from "react";
 import { cadastrarCliente, verificarOtp } from "../services/cliente";
 import { buscarClientePorEmail } from "../services/lojaIntegrada";
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import TermosPrivacidade from "./TermosPrivacidade";
-
-// Lazy + defensivo: o app NÃO pode quebrar no bootstrap só porque falta a
-// env var da Supabase. Criamos o client só na hora de usar (no fluxo OTP),
-// e se a URL estiver ausente lançamos um erro tratável em vez de explodir
-// o módulo inteiro (que deixava a tela em branco silenciosa).
-let _sb: SupabaseClient | null = null;
-function getSupabase(): SupabaseClient {
-  if (_sb) return _sb;
-  const url = import.meta.env.VITE_SUPABASE_URL as string | undefined;
-  const anon = import.meta.env.VITE_SUPABASE_ANON as string | undefined;
-  if (!url || !anon) {
-    throw new Error("Configuração do app incompleta (Supabase). Verifique as variáveis de ambiente do deploy.");
-  }
-  _sb = createClient(url, anon, { auth: { persistSession: true, autoRefreshToken: true } });
-  return _sb;
-}
 
 type Etapa = "dados" | "codigo";
 
@@ -72,18 +55,16 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
         // getSupabase() lança — ignoramos, pois o login pela Loja Integrada
         // (busca por e-mail + localStorage) já identifica o cliente na "Minha Conta".
         if (r.session) {
+          // Salva o access_token para chamadas autenticadas da API
+          // (cupons/meus, perfil, enderecos, etc.) que exigem Authorization.
+          // NÃO depende do cliente Supabase do front (que pode não estar
+          // configurado no deploy) — o token vem da resposta do backend.
           try {
             const sess = r.session as any;
-            await getSupabase().auth.setSession({
-              access_token: sess.access_token,
-              refresh_token: sess.refresh_token,
-            });
-            // Persiste o access_token para chamadas autenticadas da API
-            // (cupons/meus, perfil, enderecos, etc.) que exigem Authorization.
-            try { window.localStorage.setItem("dgriffe:cliente_token", sess.access_token); } catch { /* ignora */ }
-          } catch {
-            /* Supabase não configurado no front — login pela LI segue válido */
-          }
+            if (sess?.access_token) {
+              window.localStorage.setItem("dgriffe:cliente_token", sess.access_token);
+            }
+          } catch { /* ignora */ }
         }
         // Salva o cliente para a "Minha Conta" sobreviver ao reload.
         // Mesmo sem a LI configurada (modo demo), persistemos os dados
