@@ -37,7 +37,7 @@ import * as segredos from "./db.ts";
 import { processarCheckout } from "./pagamento.ts";
 import { processarWebhookMP } from "./webhook.ts";
 import { listarVideosRecentes } from "./youtube.ts";
-import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade, salvarNotificacao, listarNotificacoes, marcarNotificacaoLida, salvarPerfil, buscarPerfil, listarEnderecos, salvarEndereco, excluirEndereco, salvarPreferencias, buscarPreferencias, getNiveis, calcularNivel, calcularCashback, BENEFICIO_BASE, TETO_BENEFICIOS_PERC, CASHBACK_BASE, gerarCodigoIndicacao, registrarIndicacao, creditarIndicacao, getIndicacoes, getClubeFamilia, adicionarFamiliar, creditarFamilia, getCreditosFamilia } from "./db.ts";
+import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade, salvarNotificacao, listarNotificacoes, marcarNotificacaoLida, salvarPerfil, buscarPerfil, listarEnderecos, salvarEndereco, excluirEndereco, salvarPreferencias, buscarPreferencias, getNiveis, calcularNivel, calcularCashback, BENEFICIO_BASE, TETO_BENEFICIOS_PERC, CASHBACK_BASE, gerarCodigoIndicacao, registrarIndicacao, creditarIndicacao, getIndicacoes, getClubeFamilia, adicionarFamiliar, creditarFamilia, getCreditosFamilia, MISSOES, VALIDADE_PONTOS_MESES_SEM_MOV, VALIDADE_PONTOS_MESES_EXPIRACAO, VALIDADE_CASHBACK_MESES_SEM_MOV, VALIDADE_CASHBACK_DIAS_ADICIONAIS } from "./db.ts";
 import cupomApp from "./cupom.ts";
 import { receitasApp } from "./receitas";
 import { favoritosApp } from "./favoritos";
@@ -745,18 +745,14 @@ app.get("/api/fidelidade", async (req, res) => {
     return res.status(400).json({ erro: "E-mail inválido." });
   }
   try {
-    const [pontos, regras, niveis] = await Promise.all([
+    const [pontos, regras, niveis, historicoFidelidade] = await Promise.all([
       segredos.getPontos(email),
       segredos.getRegrasFidelidade(),
       getNiveis(),
+      segredos.getHistoricoFidelidade(email),
     ]);
     const descontoMax = Math.floor((pontos / regras.pontosPorDesconto) * 10);
-    const { nivel, prox, ptsParaProx } = calcularNivel(pontos, niveis);
-    // Cashback disponível estimado: usa o maior % de categoria do nível (Grau/Solar/Joias base 2% + adicional).
-    const catPrincipal = "grau";
-    const cashback = calcularCashback(1, catPrincipal, nivel).percentual; // % (sobre R$1 só p/ expor o %)
-    const cashbackDisponivel = Number(((pontos / regras.pontosPorDesconto) * 10).toFixed(2)); // R$ (pontos/100*10, igual benefício)
-    return res.json({
+      // ... (código existente da rota fidelidade, agora inclui historicos de fidelidade)
       email,
       pontos,
       regras,

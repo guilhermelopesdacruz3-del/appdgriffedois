@@ -220,7 +220,21 @@ export function calcularCashback(valor: number, categoria: string, nivel: Nivel)
 }
 
 // ---------------------------------------------------------------------------
-// INDICAÇÃO (plano oficial): R$50 + 200pts por indicação convertida, limite 10/ano.
+// MISSÕES (plano oficial): bônus por comportamento.
+// ---------------------------------------------------------------------------
+export const MISSOES: { id: string; descricao: string; pontos: number; tipo: "cadastro" | "primeira_compra" | "avaliacao" | "indicacao_convertida" | "recompra" }[] = [
+  { id: "cadastro_completo", descricao: "Completar cadastro", pontos: 100, tipo: "cadastro" },
+  { id: "primeira_compra", descricao: "Primeira compra", pontos: 500, tipo: "primeira_compra" },
+  { id: "avaliar_atendimento", descricao: "Avaliar atendimento", pontos: 100, tipo: "avaliacao" },
+  { id: "indicacao_convertida", descricao: "Indicação convertida em venda", pontos: 200, tipo: "indicacao_convertida" },
+  { id: "recompra_12m", descricao: "Recompra em até 12 meses", pontos: 400, tipo: "recompra" },
+];
+
+// Regras de validade (do plano)
+export const VALIDADE_PONTOS_MESES_SEM_MOV = 24;
+export const VALIDADE_PONTOS_MESES_EXPIRACAO = 36;
+export const VALIDADE_CASHBACK_MESES_SEM_MOV = 12;
+export const VALIDADE_CASHBACK_DIAS_ADICIONAIS = 180;
 // ---------------------------------------------------------------------------
 export const INDICACAO_CREDITO_RS = 50;
 export const INDICACAO_PONTOS = 200;
