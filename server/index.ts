@@ -875,7 +875,22 @@ app.get("/api/fidelidade/mensagens", async (req, res) => {
   }
 });
 
-// POST /api/indicacao/converter — marca indicação como convertida e credita pontos.
+// POST /api/fidelidade/missao/concluir — registra conclusão de missão (ex.: avaliação).
+// Concede pontos da missão de forma idempotente (não duplica).
+app.post("/api/fidelidade/missao/concluir", async (req, res) => {
+  const { email, tipo } = req.body || {};
+  const e = (email || "").trim().toLowerCase();
+  if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return res.status(400).json({ ok: false, erro: "E-mail inválido." });
+  if (!tipo) return res.status(400).json({ ok: false, erro: "Informe o tipo da missão." });
+  try {
+    const pontos = await segredos.concederMissao(e, tipo);
+    return res.json({ ok: true, pontosConcedidos: pontos, jaConcedida: pontos === 0 });
+  } catch (err) {
+    console.error("[missao:concluir] falha:", (err as Error)?.message);
+    return res.status(502).json({ ok: false, erro: "Falha ao concluir missão." });
+  }
+});
+
 app.post("/api/indicacao/converter", async (req, res) => {
   const { indicadorEmail, indicadoEmail } = req.body || {};
   if (!indicadorEmail || !indicadoEmail)
@@ -1334,6 +1349,10 @@ app.post("/api/cliente/verificar", async (req, res) => {
       return res.status(401).json({ erro: error.message });
     }
     registrarTentativaSucesso(ip);
+    // Fase B: concede a missão "cadastro completo" (idempotente — só 1x).
+    try { await segredos.concederMissao(e, "cadastro_completo"); } catch (mErr) {
+      console.warn("[verificar] falha ao conceder missão de cadastro (ignorado):", (mErr as Error)?.message);
+    }
     return res.json({ ok: true, session: data.session, user: data.user });
   } catch (err) {
     registrarTentativaFalha(ip);

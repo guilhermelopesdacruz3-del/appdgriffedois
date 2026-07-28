@@ -236,7 +236,7 @@ export const VALIDADE_PONTOS_MESES_EXPIRACAO = 36;
 export const VALIDADE_CASHBACK_MESES_SEM_MOV = 12;
 export const VALIDADE_CASHBACK_DIAS_ADICIONAIS = 180;
 // ---------------------------------------------------------------------------
-export const INDICACAO_CREDITO_RS = 50;
+export const INDICACAO_CREDITO_RS = 0; // sem crédito em R$ — só pontos (regra: não dar dinheiro)
 export const INDICACAO_PONTOS = 200;
 export const INDICACAO_LIMITE_ANUAL = 10;
 
@@ -286,7 +286,6 @@ export async function creditarIndicacao(indicadorEmail: string, indicadoEmail: s
     const { data: pend } = await sb.from("indicacoes").select("id").eq("indicador_email", ind).eq("indicado_email", indado).eq("status", "pendente").maybeSingle();
     if (!pend) return { creditoRs: 0, pontos: 0 };
     await sb.from("indicacoes").update({ status: "convertida", convertido_at: new Date().toISOString() }).eq("id", pend.id);
-    await creditarCreditoFidelidade(ind, INDICACAO_CREDITO_RS, "indicacao");
     await creditarPontos(ind, INDICACAO_PONTOS, `indicacao-${indado}`);
     return { creditoRs: INDICACAO_CREDITO_RS, pontos: INDICACAO_PONTOS };
   }
@@ -327,15 +326,53 @@ export async function adicionarFamiliar(responsavelEmail: string, familiarEmail:
   return { ok: true };
 }
 
-// Credita 20% dos pontos da compra para a conta família do responsável.
+// Credita 20% dos pontos da compra para a conta família do responsável (SÓ PONTOS, sem R$).
 export async function creditarFamilia(responsavelEmail: string, pontosCompra: number): Promise<number> {
   const r = (responsavelEmail || "").trim().toLowerCase();
   if (!r || pontosCompra <= 0) return 0;
   const pontosFamilia = Math.floor((pontosCompra * FAMILIA_PERCENTUAL_PONTOS) / 100);
-  if (sb && pontosFamilia > 0) {
-    await creditarCreditoFidelidade(r, 0, "familia", pontosFamilia); // crédito em pontos família
+  if (pontosFamilia > 0) {
+    // Os pontos da família são somados ao saldo do responsável conforme o plano (20% dos pontos da compra).
+    await creditarPontos(r, pontosFamilia, "familia-compra");
   }
   return pontosFamilia;
+}
+
+// Concede pontos diretos (não derivados de valor de compra) de forma idempotente.
+// `ref` único evita duplicar concessão (ex.: mesma missão/indicação duas vezes).
+// Retorna os pontos concedidos (0 se já concedido ou sem Supabase).
+export async function concederPontos(email: string, pontos: number, ref: string): Promise<number> {
+  const e = (email || "").trim().toLowerCase();
+  if (!e || !(pontos > 0) || !ref) return 0;
+  if (!sb) return 0; // sem banco, não cria saldo fantasma
+  // Idempotência: se já existe histórico com essa ref, não concede de novo.
+  const { data: existe } = await sb.from("fidelidade_historico").select("id").eq("email", e).eq("ref", ref).eq("tipo", "conquista").maybeSingle();
+  if (existe) return 0;
+  try {
+    const { data } = await sb.from("fidelidade").select("pontos").eq("email", e).single();
+    const atual = (data?.pontos || 0) + pontos;
+    await sb.from("fidelidade").upsert({ email: e, pontos: atual, updated_at: new Date().toISOString() }, { onConflict: "email" });
+    await sb.from("fidelidade_historico").insert({ email: e, tipo: "conquista", pontos, motivo: "conquista", ref });
+    return pontos;
+  } catch {
+    return 0;
+  }
+}
+
+// Mapa de missões -> pontos (do plano oficial Fase B).
+export const PONTOS_MISSAO: Record<string, number> = {
+  cadastro_completo: 100,
+  primeira_compra: 500,
+  avaliar_atendimento: 100,
+  indicacao_convertida: 200,
+  recompra_12m: 400,
+};
+
+// Concede a missão se ainda não foi concedida. Retorna pontos concedidos.
+export async function concederMissao(email: string, tipo: string): Promise<number> {
+  const pontos = PONTOS_MISSAO[tipo];
+  if (!pontos) return 0;
+  return concederPontos(email, pontos, `missao:${tipo}`);
 }
 
 // Créditos Família disponíveis (R$) conforme pontos acumulados.

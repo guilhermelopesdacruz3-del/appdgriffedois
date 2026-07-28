@@ -9,7 +9,7 @@
 // - Em DEMO (sem MP_ACCESS_TOKEN), devolve PIX/cartão SIMULADO para o fluxo funcionar.
 
 import crypto from "node:crypto";
-import { getSecret, creditarPontos, resgatarPontos, getRegrasFidelidade, getPontos, upsertPedidoMP, TETO_BENEFICIOS_PERC } from "./db.ts";
+import { getSecret, creditarPontos, resgatarPontos, getRegrasFidelidade, getPontos, upsertPedidoMP, TETO_BENEFICIOS_PERC, concederMissao, creditarIndicacao, creditarFamilia, supabaseClient } from "./db.ts";
 import { criarPedidoLI, baixarEstoqueLI, atualizarPedidoLI, buscarPrecoLI } from "./liClient.ts";
 
 const MP_API = "https://api.mercadopago.com";
@@ -204,6 +204,12 @@ export async function processarCheckout(params: {
     const idPedido = `DEMO-${Date.now().toString().slice(-8)}`;
     // No demo, creditamos pontos imediatamente (simula pagamento aprovado).
     const pontos = e ? await creditarPontos(e, total, idPedido) : 0;
+    // Fase C: missão 1ª compra + indicação + clube família (só pontos, sem R$).
+    if (e && pontos > 0) {
+      try { await dispararFaseC(e, pontos, params.indicadorEmail); } catch (fcErr) {
+        console.warn("[checkout-demo] Fase C (ignorado):", (fcErr as Error)?.message);
+      }
+    }
     // Cria o pedido na Loja Integrada (site) também em demo — garante que o
     // fluxo de sincronia é exercitado e o admin reflete a venda.
     let liPedido: number | string | null = null;
@@ -290,4 +296,31 @@ export async function processarCheckout(params: {
   resultado.valor_original = autorizado.total;
   resultado.desconto_aplicado = desconto;
   return resultado;
+}
+
+// Dispara os gatilhos da Fase C após uma compra creditada (SÓ PONTOS, sem R$):
+// - missão "primeira_compra" (se for a 1ª compra do cliente)
+// - indicação convertida (se o cliente veio de um indicador)
+// - clube família (20% dos pontos da compra viram pontos do responsável)
+// `indicadorEmail` vem do front (quem indicou). `pontosCompra` = pontos já creditados.
+export async function dispararFaseC(compradorEmail: string, pontosCompra: number, indicadorEmail?: string): Promise<void> {
+  const e = (compradorEmail || "").trim().toLowerCase();
+  if (!e || !(pontosCompra > 0)) return;
+  // 1) Missão primeira_compra (idempotente: só concede se ainda não tem pontos de compra).
+  try { await concederMissao(e, "primeira_compra"); } catch (err) { console.warn("[faseC] primeira_compra:", (err as Error)?.message); }
+  // 2) Indicação convertida (se veio de indicador e ainda está pendente).
+  const ind = (indicadorEmail || "").trim().toLowerCase();
+  if (ind && ind !== e) {
+    try { await creditarIndicacao(ind, e); } catch (err) { console.warn("[faseC] indicacao:", (err as Error)?.message); }
+  }
+  // 3) Clube família: se o comprador é membro de algum clube, credita 20% dos pontos ao responsável.
+  try {
+    const sb = supabaseClient();
+    if (sb) {
+      const { data: vinculo } = await sb.from("familia").select("responsavel_email").eq("membro_email", e).maybeSingle();
+      if (vinculo?.responsavel_email) {
+        await creditarFamilia(vinculo.responsavel_email, pontosCompra);
+      }
+    }
+  } catch (err) { console.warn("[faseC] familia:", (err as Error)?.message); }
 }
