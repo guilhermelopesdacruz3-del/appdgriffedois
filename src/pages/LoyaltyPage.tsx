@@ -157,6 +157,35 @@ export default function LoyaltyPage({ fidelidade: info, historicoFidelidade: his
           }} className="px-4 py-2 bg-luxury-black text-white text-[10px] font-bold rounded-xl active:scale-95 transition-all">Ver</button>
         </div>
         <p className="text-[9px] text-gray-400 text-center px-2">Teto de benefícios por venda: {TETO_BENEFICIOS_PERC}%</p>
+      {info && (
+        <div className="px-4 mt-5">
+          <h3 className="text-sm font-bold text-luxury-black mb-2">Missões</h3>
+          <div className="space-y-2">
+            {[
+              { id: "cadastro_completo", label: "Completar cadastro", pontos: 100, icon: "✅", feito: true },
+              { id: "primeira_compra", label: "Primeira compra", pontos: 500, icon: "🛒", feito: false },
+              { id: "avaliar_atendimento", label: "Avaliar atendimento", pontos: 100, icon: "⭐", feito: false },
+              { id: "indicacao_convertida", label: "Indicação convertida", pontos: 200, icon: "🎁", feito: false },
+              { id: "recompra_12m", label: "Recompra em 12 meses", pontos: 400, icon: "🔁", feito: false },
+            ].map((m) => (
+              <div key={m.id} className={`flex items-center gap-3 p-3 rounded-xl ${m.feito ? "bg-green-50 border border-green-200" : "bg-white border border-ice-dark/40"}`}>
+                <span className="text-lg">{m.icon}</span>
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-luxury-black">{m.label}</p>
+                  <p className="text-[10px] text-gold font-bold">+{m.pontos} pts</p>
+                </div>
+                {m.feito ? <span className="text-green-600 text-xs font-bold">✓</span> : <span className="text-gray-300 text-xs font-bold">○</span>}
+              </div>
+            ))}
+          </div>
+          <h3 className="text-sm font-bold text-luxury-black mt-5 mb-2">Validade</h3>
+          <div className="bg-white rounded-2xl p-4 border border-ice-dark/40 space-y-2 text-xs text-luxury-black">
+            <div className="flex justify-between"><span>Pontos sem movimentação</span><span className="font-bold">24 meses → -50% / 36 meses → expira</span></div>
+            <div className="flex justify-between"><span>Cashback sem movimentação</span><span className="font-bold">12 meses → -50% + 180 dias</span></div>
+            <p className="text-gray-500 text-[10px]">Qualquer compra ou serviço pago renova o prazo.</p>
+          </div>
+        </div>
+      )}
       </div>
 
       {/* Histórico */}
