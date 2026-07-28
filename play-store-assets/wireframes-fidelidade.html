@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<title>Wireframes Fidelidade D'Griffe</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: Inter, system-ui, sans-serif; }
+  body { background: #f0f0f0; padding: 24px; }
+  h1 { font-size: 18px; margin-bottom: 4px; color: #0A0A0A; }
+  p.sub { color: #666; font-size: 12px; margin-bottom: 20px; }
+  .grid { display: flex; flex-wrap: wrap; gap: 20px; }
+  .phone { width: 300px; background: #fff; border-radius: 28px; border: 8px solid #0A0A0A; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,.12); }
+  .phone .bar { background: #0A0A0A; color: #D4A853; font-size: 11px; font-weight: 700; letter-spacing: 2px; padding: 10px 16px; display: flex; justify-content: space-between; }
+  .phone .body { padding: 14px; }
+  .phone h2 { font-size: 13px; font-weight: 800; color: #0A0A0A; margin: 6px 0 12px; }
+  .card { background: #0A0A0A; color: #fff; border-radius: 18px; padding: 14px; margin-bottom: 12px; position: relative; }
+  .gold { color: #D4A853; }
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid #eee; font-size: 12px; color: #222; }
+  .row:last-child { border: none; }
+  .pill { background: #f5f0e6; color: #9a7b2e; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 99px; }
+  .lock { opacity: .45; }
+  .tier { display: flex; gap: 6px; margin: 10px 0; }
+  .tier div { flex: 1; text-align: center; font-size: 9px; padding: 6px 2px; border-radius: 8px; font-weight: 700; }
+  .tier .on { background: #D4A853; color: #0A0A0A; }
+  .tier .off { background: #f0f0f0; color: #999; }
+  .progress { height: 8px; background: #eee; border-radius: 99px; overflow: hidden; margin: 8px 0; }
+  .progress i { display: block; height: 100%; background: linear-gradient(90deg,#b8862f,#D4A853); width: 38%; }
+  .btn { background: #0A0A0A; color: #fff; text-align: center; font-size: 11px; font-weight: 700; padding: 10px; border-radius: 12px; margin-top: 6px; }
+  .muted { color: #999; font-size: 10px; }
+  .fam { display: flex; gap: 6px; }
+  .fam div { width: 34px; height: 34px; border-radius: 50%; background: #f0f0f0; border: 2px solid #D4A853; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 700; }
+  .fam div.add { border-style: dashed; color: #999; border-color: #ccc; }
+  .note { font-size: 10px; color: #888; margin-top: 10px; line-height: 1.4; }
+  .tag { display:inline-block; background:#D4A853; color:#0A0A0A; font-size:9px; font-weight:800; padding:2px 6px; border-radius:6px; }
+</style>
+</head>
+<body>
+<h1>Wireframes — Programa de Fidelidade D'Griffe</h1>
+<p class="sub">Baseado no PROJETO OFICIAL. Pré-aprovação antes da implementação (evita retrabalho).</p>
+
+<div class="grid">
+
+  <!-- 1. TELA INICIAL / CLUBE -->
+  <div class="phone">
+    <div class="bar"><span>D'GRIFFE</span><span>👤</span></div>
+    <div class="body">
+      <h2>Clube D'Griffe</h2>
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="muted" style="color:#D4A853;font-weight:700;letter-spacing:1px">NÍVEL ATUAL</div>
+            <div style="font-size:18px;font-weight:800;margin-top:2px">GOLD</div>
+          </div>
+          <div style="font-size:22px">👑</div>
+        </div>
+        <div class="row" style="color:#fff;border-color:#333">
+          <span class="muted" style="color:#bbb">Pontos</span><b>7.250</b>
+        </div>
+        <div class="row" style="color:#fff;border-color:#333">
+          <span class="muted" style="color:#bbb">Cashback disp.</span><b class="gold">R$ 145,00</b>
+        </div>
+        <div class="tier">
+          <div class="off">CLIENTE</div><div class="on">GOLD</div><div class="off">PLAT</div><div class="off">DIAM</div>
+        </div>
+        <div class="progress"><i></i></div>
+        <div class="muted" style="color:#bbb;font-size:9px">Faltam 7.750 pts p/ Platinum</div>
+      </div>
+      <div class="row"><span>Benefício base</span><span class="gold">10% / 15% Pix</span></div>
+      <div class="row"><span>Cashback Grau/Solar/Joias</span><span class="gold">4%</span></div>
+      <div class="row"><span>Clube Família</span><span class="pill">R$ 100 créd.</span></div>
+      <div class="row"><span>Indicações</span><span class="pill">3 / 10</span></div>
+      <div class="btn">Ver carteira completa</div>
+      <div class="note">Wireframe 1 — Tela Inicial do Clube (já existe como LoyaltyPage; será reescrita para os 4 níveis reais + cashback + família + indicações).</div>
+    </div>
+  </div>
+
+  <!-- 2. CARTEIRA DE CASHBACK -->
+  <div class="phone">
+    <div class="bar"><span>◆ CARTEIRA</span><span>×</span></div>
+    <div class="body">
+      <h2>Minha Carteira</h2>
+      <div class="card">
+        <div class="muted" style="color:#D4A853;font-weight:700">CASHBACK DISPONÍVEL</div>
+        <div style="font-size:30px;font-weight:800;margin:4px 0">R$ 145,00</div>
+        <div class="muted" style="color:#bbb;font-size:9px">Válido por 12 meses. Após 12 meses sem uso: -50% + 180 dias.</div>
+      </div>
+      <div class="row"><span>Cashback Óculos Grau</span><span class="gold">4%</span></div>
+      <div class="row"><span>Cashback Óculos Solar</span><span class="gold">4%</span></div>
+      <div class="row"><span>Cashback Joias</span><span class="gold">4%</span></div>
+      <div class="row"><span>Cashback Relógios</span><span class="gold">3%</span></div>
+      <div class="row"><span>Créditos Família</span><span class="gold">R$ 100,00</span></div>
+      <div class="btn">Usar cashback no checkout</div>
+      <div class="note">Wireframe 2 — Carteira de Cashback. Mostra saldo + % por categoria (do plano) + créditos família. Teto de 20% de benefícios por venda é aplicado no checkout.</div>
+    </div>
+  </div>
+
+  <!-- 3. NÍVEIS -->
+  <div class="phone">
+    <div class="bar"><span>◆ NÍVEIS</span><span>×</span></div>
+    <div class="body">
+      <h2>Níveis de Relacionamento</h2>
+      <div class="tier" style="flex-direction:column;gap:8px">
+        <div class="off" style="text-align:left;padding:10px">CLIENTE · 0–4.999 pts · Cashback base · App completo</div>
+        <div class="on" style="text-align:left;padding:10px">GOLD · 5.000–14.999 · +2% cashback · Cupom aniv. R$50 · Promoções antec.</div>
+        <div class="off" style="text-align:left;padding:10px">PLATINUM · 15.000–29.999 · +3% · Aniv R$100 · Atend. priorit.</div>
+        <div class="off" style="text-align:left;padding:10px">DIAMOND · 30.000+ · +5% · Aniv R$200 · VIP · Eventos</div>
+      </div>
+      <div class="card" style="margin-top:10px">
+        <div class="muted" style="color:#bbb;font-size:9px">VOCÊ ESTÁ AQUI</div>
+        <div class="progress"><i style="width:48%"></i></div>
+        <div class="muted" style="color:#bbb;font-size:9px">7.250 / 15.000 pts p/ Platinum</div>
+      </div>
+      <div class="note">Wireframe 3 — Níveis. 4 faixas exatas do plano. Progresso real calculado por pontos. Cashback adicional por nível aplicado na carteira.</div>
+    </div>
+  </div>
+
+  <!-- 4. CLUBE FAMÍLIA -->
+  <div class="phone">
+    <div class="bar"><span>◆ FAMÍLIA</span><span>×</span></div>
+    <div class="body">
+      <h2>Clube Família D'Griffe</h2>
+      <div class="fam" style="margin:10px 0">
+        <div>VC</div><div>MÃE</div><div>PÁI</div><div class="add">+</div><div class="add">+</div>
+      </div>
+      <div class="row"><span>Integrantes</span><span class="gold">3 / 5</span></div>
+      <div class="row"><span>Pontos Família</span><span class="gold">12.400</span></div>
+      <div class="row"><span>Crédito disponível</span><span class="gold">R$ 100,00</span></div>
+      <div class="card" style="margin-top:8px">
+        <div class="muted" style="color:#bbb;font-size:9px">COMO FUNCIONA</div>
+        <div style="font-size:11px;margin-top:4px;line-height:1.5">Cada membro mantém seu CPF, pontos e nível. Ao comprar, 100% dos pontos vão p/ conta individual + 20% p/ conta família.</div>
+      </div>
+      <div class="note">Wireframe 4 — Clube Família. Até 5 membros, 20% dos pontos viram conta família, créditos conforme tabela (5k=R$50, 10k=R$100, 20k=R$200).</div>
+    </div>
+  </div>
+
+  <!-- 5. INDICAÇÕES -->
+  <div class="phone">
+    <div class="bar"><span>◆ INDICAR</span><span>×</span></div>
+    <div class="body">
+      <h2>Indique e Ganhe</h2>
+      <div class="card">
+        <div style="font-size:11px">Seu código exclusivo</div>
+        <div style="font-size:20px;font-weight:800;letter-spacing:2px;margin:4px 0" class="gold">DG-7F3A9K</div>
+        <div class="muted" style="color:#bbb;font-size:9px">Compartilhe: indicado ganha R$50 + você ganha R$50 e 200 pts.</div>
+      </div>
+      <div class="btn">Compartilhar código</div>
+      <div class="row"><span>Indicações convertidas</span><span class="gold">3 / 10</span></div>
+      <div class="row"><span>Pontos de indicação</span><span class="gold">600 pts</span></div>
+      <div class="row"><span>Créditos recebidos</span><span class="gold">R$ 150,00</span></div>
+      <div class="note">Wireframe 5 — Indicações. Código exclusivo, limite 10/ano, R$50 + 200pts por conversão. Backend credita ao confirmar 1ª compra do indicado.</div>
+    </div>
+  </div>
+
+  <!-- 6. HISTÓRICO -->
+  <div class="phone">
+    <div class="bar"><span>◆ HISTÓRICO</span><span>×</span></div>
+    <div class="body">
+      <h2>Histórico Completo</h2>
+      <div class="tag" style="margin-bottom:8px">PONTOS</div>
+      <div class="row"><span>⬆ Compra óculos grau</span><span class="gold">+1.290</span></div>
+      <div class="row"><span>⬇ Resgate desconto</span><span style="color:#c0392b">−200</span></div>
+      <div class="row"><span>⬆ Indicação convertida</span><span class="gold">+200</span></div>
+      <div class="tag" style="margin:10px 0 8px">CASHBACK / CRÉDITOS</div>
+      <div class="row"><span>⬆ Cashback grau</span><span class="gold">+R$ 25,80</span></div>
+      <div class="row"><span>⬇ Uso no checkout</span><span style="color:#c0392b">−R$ 25,80</span></div>
+      <div class="row"><span>⬆ Crédito Família</span><span class="gold">+R$ 100,00</span></div>
+      <div class="tag" style="margin:10px 0 8px">BENEFÍCIOS</div>
+      <div class="row"><span>🎂 Cupom aniv. R$50</span><span class="gold">usado</span></div>
+      <div class="note">Wireframe 6 — Histórico. Separa pontos / cashback / benefícios (do plano). Mostra movimentação de cada tipo.</div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

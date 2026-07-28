@@ -1,58 +1,9 @@
-# Dependências
+gradle-*.zip
+*.zip
+twa-project/app/build/
+twa-project/.gradle/
 node_modules/
-
-# Build de produção (gerado)
+twa-project/app/dgriffe-release.keystore
+twa-project/local.properties
+src/pages/.hermes-tmp.*
 dist/
-dist-locked-*
-
-# Segredos / environment (NUNCA comitar)
-.env
-.env.local
-.env.*.local
-server/.env
-server/.store-config.json
-
-# Backups locais de env (segredos reais - NUNCA comitar)
-.env.real
-.env.raiz.real
-server/.env.real
-*.env.real
-
-# Android / Capacitor (gerado pelo cap add android; pode conter handles travados)
-android/
-android_old/
-
-# Netlify / Render (não versionar build artifacts, mas os .toml/.yaml ficam)
-.netlify/
-
-# Cache de vídeos do YouTube (gerado em runtime, não versionar)
-server/.youtube-cache.json
-
-# Estado local do servidor (fallback JSON — pode conter dados de runtime/teste; NUNCA comitar)
-server/.notificacoes.json
-server/.admin-state.json
-
-# Logs e lixo
-*.log
-npm-debug.log*
-.DS_Store
-Thumbs.db
-
-# IDE
-.vscode/
-.idea/
-
-# Testes manuais descartáveis
-test_*.mjs
-login_resp.json
-relatorio.json
-
-# Backup/pendrive de outro projeto (contem segredos reais)
-LOJA-DGRiffe-PENDRIVE/
-
-# Orphan/legado nao usado pelo app principal
-src/lib/supabase.ts
-api/
-deploy.sh
-android/  
-dist/  
