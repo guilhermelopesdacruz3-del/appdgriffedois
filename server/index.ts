@@ -817,13 +817,13 @@ app.get("/api/fidelidade/missao", async (req, res) => {
     return res.status(400).json({ erro: "E-mail inválido." });
   try {
     const niveis = getNiveis();
-    const cliente = await supabaseClient.from("clientes").select("pontos,pedidos_count").eq("email", email).single();
-    const pontos = cliente.data?.pontos ?? 0;
-    const pedidosCount = cliente.data?.pedidos_count ?? 0;
-    const nivel = calcularNivel(pontos, niveis);
+    const { data: fidelidade } = await supabaseClient.from("fidelidade").select("pontos").eq("email", email).single();
+    const pontos = fidelidade?.pontos ?? 0;
+    const { data: pedidos } = await supabaseClient.from("pedidos").select("id").eq("email", email);
+    const pedidosCount = pedidos?.length ?? 0;
     const missoes = MISSOES.map((m) => ({
       ...m,
-      feito: m.tipo === "cadastro" ? cliente.data?.pontos > 0 :
+      feito: m.tipo === "cadastro" ? pontos > 0 :
              m.tipo === "primeira_compra" ? pedidosCount >= 1 : false,
       pontos_concedidos: 0,
     }));
@@ -860,11 +860,12 @@ app.get("/api/fidelidade/mensagens", async (req, res) => {
     return res.status(400).json({ erro: "E-mail inválido." });
   try {
     const mensagens: string[] = [];
-    const cliente = await supabaseClient.from("clientes").select("pontos,cashback").eq("email", email).single();
-    const cashback = cliente.data?.cashback ?? 0;
+    const { data: fidelidade } = await supabaseClient.from("fidelidade").select("pontos,cashback").eq("email", email).single();
+    const cashback = fidelidade?.cashback ?? 0;
+    const pontos = fidelidade?.pontos ?? 0;
     if (cashback > 0) mensagens.push(`Você possui R$ ${cashback.toFixed(2)} de cashback disponível.`);
     const niveis = getNiveis();
-    const nivel = calcularNivel(cliente.data?.pontos ?? 0, niveis);
+    const nivel = calcularNivel(pontos, niveis);
     if (nivel.prox) mensagens.push(`Faltam ${nivel.ptsParaProx} pts para ${nivel.prox.nome}.`);
     return res.json({ email, mensagens });
   } catch (e) {
