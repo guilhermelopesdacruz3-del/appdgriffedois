@@ -752,7 +752,7 @@ app.get("/api/fidelidade", async (req, res) => {
       segredos.getHistoricoFidelidade(email),
     ]);
     const descontoMax = Math.floor((pontos / regras.pontosPorDesconto) * 10);
-      // ... (código existente da rota fidelidade, agora inclui historicos de fidelidade)
+    return res.json({
       email,
       pontos,
       regras,
