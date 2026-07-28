@@ -344,17 +344,21 @@ export async function creditarFamilia(responsavelEmail: string, pontosCompra: nu
 export async function concederPontos(email: string, pontos: number, ref: string): Promise<number> {
   const e = (email || "").trim().toLowerCase();
   if (!e || !(pontos > 0) || !ref) return 0;
-  if (!sb) return 0; // sem banco, não cria saldo fantasma
-  // Idempotência: se já existe histórico com essa ref, não concede de novo.
+  if (!sb) return 0;
   const { data: existe } = await sb.from("fidelidade_historico").select("id").eq("email", e).eq("ref", ref).eq("tipo", "conquista").maybeSingle();
   if (existe) return 0;
   try {
     const { data } = await sb.from("fidelidade").select("pontos").eq("email", e).single();
     const atual = (data?.pontos || 0) + pontos;
     await sb.from("fidelidade").upsert({ email: e, pontos: atual, updated_at: new Date().toISOString() }, { onConflict: "email" });
-    await sb.from("fidelidade_historico").insert({ email: e, tipo: "conquista", pontos, motivo: "conquista", ref });
+    const { error: histErr } = await sb.from("fidelidade_historico").insert({ email: e, tipo: "conquista", pontos, motivo: "conquista", ref });
+    if (histErr) {
+      console.error("[concederPontos] insert historico falhou:", histErr.message, "ref:", ref);
+      return pontos; // pontos já creditados no saldo, mas historico falhou
+    }
     return pontos;
-  } catch {
+  } catch (err: any) {
+    console.error("[concederPontos] erro geral:", err?.message, "ref:", ref);
     return 0;
   }
 }
