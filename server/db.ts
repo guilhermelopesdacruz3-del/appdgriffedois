@@ -163,6 +163,68 @@ export async function getRegrasFidelidade(): Promise<{ pontosPorReal: number; po
   return def;
 }
 
+// ---------------------------------------------------------------------------
+// REGRAS DO PROGRAMA DE FIDELIDADE (plano oficial) — parametrizáveis.
+// ---------------------------------------------------------------------------
+
+// Níveis de relacionamento (faixas em pontos).
+export type Nivel = {
+  id: "cliente" | "gold" | "platinum" | "diamond";
+  nome: string;
+  min: number;
+  max: number | null;
+  cashbackAdicional: number; // % extra sobre o base, por categoria
+  cupomAniversario: number; // R$
+  beneficios: string[];
+};
+
+export const NIVEIS_PADRAO: Nivel[] = [
+  { id: "cliente", nome: "Cliente D'Griffe", min: 0, max: 4999, cashbackAdicional: 0, cupomAniversario: 0, beneficios: ["Benefício fidelidade", "Cashback base", "Acesso completo ao app"] },
+  { id: "gold", nome: "Gold", min: 5000, max: 14999, cashbackAdicional: 2, cupomAniversario: 50, beneficios: ["Cashback base +2%", "Promoções antecipadas", "Cupom aniversário R$50"] },
+  { id: "platinum", nome: "Platinum", min: 15000, max: 29999, cashbackAdicional: 3, cupomAniversario: 100, beneficios: ["Cashback base +3%", "Cupom aniversário R$100", "Atendimento prioritário", "Garantia estendida"] },
+  { id: "diamond", nome: "Diamond", min: 30000, max: null, cashbackAdicional: 5, cupomAniversario: 200, beneficios: ["Cashback base +5%", "Cupom aniversário R$200", "Atendimento VIP", "Eventos exclusivos"] },
+];
+
+// Cashback base por categoria (% sobre o valor).
+export const CASHBACK_BASE: Record<string, number> = {
+  grau: 2,
+  solar: 2,
+  joias: 2,
+  relogios: 1,
+};
+
+export async function getNiveis(): Promise<Nivel[]> {
+  // Por enquanto fixo em NIVEIS_PADRAO; futuramente lido de store_config se houver override.
+  return NIVEIS_PADRAO;
+}
+
+// Calcula o nível a partir dos pontos.
+export function calcularNivel(pontos: number, niveis: Nivel[] = NIVEIS_PADRAO): { nivel: Nivel; indice: number; prox: Nivel | null; ptsParaProx: number } {
+  const p = Math.max(0, Math.floor(pontos));
+  let indice = 0;
+  for (let i = 0; i < niveis.length; i++) {
+    if (p >= niveis[i].min) indice = i;
+  }
+  const nivel = niveis[indice];
+  const prox = indice < niveis.length - 1 ? niveis[indice + 1] : null;
+  const ptsParaProx = prox ? Math.max(0, prox.min - p) : 0;
+  return { nivel, indice, prox, ptsParaProx };
+}
+
+// Cashback (% e R$) para um valor de compra numa categoria, dado o nível.
+export function calcularCashback(valor: number, categoria: string, nivel: Nivel): { percentual: number; valorCashback: number } {
+  const base = CASHBACK_BASE[categoria] ?? 0;
+  const percentual = Math.max(0, base + nivel.cashbackAdicional);
+  const valorCashback = Number(((valor * percentual) / 100).toFixed(2));
+  return { percentual, valorCashback };
+}
+
+// Benefício fidelidade base: 10% parcelado / 15% Pix (do plano).
+export const BENEFICIO_BASE = { parcelado: 10, pix: 15 };
+
+// Teto máximo de benefícios por venda: 20% do valor total (do plano).
+export const TETO_BENEFICIOS_PERC = 20;
+
 export async function getPontos(email: string): Promise<number> {
   const e = (email || "").trim().toLowerCase();
   if (!e) return 0;

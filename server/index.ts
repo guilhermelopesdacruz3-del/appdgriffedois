@@ -37,7 +37,7 @@ import * as segredos from "./db.ts";
 import { processarCheckout } from "./pagamento.ts";
 import { processarWebhookMP } from "./webhook.ts";
 import { listarVideosRecentes } from "./youtube.ts";
-import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade, salvarNotificacao, listarNotificacoes, marcarNotificacaoLida, salvarPerfil, buscarPerfil, listarEnderecos, salvarEndereco, excluirEndereco, salvarPreferencias, buscarPreferencias } from "./db.ts";
+import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade, salvarNotificacao, listarNotificacoes, marcarNotificacaoLida, salvarPerfil, buscarPerfil, listarEnderecos, salvarEndereco, excluirEndereco, salvarPreferencias, buscarPreferencias, getNiveis, calcularNivel, calcularCashback, BENEFICIO_BASE, TETO_BENEFICIOS_PERC, CASHBACK_BASE } from "./db.ts";
 import cupomApp from "./cupom.ts";
 import { receitasApp } from "./receitas";
 import { favoritosApp } from "./favoritos";
@@ -745,12 +745,34 @@ app.get("/api/fidelidade", async (req, res) => {
     return res.status(400).json({ erro: "E-mail inválido." });
   }
   try {
-    const [pontos, regras] = await Promise.all([
+    const [pontos, regras, niveis] = await Promise.all([
       segredos.getPontos(email),
       segredos.getRegrasFidelidade(),
+      getNiveis(),
     ]);
     const descontoMax = Math.floor((pontos / regras.pontosPorDesconto) * 10);
-    return res.json({ email, pontos, regras, desconto_max: descontoMax });
+    const { nivel, prox, ptsParaProx } = calcularNivel(pontos, niveis);
+    // Cashback disponível estimado: usa o maior % de categoria do nível (Grau/Solar/Joias base 2% + adicional).
+    const catPrincipal = "grau";
+    const cashback = calcularCashback(1, catPrincipal, nivel).percentual; // % (sobre R$1 só p/ expor o %)
+    const cashbackDisponivel = Number(((pontos / regras.pontosPorDesconto) * 10).toFixed(2)); // R$ (pontos/100*10, igual benefício)
+    return res.json({
+      email,
+      pontos,
+      regras,
+      desconto_max: descontoMax,
+      nivel: { id: nivel.id, nome: nivel.nome, cashbackAdicional: nivel.cashbackAdicional, cupomAniversario: nivel.cupomAniversario, beneficios: nivel.beneficios },
+      niveis: niveis.map((n) => ({ id: n.id, nome: n.nome, min: n.min, max: n.max })),
+      proximoNivel: prox ? { id: prox.id, nome: prox.nome, min: prox.min } : null,
+      pontosParaProximoNivel: ptsParaProx,
+      cashback: {
+        percentual: cashback,
+        disponivel: cashbackDisponivel,
+        porCategoria: CASHBACK_BASE,
+        beneficioBase: BENEFICIO_BASE,
+      },
+      tetoBeneficiosPerc: TETO_BENEFICIOS_PERC,
+    });
   } catch (e) {
     console.error("[fidelidade] falha:", e?.message);
     return res.status(502).json({ erro: "Falha ao ler o saldo de fidelidade." });

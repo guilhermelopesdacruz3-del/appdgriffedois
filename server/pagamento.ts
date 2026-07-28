@@ -9,7 +9,7 @@
 // - Em DEMO (sem MP_ACCESS_TOKEN), devolve PIX/cartão SIMULADO para o fluxo funcionar.
 
 import crypto from "node:crypto";
-import { getSecret, creditarPontos, resgatarPontos, getRegrasFidelidade, getPontos, upsertPedidoMP } from "./db.ts";
+import { getSecret, creditarPontos, resgatarPontos, getRegrasFidelidade, getPontos, upsertPedidoMP, TETO_BENEFICIOS_PERC } from "./db.ts";
 import { criarPedidoLI, baixarEstoqueLI, atualizarPedidoLI, buscarPrecoLI } from "./liClient.ts";
 
 const MP_API = "https://api.mercadopago.com";
@@ -188,6 +188,15 @@ export async function processarCheckout(params: {
     desconto = Number((desconto + descontoCupom).toFixed(2));
   }
 
+  // Regra do plano: teto de 20% de benefícios sobre o valor original.
+  // Benefícios = desconto de pontos + desconto de cupom. Se ultrapassar 20%,
+  // reduz o desconto pro teto (não estoura a margem).
+  const tetoMax = Number((autorizado.total * (TETO_BENEFICIOS_PERC / 100)).toFixed(2));
+  if (desconto > tetoMax) {
+    desconto = tetoMax;
+  }
+  total = Number((autorizado.total - desconto).toFixed(2));
+  if (total <= 0) total = 0.01;
   // Em DEMO (sem token MP válido ou modo demo), mantém fluxo simulado.
   const mpToken = await getSecret("MP_ACCESS_TOKEN").catch(() => null);
   const demoAtivo = process.env.DEMO_MODE === "true" || !mpToken;
