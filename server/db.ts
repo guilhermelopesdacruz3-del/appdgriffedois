@@ -219,6 +219,123 @@ export function calcularCashback(valor: number, categoria: string, nivel: Nivel)
   return { percentual, valorCashback };
 }
 
+// ---------------------------------------------------------------------------
+// INDICAÇÃO (plano oficial): R$50 + 200pts por indicação convertida, limite 10/ano.
+// ---------------------------------------------------------------------------
+export const INDICACAO_CREDITO_RS = 50;
+export const INDICACAO_PONTOS = 200;
+export const INDICACAO_LIMITE_ANUAL = 10;
+
+// Gera/retorna código único de indicação para o email (cliente).
+export async function gerarCodigoIndicacao(email: string): Promise<string> {
+  const e = (email || "").trim().toLowerCase();
+  if (!e) throw new Error("Email obrigatório.");
+  if (sb) {
+    // Busca código existente.
+    const { data: existente } = await sb.from("indicacoes").select("codigo").eq("indicador_email", e).eq("tipo", "indicador").maybeSingle();
+    if (existente?.codigo) return existente.codigo;
+    // Gera código DG-XXXXX (5 chars alfanuméricos).
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+    let codigo = "";
+    for (let i = 0; i < 5; i++) codigo += chars[Math.floor(Math.random() * chars.length)];
+    const codigoFinal = `DG-${codigo}`;
+    await sb.from("indicacoes").insert({ codigo: codigoFinal, indicador_email: e, tipo: "indicador" });
+    return codigoFinal;
+  }
+  // Fallback local (sem Supabase): código determinístico.
+  return `DG-${Buffer.from(e).slice(0, 5).toString("base64").replace(/[^A-Z0-9]/gi, "X").toUpperCase().slice(0, 5)}`;
+}
+
+// Registra uma indicação (indicador indica indicado).
+export async function registrarIndicacao(indicadorEmail: string, indicadoEmail: string): Promise<{ ok: boolean; erro?: string }> {
+  const ind = (indicadorEmail || "").trim().toLowerCase();
+  const indado = (indicadoEmail || "").trim().toLowerCase();
+  if (!ind || !indado || ind === indado) return { ok: false, erro: "Dados inválidos." };
+  if (sb) {
+    // Limite anual de 10 indicações convertidas.
+    const { count } = await sb.from("indicacoes").select("*", { count: "exact", head: true }).eq("indicador_email", ind).eq("status", "convertida").gte("created_at", new Date(Date.now() - 365 * 24 * 3600 * 1000).toISOString());
+    if ((count ?? 0) >= INDICACAO_LIMITE_ANUAL) return { ok: false, erro: `Limite de ${INDICACAO_LIMITE_ANUAL} indicações/ano atingido.` };
+    // Evita duplicata.
+    const { data: dup } = await sb.from("indicacoes").select("id").eq("indicador_email", ind).eq("indicado_email", indado).maybeSingle();
+    if (dup) return { ok: false, erro: "Indicação já registrada." };
+    await sb.from("indicacoes").insert({ indicador_email: ind, indicado_email: indado, status: "pendente" });
+  }
+  return { ok: true };
+}
+
+// Confirma indicação (chamado quando o indicado faz 1ª compra).
+export async function creditarIndicacao(indicadorEmail: string, indicadoEmail: string): Promise<{ creditoRs: number; pontos: number }> {
+  const ind = (indicadorEmail || "").trim().toLowerCase();
+  const indado = (indicadoEmail || "").trim().toLowerCase();
+  if (!ind || !indado || ind === indado) return { creditoRs: 0, pontos: 0 };
+  if (sb) {
+    const { data: pend } = await sb.from("indicacoes").select("id").eq("indicador_email", ind).eq("indicado_email", indado).eq("status", "pendente").maybeSingle();
+    if (!pend) return { creditoRs: 0, pontos: 0 };
+    await sb.from("indicacoes").update({ status: "convertida", convertido_at: new Date().toISOString() }).eq("id", pend.id);
+    await creditarCreditoFidelidade(ind, INDICACAO_CREDITO_RS, "indicacao");
+    await creditarPontos(ind, INDICACAO_PONTOS, `indicacao-${indado}`);
+    return { creditoRs: INDICACAO_CREDITO_RS, pontos: INDICACAO_PONTOS };
+  }
+  return { creditoRs: 0, pontos: 0 };
+}
+
+export async function getIndicacoes(email: string): Promise<any[]> {
+  const e = (email || "").trim().toLowerCase();
+  if (!sb) return [];
+  const { data } = await sb.from("indicacoes").select("*").or(`indicador_email.eq.${e},indicado_email.eq.${e}`).order("created_at", { ascending: false });
+  return data || [];
+}
+
+// ---------------------------------------------------------------------------
+// CLUBE FAMÍLIA (plano oficial): até 5 membros, 20% dos pontos viram crédito.
+// ---------------------------------------------------------------------------
+export const FAMILIA_LIMITE_MEMBROS = 5;
+export const FAMILIA_PERCENTUAL_PONTOS = 20; // % dos pontos da compra viram crédito família
+export const CREDITOS_FAMILIA: Record<number, number> = { 5000: 50, 10000: 100, 20000: 200 };
+
+export async function getClubeFamilia(email: string): Promise<any[]> {
+  const e = (email || "").trim().toLowerCase();
+  if (!sb) return [];
+  const { data } = await sb.from("familia").select("*").eq("responsavel_email", e).order("created_at", { ascending: false });
+  return data || [];
+}
+
+export async function adicionarFamiliar(responsavelEmail: string, familiarEmail: string): Promise<{ ok: boolean; erro?: string }> {
+  const r = (responsavelEmail || "").trim().toLowerCase();
+  const f = (familiarEmail || "").trim().toLowerCase();
+  if (!r || !f || r === f) return { ok: false, erro: "Dados inválidos." };
+  if (sb) {
+    const { count } = await sb.from("familia").select("*", { count: "exact", head: true }).eq("responsavel_email", r);
+    if ((count ?? 0) >= FAMILIA_LIMITE_MEMBROS) return { ok: false, erro: `Limite de ${FAMILIA_LIMITE_MEMBROS} membros atingido.` };
+    const { error } = await sb.from("familia").insert({ responsavel_email: r, membro_email: f });
+    if (error) return { ok: false, erro: error.message };
+  }
+  return { ok: true };
+}
+
+// Credita 20% dos pontos da compra para a conta família do responsável.
+export async function creditarFamilia(responsavelEmail: string, pontosCompra: number): Promise<number> {
+  const r = (responsavelEmail || "").trim().toLowerCase();
+  if (!r || pontosCompra <= 0) return 0;
+  const pontosFamilia = Math.floor((pontosCompra * FAMILIA_PERCENTUAL_PONTOS) / 100);
+  if (sb && pontosFamilia > 0) {
+    await creditarCreditoFidelidade(r, 0, "familia", pontosFamilia); // crédito em pontos família
+  }
+  return pontosFamilia;
+}
+
+// Créditos Família disponíveis (R$) conforme pontos acumulados.
+export async function getCreditosFamilia(email: string): Promise<{ pontos: number; creditoRs: number }> {
+  const e = (email || "").trim().toLowerCase();
+  if (!sb) return { pontos: 0, creditoRs: 0 };
+  const { data } = await sb.from("fidelidade_historico").select("pontos").eq("email", e).eq("tipo", "familia").eq("credito_rs", 0).maybeSingle();
+  const pontos = data?.pontos ?? 0;
+  let creditoRs = 0;
+  const thresholds = Object.keys(CREDITOS_FAMILIA).map(Number).sort((a, b) => a - b);
+  for (const t of thresholds) { if (pontos >= t) creditoRs = CREDITOS_FAMILIA[t]; }
+  return { pontos, creditoRs };
+}
+
 // Benefício fidelidade base: 10% parcelado / 15% Pix (do plano).
 export const BENEFICIO_BASE = { parcelado: 10, pix: 15 };
 

@@ -37,7 +37,7 @@ import * as segredos from "./db.ts";
 import { processarCheckout } from "./pagamento.ts";
 import { processarWebhookMP } from "./webhook.ts";
 import { listarVideosRecentes } from "./youtube.ts";
-import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade, salvarNotificacao, listarNotificacoes, marcarNotificacaoLida, salvarPerfil, buscarPerfil, listarEnderecos, salvarEndereco, excluirEndereco, salvarPreferencias, buscarPreferencias, getNiveis, calcularNivel, calcularCashback, BENEFICIO_BASE, TETO_BENEFICIOS_PERC, CASHBACK_BASE } from "./db.ts";
+import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade, salvarNotificacao, listarNotificacoes, marcarNotificacaoLida, salvarPerfil, buscarPerfil, listarEnderecos, salvarEndereco, excluirEndereco, salvarPreferencias, buscarPreferencias, getNiveis, calcularNivel, calcularCashback, BENEFICIO_BASE, TETO_BENEFICIOS_PERC, CASHBACK_BASE, gerarCodigoIndicacao, registrarIndicacao, creditarIndicacao, getIndicacoes, getClubeFamilia, adicionarFamiliar, creditarFamilia, getCreditosFamilia } from "./db.ts";
 import cupomApp from "./cupom.ts";
 import { receitasApp } from "./receitas";
 import { favoritosApp } from "./favoritos";
@@ -791,6 +791,59 @@ app.get("/api/fidelidade/historico", async (req, res) => {
   } catch (e) {
     console.error("[fidelidade] falha histórico:", e?.message);
     return res.status(502).json({ erro: "Falha ao ler o histórico de fidelidade." });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// INDICAÇÃO — código único + crédito R$50 + 200pts por conversão.
+// ---------------------------------------------------------------------------
+app.get("/api/indicacao/codigo", async (req, res) => {
+  const email = String(req.query.email || "").trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ erro: "E-mail inválido." });
+  try {
+    const codigo = await gerarCodigoIndicacao(email);
+    const indicacoes = await getIndicacoes(email);
+    const convertidas = indicacoes.filter((i) => i.indicador_email === email && i.status === "convertida");
+    return res.json({ email, codigo, indicacoesConvertidas: convertidas.length, limiteAnual: 10 });
+  } catch (e) {
+    return res.status(502).json({ erro: "Falha ao gerar código." });
+  }
+});
+
+app.post("/api/indicacao/registrar", async (req, res) => {
+  const { indicadorEmail, indicadoEmail } = req.body || {};
+  try {
+    const r = await registrarIndicacao(indicadorEmail, indicadoEmail);
+    if (!r.ok) return res.status(400).json({ ok: false, erro: r.erro });
+    return res.json({ ok: true });
+  } catch (e) {
+    return res.status(502).json({ ok: false, erro: "Falha ao registrar indicação." });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// CLUBE FAMÍLIA — membros + créditos.
+// ---------------------------------------------------------------------------
+app.get("/api/familia", async (req, res) => {
+  const email = String(req.query.email || "").trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ erro: "E-mail inválido." });
+  try {
+    const membros = await getClubeFamilia(email);
+    const creditos = await getCreditosFamilia(email);
+    return res.json({ email, membros, limite: 5, creditos });
+  } catch (e) {
+    return res.status(502).json({ erro: "Falha ao ler clube família." });
+  }
+});
+
+app.post("/api/familia/adicionar", async (req, res) => {
+  const { responsavelEmail, membroEmail } = req.body || {};
+  try {
+    const r = await adicionarFamiliar(responsavelEmail, membroEmail);
+    if (!r.ok) return res.status(400).json({ ok: false, erro: r.erro });
+    return res.json({ ok: true });
+  } catch (e) {
+    return res.status(502).json({ ok: false, erro: "Falha ao adicionar membro." });
   }
 });
 
