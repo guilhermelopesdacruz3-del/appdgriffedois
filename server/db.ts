@@ -345,13 +345,13 @@ export async function concederPontos(email: string, pontos: number, ref: string)
   const e = (email || "").trim().toLowerCase();
   if (!e || !(pontos > 0) || !ref) return 0;
   if (!sb) return 0;
-  const { data: existe } = await sb.from("fidelidade_historico").select("id").eq("email", e).eq("ref", ref).eq("tipo", "conquista").maybeSingle();
+  const { data: existe } = await sb.from("fidelidade_historico").select("id").eq("email", e).eq("ref", ref).eq("tipo", "credito").maybeSingle();
   if (existe) return 0;
   try {
     const { data } = await sb.from("fidelidade").select("pontos").eq("email", e).single();
     const atual = (data?.pontos || 0) + pontos;
     await sb.from("fidelidade").upsert({ email: e, pontos: atual, updated_at: new Date().toISOString() }, { onConflict: "email" });
-    const { error: histErr } = await sb.from("fidelidade_historico").insert({ email: e, tipo: "conquista", pontos, motivo: "conquista", ref });
+    const { error: histErr } = await sb.from("fidelidade_historico").insert({ email: e, tipo: "credito", pontos, motivo: "conquista", ref });
     if (histErr) {
       console.error("[concederPontos] insert historico falhou:", histErr.message, "ref:", ref);
       return pontos; // pontos já creditados no saldo, mas historico falhou
