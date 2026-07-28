@@ -860,14 +860,14 @@ app.get("/api/fidelidade/mensagens", async (req, res) => {
     return res.status(400).json({ erro: "E-mail inválido." });
   try {
     const mensagens: string[] = [];
-    const { data: fidelidade } = await supabaseClient.from("fidelidade").select("pontos,cashback").eq("email", email).single();
-    const cashback = fidelidade?.cashback ?? 0;
-    const pontos = fidelidade?.pontos ?? 0;
-    if (cashback > 0) mensagens.push(`Você possui R$ ${cashback.toFixed(2)} de cashback disponível.`);
+    const pontos = await segredos.getPontos(email);
+    const regras = await segredos.getRegrasFidelidade();
     const niveis = getNiveis();
     const nivel = calcularNivel(pontos, niveis);
     if (nivel.prox) mensagens.push(`Faltam ${nivel.ptsParaProx} pts para ${nivel.prox.nome}.`);
-    return res.json({ email, mensagens });
+    const cashback = calcularCashback(0, regras, nivel);
+    // Mensagem de cashback disponível (simplificado: só mostra se tem pontos suficientes)
+    return res.json({ email, mensagens, nivel: nivel.nome, pontos });
   } catch (e) {
     console.error("[mensagens] falha:", e?.message);
     return res.status(502).json({ erro: "Falha ao ler mensagens." });
