@@ -1435,7 +1435,7 @@ app.post("/api/cliente/excluir-confirmar", async (req, res) => {
 
     // 4) Limpa fidelidade (Supabase + espelho local, se houver).
     try {
-      await sb.from("pontos").delete().eq("email", e);
+      await sb.from("fidelidade").delete().eq("email", e);
     } catch (fErr) {
       console.warn("[exclusao] falha ao limpar fidelidade (ignorado):", (fErr as Error)?.message);
     }
