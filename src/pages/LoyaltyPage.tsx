@@ -1,4 +1,3 @@
-import { benefits } from "../data";
 import { useCliente } from "../hooks/useCliente";
 import { NIVEIS, BENEFICIO_BASE, TETO_BENEFICIOS_PERC } from "../data/fidelidade";
 
@@ -27,6 +26,38 @@ export default function LoyaltyPage({ fidelidade: info, historicoFidelidade: his
   const cashbackPerc = info?.cashback?.percentual ?? nivel.cashbackAdicional + 2;
   const cashbackDisp = info?.cashback?.disponivel ?? Number(((pontos / regras.pontosPorDesconto) * 10).toFixed(2));
   const descontoMax = info?.desconto_max ?? 0;
+  const [missoes, setMissoes] = useState<{id:string; descricao:string; pontos:number; feito:boolean}[]>([]);
+  const [missoesLoading, setMissoesLoading] = useState(false);
+
+  useEffect(() => {
+    if (!email) return;
+    let mounted = true;
+    setMissoesLoading(true);
+    fetch(`/api/fidelidade/missao?email=${encodeURIComponent(email)}`)
+      .then((r) => r.json())
+      .then((j) => { if (mounted) setMissoes(j.missoes || []); })
+      .catch(() => {})
+      .finally(() => { if (mounted) setMissoesLoading(false); });
+    return () => { mounted = false; };
+  }, [email]);
+
+  const concluirMissao = async (tipo: string) => {
+    if (!email) return;
+    setMissoesLoading(true);
+    try {
+      const r = await fetch("/api/fidelidade/missao/concluir", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, tipo }),
+      });
+      const j = await r.json();
+      if (!r.ok || !j.ok) { alert(j.erro || "Não foi possível concluir."); return; }
+      // Atualiza o estado local: marca como feito.
+      setMissoes((prev) => prev.map((m) => (m.id === tipo ? { ...m, feito: true } : m)));
+      // Recarrega saldo e histórico (frontome também expõe info, então não mexemos aqui).
+    } catch { alert("Não foi possível concluir a missão."); }
+    setMissoesLoading(false);
+  };
 
   return (
     <div className="pb-4">
@@ -130,7 +161,7 @@ export default function LoyaltyPage({ fidelidade: info, historicoFidelidade: his
           <div className="w-10 h-10 bg-gold/20 rounded-xl flex items-center justify-center"><span className="text-lg">🎁</span></div>
           <div className="flex-1">
             <p className="text-xs font-bold text-luxury-black">Indique e Ganhe</p>
-            <p className="text-[10px] text-gray-500">R$ 50 + 200 pontos por indicação</p>
+            <p className="text-[10px] text-gray-500">200 pontos por indicação convertida</p>
           </div>
           <button onClick={async () => {
             if (!cliente?.email) return;
@@ -145,7 +176,7 @@ export default function LoyaltyPage({ fidelidade: info, historicoFidelidade: his
           <div className="w-10 h-10 bg-gold/20 rounded-xl flex items-center justify-center"><span className="text-lg">👨‍👩‍👧</span></div>
           <div className="flex-1">
             <p className="text-xs font-bold text-luxury-black">Clube Família</p>
-            <p className="text-[10px] text-gray-500">Até 5 membros · 20% dos pontos viram crédito</p>
+            <p className="text-[10px] text-gray-500">Até 5 membros · 20% dos pontos da compra viram pontos do responsável</p>
           </div>
           <button onClick={async () => {
             if (!cliente?.email) return;
@@ -160,21 +191,22 @@ export default function LoyaltyPage({ fidelidade: info, historicoFidelidade: his
       {info && (
         <div className="px-4 mt-5">
           <h3 className="text-sm font-bold text-luxury-black mb-2">Missões</h3>
+          {missoesLoading && <p className="text-[11px] text-gray-400 text-center py-2">Carregando missões…</p>}
           <div className="space-y-2">
-            {[
-              { id: "cadastro_completo", label: "Completar cadastro", pontos: 100, icon: "✅", feito: true },
-              { id: "primeira_compra", label: "Primeira compra", pontos: 500, icon: "🛒", feito: false },
-              { id: "avaliar_atendimento", label: "Avaliar atendimento", pontos: 100, icon: "⭐", feito: false },
-              { id: "indicacao_convertida", label: "Indicação convertida", pontos: 200, icon: "🎁", feito: false },
-              { id: "recompra_12m", label: "Recompra em 12 meses", pontos: 400, icon: "🔁", feito: false },
-            ].map((m) => (
+            {missoes.map((m) => (
               <div key={m.id} className={`flex items-center gap-3 p-3 rounded-xl ${m.feito ? "bg-green-50 border border-green-200" : "bg-white border border-ice-dark/40"}`}>
-                <span className="text-lg">{m.icon}</span>
+                <span className="text-lg">{m.id === "cadastro_completo" ? "✅" : m.id === "primeira_compra" ? "🛒" : m.id === "avaliar_atendimento" ? "⭐" : m.id === "indicacao_convertida" ? "🎁" : m.id === "recompra_12m" ? "🔁" : "🏆"}</span>
                 <div className="flex-1">
-                  <p className="text-xs font-semibold text-luxury-black">{m.label}</p>
+                  <p className="text-xs font-semibold text-luxury-black">{m.descricao}</p>
                   <p className="text-[10px] text-gold font-bold">+{m.pontos} pts</p>
                 </div>
-                {m.feito ? <span className="text-green-600 text-xs font-bold">✓</span> : <span className="text-gray-300 text-xs font-bold">○</span>}
+                {m.feito ? (
+                  <span className="text-green-600 text-xs font-bold">✓</span>
+                ) : m.id === "avaliar_atendimento" ? (
+                  <button onClick={async () => { await concluirMissao(m.id); }} className="px-3 py-1.5 bg-gold text-white text-[10px] font-bold rounded-xl active:scale-95 transition-all">Concluir</button>
+                ) : (
+                  <span className="text-gray-300 text-xs font-bold">○</span>
+                )}
               </div>
             ))}
           </div>
