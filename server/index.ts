@@ -37,7 +37,7 @@ import * as segredos from "./db.ts";
 import { processarCheckout } from "./pagamento.ts";
 import { processarWebhookMP } from "./webhook.ts";
 import { listarVideosRecentes } from "./youtube.ts";
-import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade, salvarNotificacao, listarNotificacoes, marcarNotificacaoLida, salvarPerfil, buscarPerfil, listarEnderecos, salvarEndereco, excluirEndereco, salvarPreferencias, buscarPreferencias, getNiveis, calcularNivel, calcularCashback, BENEFICIO_BASE, TETO_BENEFICIOS_PERC, CASHBACK_BASE, gerarCodigoIndicacao, registrarIndicacao, creditarIndicacao, getIndicacoes, getClubeFamilia, adicionarFamiliar, creditarFamilia, getCreditosFamilia, MISSOES, VALIDADE_PONTOS_MESES_SEM_MOV, VALIDADE_PONTOS_MESES_EXPIRACAO, VALIDADE_CASHBACK_MESES_SEM_MOV, VALIDADE_CASHBACK_DIAS_ADICIONAIS } from "./db.ts";
+import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade, salvarNotificacao, listarNotificacoes, marcarNotificacaoLida, salvarPerfil, buscarPerfil, listarEnderecos, salvarEndereco, excluirEndereco, salvarPreferencias, buscarPreferencias, getNiveis, NIVEIS_PADRAO, calcularNivel, calcularCashback, BENEFICIO_BASE, TETO_BENEFICIOS_PERC, CASHBACK_BASE, gerarCodigoIndicacao, registrarIndicacao, creditarIndicacao, getIndicacoes, getClubeFamilia, adicionarFamiliar, creditarFamilia, getCreditosFamilia, MISSOES, VALIDADE_PONTOS_MESES_SEM_MOV, VALIDADE_PONTOS_MESES_EXPIRACAO, VALIDADE_CASHBACK_MESES_SEM_MOV, VALIDADE_CASHBACK_DIAS_ADICIONAIS } from "./db.ts";
 import cupomApp from "./cupom.ts";
 import { receitasApp } from "./receitas";
 import { favoritosApp } from "./favoritos";
@@ -745,30 +745,29 @@ app.get("/api/fidelidade", async (req, res) => {
     return res.status(400).json({ erro: "E-mail inválido." });
   }
   try {
-    const [pontosRaw, regrasRaw, niveisRaw, historicoFidelidadeRaw] = await Promise.all([
+    const [pontos, regras, niveis, historicoFidelidade] = await Promise.all([
       segredos.getPontos(email).catch((e) => { console.error("[fidelidade] getPontos:", e?.message); return 0; }),
       segredos.getRegrasFidelidade().catch((e) => { console.error("[fidelidade] getRegras:", e?.message); return { pontosPorReal: 1, pontosPorDesconto: 100 }; }),
       getNiveis().catch((e) => { console.error("[fidelidade] getNiveis:", e?.message); return NIVEIS_PADRAO; }),
       segredos.getHistoricoFidelidade(email).catch((e) => { console.error("[fidelidade] getHistorico:", e?.message); return []; }),
     ]);
-    const pontos = pontosRaw ?? 0;
-    const regras = regrasRaw;
-    const niveis = niveisRaw;
-    const historicoFidelidade = historicoFidelidadeRaw ?? [];
     const nivel = calcularNivel(pontos, niveis);
+    const prox = nivel.prox;
+    const ptsParaProx = nivel.ptsParaProx;
     const descontoMax = Math.floor((pontos / (regras.pontosPorDesconto || 100)) * 10);
+    const percentual = Math.max(...Object.keys(CASHBACK_BASE).map((cat) => calcularCashback(0, cat, nivel.nivel).percentual));
     return res.json({
       email,
       pontos,
       regras: { pontosPorReal: regras.pontosPorReal, pontosPorDesconto: regras.pontosPorDesconto },
       desconto_max: descontoMax,
-      nivel: { id: nivel.id, nome: nivel.nome, cashbackAdicional: nivel.cashbackAdicional, cupomAniversario: nivel.cupomAniversario, beneficios: nivel.beneficios },
+      nivel: { id: nivel.nivel.id, nome: nivel.nivel.nome, cashbackAdicional: nivel.nivel.cashbackAdicional, cupomAniversario: nivel.nivel.cupomAniversario, beneficios: nivel.nivel.beneficios },
       niveis: niveis.map((n) => ({ id: n.id, nome: n.nome, min: n.min, max: n.max })),
       proximoNivel: prox ? { id: prox.id, nome: prox.nome, min: prox.min } : null,
       pontosParaProximoNivel: ptsParaProx,
       cashback: {
-        percentual: cashback,
-        disponivel: cashbackDisponivel,
+        percentual,
+        disponivel: 0,
         porCategoria: CASHBACK_BASE,
         beneficioBase: BENEFICIO_BASE,
       },
@@ -865,14 +864,11 @@ app.get("/api/fidelidade/mensagens", async (req, res) => {
     return res.status(400).json({ erro: "E-mail inválido." });
   try {
     const mensagens: string[] = [];
-    const pontos = await segredos.getPontos(email);
-    const regras = await segredos.getRegrasFidelidade();
-    const niveis = getNiveis();
+    const pontos = await segredos.getPontos(email).catch((e) => { console.error("[mensagens] getPontos:", e?.message); return 0; });
+    const niveis = await getNiveis().catch((e) => { console.error("[mensagens] getNiveis:", e?.message); return NIVEIS_PADRAO; });
     const nivel = calcularNivel(pontos, niveis);
     if (nivel.prox) mensagens.push(`Faltam ${nivel.ptsParaProx} pts para ${nivel.prox.nome}.`);
-    const cashback = calcularCashback(0, regras, nivel);
-    // Mensagem de cashback disponível (simplificado: só mostra se tem pontos suficientes)
-    return res.json({ email, mensagens, nivel: nivel.nome, pontos });
+    return res.json({ email, mensagens, nivel: nivel.nivel.nome, pontos });
   } catch (e) {
     console.error("[mensagens] falha:", e?.message);
     return res.status(502).json({ erro: "Falha ao ler mensagens." });
