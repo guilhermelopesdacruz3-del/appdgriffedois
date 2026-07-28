@@ -745,22 +745,22 @@ app.get("/api/fidelidade", async (req, res) => {
     return res.status(400).json({ erro: "E-mail inválido." });
   }
   try {
-    const [pontos, regras, niveis, historicoFidelidade] = await Promise.all([
-      segredos.getPontos(email),
-      segredos.getRegrasFidelidade(),
-      getNiveis(),
-      segredos.getHistoricoFidelidade(email),
+    const [pontosRaw, regrasRaw, niveisRaw, historicoFidelidadeRaw] = await Promise.all([
+      segredos.getPontos(email).catch((e) => { console.error("[fidelidade] getPontos:", e?.message); return 0; }),
+      segredos.getRegrasFidelidade().catch((e) => { console.error("[fidelidade] getRegras:", e?.message); return { pontosPorReal: 1, pontosPorDesconto: 100 }; }),
+      getNiveis().catch((e) => { console.error("[fidelidade] getNiveis:", e?.message); return NIVEIS_PADRAO; }),
+      segredos.getHistoricoFidelidade(email).catch((e) => { console.error("[fidelidade] getHistorico:", e?.message); return []; }),
     ]);
-    const descontoMax = Math.floor((pontos / (regras?.pontosPorDesconto || 100)) * 10);
+    const pontos = pontosRaw ?? 0;
+    const regras = regrasRaw;
+    const niveis = niveisRaw;
+    const historicoFidelidade = historicoFidelidadeRaw ?? [];
     const nivel = calcularNivel(pontos, niveis);
-    const prox = niveis.find((n) => n.min > pontos) || null;
-    const ptsParaProx = prox ? prox.min - pontos : 0;
-    const cashback = calcularCashback(0, regras, nivel);
-    const cashbackDisponivel = calcularCashbackDisponivel(historicoFidelidade);
+    const descontoMax = Math.floor((pontos / (regras.pontosPorDesconto || 100)) * 10);
     return res.json({
       email,
       pontos,
-      regras,
+      regras: { pontosPorReal: regras.pontosPorReal, pontosPorDesconto: regras.pontosPorDesconto },
       desconto_max: descontoMax,
       nivel: { id: nivel.id, nome: nivel.nome, cashbackAdicional: nivel.cashbackAdicional, cupomAniversario: nivel.cupomAniversario, beneficios: nivel.beneficios },
       niveis: niveis.map((n) => ({ id: n.id, nome: n.nome, min: n.min, max: n.max })),
