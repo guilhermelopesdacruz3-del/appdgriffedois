@@ -806,6 +806,85 @@ app.get("/api/indicacao/codigo", async (req, res) => {
   }
 });
 
+// ---------------------------------------------------------------------------
+// FASE B — Rotas de fidelidade (missões, validade, mensagens).
+// ---------------------------------------------------------------------------
+
+// GET /api/fidelidade/missao — lista as 5 missões com progresso do cliente.
+app.get("/api/fidelidade/missao", async (req, res) => {
+  const email = String(req.query.email || "").trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return res.status(400).json({ erro: "E-mail inválido." });
+  try {
+    const niveis = getNiveis();
+    const cliente = await supabaseClient.from("clientes").select("pontos,pedidos_count").eq("email", email).single();
+    const pontos = cliente.data?.pontos ?? 0;
+    const pedidosCount = cliente.data?.pedidos_count ?? 0;
+    const nivel = calcularNivel(pontos, niveis);
+    const missoes = MISSOES.map((m) => ({
+      ...m,
+      feito: m.tipo === "cadastro" ? cliente.data?.pontos > 0 :
+             m.tipo === "primeira_compra" ? pedidosCount >= 1 : false,
+      pontos_concedidos: 0,
+    }));
+    return res.json({ email, missoes });
+  } catch (e) {
+    return res.status(502).json({ erro: "Falha ao ler missões." });
+  }
+});
+
+// GET /api/fidelidade/validade — regras de validade de pontos e cashback.
+app.get("/api/fidelidade/validade", async (req, res) => {
+  const email = String(req.query.email || "").trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return res.status(400).json({ erro: "E-mail inválido." });
+  try {
+    const pontos = VALIDADE_PONTOS_MESES_SEM_MOV * 30; // approx
+    const cashbackExpiraMeses = 12 + Math.floor(VALIDADE_CASHBACK_DIAS_ADICIONAIS / 30);
+    return res.json({
+      pontos_validade_meses_sem_mov: VALIDADE_PONTOS_MESES_SEM_MOV,
+      pontos_validade_meses_expiracao: VALIDADE_PONTOS_MESES_EXPIRACAO,
+      cashback_validade_meses: cashbackExpiraMeses,
+      cashback_reducao_50_pct: "após 12 meses sem movimentação",
+      cashback_zera_apos: "12 meses + 180 dias",
+    });
+  } catch (e) {
+    return res.status(502).json({ erro: "Falha ao ler validade." });
+  }
+});
+
+// GET /api/fidelidade/mensagens — mensagens automáticas para o cliente.
+app.get("/api/fidelidade/mensagens", async (req, res) => {
+  const email = String(req.query.email || "").trim().toLowerCase();
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+    return res.status(400).json({ erro: "E-mail inválido." });
+  try {
+    const mensagens: string[] = [];
+    const cliente = await supabaseClient.from("clientes").select("pontos,cashback").eq("email", email).single();
+    const cashback = cliente.data?.cashback ?? 0;
+    if (cashback > 0) mensagens.push(`Você possui R$ ${cashback.toFixed(2)} de cashback disponível.`);
+    const niveis = getNiveis();
+    const nivel = calcularNivel(cliente.data?.pontos ?? 0, niveis);
+    if (nivel.prox) mensagens.push(`Faltam ${nivel.ptsParaProx} pts para ${nivel.prox.nome}.`);
+    return res.json({ email, mensagens });
+  } catch (e) {
+    return res.status(502).json({ erro: "Falha ao ler mensagens." });
+  }
+});
+
+// POST /api/indicacao/converter — marca indicação como convertida e credita pontos.
+app.post("/api/indicacao/converter", async (req, res) => {
+  const { indicadorEmail, indicadoEmail } = req.body || {};
+  if (!indicadorEmail || !indicadoEmail)
+    return res.status(400).json({ ok: false, erro: "Informe indicador e indicado." });
+  try {
+    const r = await creditarIndicacao(indicadorEmail, indicadoEmail);
+    return res.json({ ok: true, creditoRs: r.creditoRs, pontos: r.pontos });
+  } catch (e) {
+    return res.status(502).json({ ok: false, erro: "Falha ao converter indicação." });
+  }
+});
+
 app.post("/api/indicacao/registrar", async (req, res) => {
   const { indicadorEmail, indicadoEmail } = req.body || {};
   try {
