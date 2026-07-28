@@ -1,9 +1,9 @@
 import { useState } from "react";
-import { formatPrice, isValidEmail } from "../utils";
-import { useCliente } from "../hooks/useCliente";
-import { validarCupom, usarCupom } from "../services/cupomApp";
-import { iniciarCheckout } from "../services/apiConfig";
-import type { Product } from "../data";
+import { formatPrice, isValidEmail } from "../../utils";
+import { useCliente } from "../../hooks/useCliente";
+import { validarCupom, usarCupom } from "../../services/cupomApp";
+import { iniciarCheckout } from "../../services/apiConfig";
+import type { Product } from "../../data";
 
 interface CartItem {
   product: Product;

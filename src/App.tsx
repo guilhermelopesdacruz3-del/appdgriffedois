@@ -1,25 +1,25 @@
 import { useState, useCallback, useEffect } from "react";
 import { Product } from "./data";
 import { useProdutos } from "./hooks/useProdutos";
-import Header from "./components/Header";
-import BottomNav from "./components/BottomNav";
-import PurchaseDrawer from "./components/PurchaseDrawer";
-import CartDrawer from "./components/CartDrawer";
-import CheckoutDrawer from "./components/CheckoutDrawer";
-import VirtualTryOn from "./components/VirtualTryOn";
-import ScrollToTop from "./components/ScrollToTop";
+import Header from "./components/layout/Header";
+import BottomNav from "./components/layout/BottomNav";
+import PurchaseDrawer from "./components/features/PurchaseDrawer";
+import CartDrawer from "./components/features/CartDrawer";
+import CheckoutDrawer from "./components/features/CheckoutDrawer";
+import VirtualTryOn from "./components/features/VirtualTryOn";
+import ScrollToTop from "./components/layout/ScrollToTop";
 import HomePage from "./pages/HomePage";
 import CatalogPage from "./pages/CatalogPage";
 import ProductPage from "./pages/ProductPage";
 import LoyaltyPage from "./pages/LoyaltyPage";
 import ProfilePage from "./pages/ProfilePage";
-import { ErrorBoundary } from "./components/ErrorBoundary";
+import { ErrorBoundary } from "./components/layout/ErrorBoundary";
 import ClienteCadastro from "./pages/ClienteCadastro";
 import AdminPage from "./pages/AdminPage";
 import { ClienteProvider, useCliente } from "./hooks/useCliente";
 import { useFidelidade } from "./hooks/useFidelidade";
 import { useNotificacoes } from "./hooks/useNotificacoes";
-import { ProductGridSkeleton } from "./components/ProductSkeleton";
+import { ProductGridSkeleton } from "./components/features/ProductSkeleton";
 import { useFavorites, useRecentlyViewed } from "./hooks/useUserLists";
 
 

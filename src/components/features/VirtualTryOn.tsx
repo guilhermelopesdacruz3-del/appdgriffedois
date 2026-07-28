@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { Product } from "../data";
+import { Product } from "../../data";
 
 interface VirtualTryOnProps {
   isOpen: boolean;

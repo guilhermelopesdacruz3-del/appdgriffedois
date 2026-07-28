@@ -1,8 +1,8 @@
 import { Product } from "../data";
 import { categories } from "../data";
-import ProductCard from "../components/ProductCard";
-import YouTubeSection from "../components/YouTubeSection";
-import CategoryIcon from "../components/CategoryIcon";
+import ProductCard from "../components/features/ProductCard";
+import YouTubeSection from "../components/features/YouTubeSection";
+import CategoryIcon from "../components/features/CategoryIcon";
 
 interface HomePageProps {
   products: Product[];

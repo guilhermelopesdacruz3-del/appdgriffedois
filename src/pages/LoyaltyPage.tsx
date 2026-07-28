@@ -125,7 +125,7 @@ export default function LoyaltyPage({ fidelidade: info, historicoFidelidade: his
               <div className="flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full" style={{ background: NIVEIS[idx]?.cor || '#ccc' }} />
                 <span className={`text-xs font-semibold ${ativo ? 'text-white' : alcancado ? 'text-luxury-black' : 'text-gray-400'}`}>{n.nome}</span>
-              </span>
+              </div>
               <span className={`text-[9px] ${ativo ? 'text-gold' : 'text-gray-400'}`}>
                 {n.min?.toLocaleString('pt-BR')}{n.max ? `–${n.max.toLocaleString('pt-BR')}` : '+'} pts
               </span>

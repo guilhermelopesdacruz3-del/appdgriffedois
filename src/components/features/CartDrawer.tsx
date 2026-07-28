@@ -1,5 +1,5 @@
-import { Product } from "../data";
-import { getProductImage, formatPrice } from "../utils";
+import { Product } from "../../data";
+import { getProductImage, formatPrice } from "../../utils";
 
 interface CartItem {
   product: Product;

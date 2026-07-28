@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Product } from "../data";
 import { getProductImage, formatPrice, formatInstallment } from "../utils";
-import ImageViewer from "../components/ImageViewer";
+import ImageViewer from "../components/ui/ImageViewer";
 
 interface ProductPageProps {
   product: Product;

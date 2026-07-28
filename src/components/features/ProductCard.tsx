@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Product } from "../data";
-import { getProductImage, formatPrice, formatInstallment } from "../utils";
-import ImageViewer from "./ImageViewer";
+import { Product } from "../../data";
+import { getProductImage, formatPrice, formatInstallment } from "../../utils";
+import ImageViewer from "../ui/ImageViewer";
 
 interface ProductCardProps {
   product: Product;

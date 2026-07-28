@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { Product } from "../data";
-import { getProductImage, formatPrice, formatInstallment } from "../utils";
+import { Product } from "../../data";
+import { getProductImage, formatPrice, formatInstallment } from "../../utils";
 
 interface PurchaseDrawerProps {
   product: Product | null;

@@ -2,11 +2,11 @@
 // Usa as imagens reais da loja (assets) para Sol, Grau, Grazi, MK e Infantil;
 // Ray-Ban (sem imagem enviada) usa um ícone SVG wayfarer elegante.
 import type { ReactElement } from "react";
-import solImg from "../assets/categorias/sol.png";
-import grauImg from "../assets/categorias/grau.png";
-import graziImg from "../assets/categorias/grazi.png";
-import mkImg from "../assets/categorias/mk.png";
-import infantilImg from "../assets/categorias/infantil.png";
+import solImg from "../../assets/categorias/sol.png";
+import grauImg from "../../assets/categorias/grau.png";
+import graziImg from "../../assets/categorias/grazi.png";
+import mkImg from "../../assets/categorias/mk.png";
+import infantilImg from "../../assets/categorias/infantil.png";
 
 type IconProps = { className?: string };
 

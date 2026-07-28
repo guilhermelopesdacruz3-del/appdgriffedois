@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Product } from "../data";
-import ProductCard from "../components/ProductCard";
+import ProductCard from "../components/features/ProductCard";
 
 interface CatalogPageProps {
   products: Product[];
