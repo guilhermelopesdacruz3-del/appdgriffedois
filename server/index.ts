@@ -751,7 +751,7 @@ app.get("/api/fidelidade", async (req, res) => {
       getNiveis(),
       segredos.getHistoricoFidelidade(email),
     ]);
-    const descontoMax = Math.floor((pontos / regras.pontosPorDesconto) * 10);
+    const descontoMax = Math.floor((pontos / (regras.pontosPorDesconto || 100)) * 10);
     return res.json({
       email,
       pontos,
