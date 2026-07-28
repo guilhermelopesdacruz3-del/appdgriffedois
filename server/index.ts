@@ -816,11 +816,10 @@ app.get("/api/fidelidade/missao", async (req, res) => {
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     return res.status(400).json({ erro: "E-mail inválido." });
   try {
+    const pontos = await segredos.getPontos(email);
+    const historico = await segredos.getHistoricoFidelidade(email, 100);
+    const pedidosCount = historico.filter((h) => h.tipo === "compra").length;
     const niveis = getNiveis();
-    const { data: fidelidade } = await supabaseClient.from("fidelidade").select("pontos").eq("email", email).single();
-    const pontos = fidelidade?.pontos ?? 0;
-    const { data: pedidos } = await supabaseClient.from("pedidos").select("id").eq("email", email);
-    const pedidosCount = pedidos?.length ?? 0;
     const missoes = MISSOES.map((m) => ({
       ...m,
       feito: m.tipo === "cadastro" ? pontos > 0 :
@@ -829,6 +828,7 @@ app.get("/api/fidelidade/missao", async (req, res) => {
     }));
     return res.json({ email, missoes });
   } catch (e) {
+    console.error("[missao] falha:", e?.message);
     return res.status(502).json({ erro: "Falha ao ler missões." });
   }
 });
@@ -869,6 +869,7 @@ app.get("/api/fidelidade/mensagens", async (req, res) => {
     if (nivel.prox) mensagens.push(`Faltam ${nivel.ptsParaProx} pts para ${nivel.prox.nome}.`);
     return res.json({ email, mensagens });
   } catch (e) {
+    console.error("[mensagens] falha:", e?.message);
     return res.status(502).json({ erro: "Falha ao ler mensagens." });
   }
 });
