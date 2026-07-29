@@ -730,6 +730,10 @@ app.put("/api/config", requireAdmin, async (req, res) => {
 // Chave PÚBLICA do Mercado Pago (segura para o front — usada pelo SDK de cartão).
 // NUNCA devolve o access_token.
 app.get("/api/mp-public-key", async (_req, res) => {
+  if (!DEMO) {
+    // Em produção, mantemos acesso público; se quiser, podemos restringir para admin.
+    // Hoje o front precisa dela para iniciar o checkout transparente quando cartão.
+  }
   try {
     const pk = await segredos.getSecret("MP_PUBLIC_KEY");
     return res.json({ public_key: pk || null });
@@ -739,8 +743,10 @@ app.get("/api/mp-public-key", async (_req, res) => {
 });
 
 // Saldo de fidelidade do cliente (por e-mail) + regras para o front calcular desconto.
+// Usa o e-mail do token de cliente quando houver; evita IDOR por querystring.
 app.get("/api/fidelidade", async (req, res) => {
-  const email = String(req.query.email || "").trim().toLowerCase();
+  const tokenEmail = requireCliente(req, res);
+  const email = String(tokenEmail || req.query.email || "").trim().toLowerCase();
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ erro: "E-mail inválido." });
   }
@@ -780,8 +786,10 @@ app.get("/api/fidelidade", async (req, res) => {
 });
 
 // Histórico de fidelidade (créditos/resgates) do cliente.
+// Isolado pelo e-mail do token de cliente quando disponível.
 app.get("/api/fidelidade/historico", async (req, res) => {
-  const email = String(req.query.email || "").trim().toLowerCase();
+  const tokenEmail = requireCliente(req, res);
+  const email = String(tokenEmail || req.query.email || "").trim().toLowerCase();
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ erro: "E-mail inválido." });
   }
@@ -876,10 +884,11 @@ app.get("/api/fidelidade/mensagens", async (req, res) => {
 });
 
 // POST /api/fidelidade/missao/concluir — registra conclusão de missão (ex.: avaliação).
-// Concede pontos da missão de forma idempotente (não duplica).
+// Usa o e-mail do token de cliente quando disponível e só aceita body se não houver token.
 app.post("/api/fidelidade/missao/concluir", async (req, res) => {
+  const tokenEmail = requireCliente(req, res);
   const { email, tipo } = req.body || {};
-  const e = (email || "").trim().toLowerCase();
+  const e = (tokenEmail || email || "").toString().trim().toLowerCase();
   if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return res.status(400).json({ ok: false, erro: "E-mail inválido." });
   if (!tipo) return res.status(400).json({ ok: false, erro: "Informe o tipo da missão." });
   try {
