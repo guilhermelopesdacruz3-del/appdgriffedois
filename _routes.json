@@ -10,6 +10,8 @@
     "/maskable-512.png",
     "/favicon.ico",
     "/favicon.png",
-    "/privacidade.html"
+    "/privacidade.html",
+    "/trusted-web-activity.html",
+    "/screenshots/*"
   ]
 }
