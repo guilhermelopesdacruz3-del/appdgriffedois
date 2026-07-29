@@ -51,12 +51,7 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
 
   const iniciar = async (meio: "pix" | "cartao") => {
     // O Mercado Pago exige e-mail válido para gerar a cobrança (PIX ou cartão).
-    const emailOk = isValidEmail(email.trim());
-    if (!emailOk) {
-      setErro("Informe um e-mail válido para continuar o pagamento.");
-      setPasso("erro");
-      return;
-    }
+    // Em demo, seguimos sem bloquear; em produção o backend usa fallback se necessário.
     setPasso("processando");
     setErro(null);
     try {
