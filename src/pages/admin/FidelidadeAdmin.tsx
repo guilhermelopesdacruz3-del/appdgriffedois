@@ -67,13 +67,13 @@ export default function FidelidadeAdmin() {
   return (
     <div className="space-y-4">
       {/* Ajuste de pontos */}
-      <form onSubmit={ajustar} className="bg-white rounded-2xl p-4 space-y-3">
-        <p className="text-xs font-bold text-luxury-black">Ajustar pontos de um cliente</p>
+      <form onSubmit={ajustar} className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3 backdrop-blur">
+        <p className="text-xs font-bold text-white">Ajustar pontos de um cliente</p>
         <input
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="E-mail do cliente"
-          className="w-full h-10 px-3 rounded-xl border border-gray-200 text-xs"
+          className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold"
           required
         />
         <div className="flex gap-2">
@@ -82,13 +82,13 @@ export default function FidelidadeAdmin() {
             onChange={(e) => setPontos(e.target.value)}
             placeholder="Quantidade"
             type="number"
-            className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-xs"
+            className="flex-1 h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold"
             required
           />
           <select
             value={operacao}
             onChange={(e) => setOperacao(e.target.value as any)}
-            className="h-10 px-3 rounded-xl border border-gray-200 text-xs bg-white"
+            className="h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs focus:outline-none focus:border-gold"
           >
             <option value="creditar">Creditar</option>
             <option value="resgatar">Resgatar</option>
@@ -99,70 +99,70 @@ export default function FidelidadeAdmin() {
           value={motivo}
           onChange={(e) => setMotivo(e.target.value)}
           placeholder="Motivo (opcional)"
-          className="w-full h-10 px-3 rounded-xl border border-gray-200 text-xs"
+          className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold"
         />
-        <button type="submit" className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl active:scale-[0.98] transition-all">
+        <button type="submit" className="w-full h-12 bg-white text-black text-xs font-bold rounded-2xl active:scale-[0.98] transition-all disabled:opacity-50">
           Aplicar
         </button>
       </form>
 
-      {erro && <p className="text-[11px] text-red-500">{erro}</p>}
-      {msg && <p className="text-[11px] text-green-600">{msg}</p>}
+      {erro && <p className="text-[11px] text-red-400">{erro}</p>}
+      {msg && <p className="text-[11px] text-emerald-400">{msg}</p>}
 
       {/* Regras */}
-      <form onSubmit={salvarRegras} className="bg-white rounded-2xl p-4 space-y-3">
-        <p className="text-xs font-bold text-luxury-black">Regras do programa</p>
-        <div className="flex gap-2">
-          <div className="flex-1">
-            <label className="block text-[9px] text-gray-400 mb-0.5 px-1">Pontos por R$</label>
+      <form onSubmit={salvarRegras} className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3 backdrop-blur">
+        <p className="text-xs font-bold text-white">Regras do programa</p>
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <label className="block text-[9px] text-white/50 mb-0.5 px-1">Pontos por R$</label>
             <input
               value={regras.pontosPorReal}
               onChange={(e) => setRegras((r) => ({ ...r, pontosPorReal: Number(e.target.value) }))}
               type="number"
               step="0.1"
-              className="w-full h-10 px-3 rounded-xl border border-gray-200 text-xs"
+              className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold"
             />
           </div>
-          <div className="flex-1">
-            <label className="block text-[9px] text-gray-400 mb-0.5 px-1">Pontos = R$ (desconto)</label>
+          <div>
+            <label className="block text-[9px] text-white/50 mb-0.5 px-1">Pontos = R$ (desconto)</label>
             <input
               value={regras.pontosPorDesconto}
               onChange={(e) => setRegras((r) => ({ ...r, pontosPorDesconto: Number(e.target.value) }))}
               type="number"
-              className="w-full h-10 px-3 rounded-xl border border-gray-200 text-xs"
+              className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold"
             />
           </div>
         </div>
-        <p className="text-[10px] text-gray-400">
+        <p className="text-[10px] text-white/50">
           Ex.: 1 ponto por R$1 e 100 pontos = R$10 de desconto.
         </p>
-        <button type="submit" className="w-full h-12 bg-gold text-white text-xs font-bold rounded-2xl active:scale-[0.98] transition-all">
+        <button type="submit" className="w-full h-10 bg-white text-black text-[11px] font-bold rounded-xl active:scale-[0.98] transition-all disabled:opacity-50">
           Salvar regras
         </button>
       </form>
 
       {/* Clientes */}
-      <div className="bg-white rounded-2xl p-4 space-y-2">
-        <p className="text-xs font-bold text-luxury-black">Clientes ({clientes.length})</p>
-        <p className="text-[10px] text-gray-400">Clique para preencher o e-mail no ajuste acima.</p>
+      <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2 backdrop-blur">
+        <p className="text-xs font-bold text-white">Clientes ({clientes.length})</p>
+        <p className="text-[10px] text-white/50">Clique para preencher o e-mail no ajuste acima.</p>
         <div className="max-h-64 overflow-y-auto space-y-1">
           {clientes.map((cl) => (
             <button
               key={cl.email}
               onClick={() => setEmail(cl.email)}
-              className="w-full flex items-center gap-2 py-1.5 px-2 rounded-xl hover:bg-gray-50 text-left"
+              className="w-full flex items-center gap-2 py-1.5 px-2 rounded-xl hover:bg-white/10 text-left"
             >
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold text-luxury-black truncate">{cl.nome}</p>
-                <p className="text-[9px] text-gray-500 truncate">{cl.email}</p>
+                <p className="text-[11px] font-semibold text-white truncate">{cl.nome}</p>
+                <p className="text-[9px] text-white/40 truncate">{cl.email}</p>
               </div>
             </button>
           ))}
-          {clientes.length === 0 && <p className="text-[10px] text-gray-400">Nenhum cliente encontrado.</p>}
+          {clientes.length === 0 && <p className="text-[10px] text-white/50">Nenhum cliente encontrado.</p>}
         </div>
       </div>
 
-      {loading && <p className="text-xs text-gray-400 text-center">Carregando…</p>}
+      {loading && <p className="text-xs text-white/50 text-center">Carregando…</p>}
     </div>
   );
 }

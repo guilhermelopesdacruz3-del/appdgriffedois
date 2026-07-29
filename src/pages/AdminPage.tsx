@@ -27,7 +27,7 @@ import NotificacoesAdmin from "./admin/NotificacoesAdmin";
 import AdminDashboard from "./AdminDashboard";
 
 function downloadCSV(csv: string, filename: string) {
-  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
@@ -259,9 +259,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
     try {
       await definirVerificadoPedido(detalhe.id, novo);
       setDetalhe({ ...detalhe, verificado: novo, verificado_em: novo ? new Date().toISOString() : null });
-      setPedidos((prev) =>
-        prev.map((p) => (p.id === detalhe.id ? { ...p, verificado: novo } : p))
-      );
+      setPedidos((prev) => prev.map((p) => (p.id === detalhe.id ? { ...p, verificado: novo } : p)));
     } catch (e) {
       setErro((e as Error).message);
     }
@@ -287,15 +285,15 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
   // -------------------- Tela de login --------------------
   if (!token) {
     return (
-      <div className="min-h-screen bg-ice flex items-center justify-center px-6">
-        <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-sm">
-          <div className="w-14 h-14 mx-auto rounded-full bg-gradient-to-br from-gold to-gold-dark flex items-center justify-center shadow-lg shadow-gold/20 mb-4">
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center px-6">
+        <div className="w-full max-w-sm bg-white/5 border border-white/10 rounded-[2rem] p-6 shadow-[0_0_40px_rgba(212,168,83,0.15)] backdrop-blur">
+          <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-gold to-gold-dark flex items-center justify-center shadow-lg shadow-gold/20 mb-4">
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0A0A0A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
             </svg>
           </div>
-          <h2 className="text-base font-bold text-luxury-black text-center">Painel do Administrador</h2>
-          <p className="text-xs text-gray-500 mt-1 text-center">Acesso restrito — informe a senha de admin</p>
+          <h2 className="text-base font-bold text-white text-center">Painel Admin</h2>
+          <p className="text-xs text-white/60 mt-1 text-center">Acesso restrito — informe a senha</p>
 
           <form className="mt-5 space-y-3" onSubmit={fazerLogin}>
             <input
@@ -304,19 +302,19 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
               value={senha}
               onChange={(e) => setSenha(e.target.value)}
               placeholder="Senha de administrador"
-              className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+              className="w-full h-12 px-4 rounded-2xl border border-white/10 bg-black/40 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-gold"
             />
             <button
               type="submit"
               disabled={loginLoading}
-              className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl disabled:opacity-50 active:scale-[0.98] transition-all"
+              className="w-full h-12 bg-white text-black text-xs font-bold rounded-2xl disabled:opacity-50 active:scale-[0.98] transition-all"
             >
               {loginLoading ? "Entrando..." : "Entrar"}
             </button>
           </form>
 
-          {loginErro && <p className="text-[11px] text-red-500 mt-3 text-center">{loginErro}</p>}
-          <button onClick={onExit} className="w-full text-[10px] font-bold text-gray-400 hover:text-luxury-black mt-4">
+          {loginErro && <p className="text-[11px] text-red-400 mt-3 text-center">{loginErro}</p>}
+          <button onClick={onExit} className="w-full text-[10px] font-bold text-white/60 hover:text-white mt-4">
             ← Voltar à loja
           </button>
         </div>
@@ -328,26 +326,26 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
   const coresStatus = ["#D4A853", "#6366F1", "#10B981", "#F59E0B", "#3B82F6", "#EF4444", "#8B5CF6", "#EC4899"];
 
   return (
-    <div className="min-h-screen bg-ice">
-      <div className="max-w-5xl mx-auto min-h-screen bg-ice relative">
-        <div className="sticky top-0 z-20 bg-luxury-black text-white px-5 py-3 flex items-center justify-between">
+    <div className="min-h-screen bg-[#050505] text-white">
+      <div className="max-w-6xl mx-auto min-h-screen bg-[#050505] relative">
+        <div className="sticky top-0 z-20 bg-black/80 border-b border-white/10 px-5 py-3 flex items-center justify-between backdrop-blur">
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-green-400" />
+            <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.6)]" />
             <div>
               <h1 className="text-sm font-bold leading-tight">Painel Admin</h1>
               <p className="text-[10px] text-gold-dark font-semibold">{total} pedidos no total</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-white/90 bg-white/10 rounded-full pl-2 pr-2 py-1">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-white/90 bg-white/10 border border-white/10 rounded-full pl-2 pr-3 py-1">
               <span>👤</span>
               <span>Admin</span>
               <span className="text-[8px] opacity-60">▾</span>
             </div>
-            <button onClick={() => setMostrarConfig((v) => !v)} className="text-[11px] font-bold text-gold-dark hover:text-gold flex items-center gap-1" title="APIs">
+            <button onClick={() => setMostrarConfig((v) => !v)} className="text-[11px] font-bold text-gold-dark hover:text-gold flex items-center gap-1 border border-white/10 bg-white/5 rounded-full px-3 py-1" title="APIs">
               <span>⚙️</span><span className="hidden sm:inline">APIs</span>
             </button>
-            <button onClick={sair} className="text-[11px] font-bold text-gray-300 hover:text-white flex items-center gap-1" title="Sair">
+            <button onClick={sair} className="text-[11px] font-bold text-gray-300 hover:text-white flex items-center gap-1 border border-white/10 bg-white/5 rounded-full px-3 py-1" title="Sair">
               <span>🚪</span><span className="hidden sm:inline">Sair</span>
             </button>
           </div>
@@ -358,11 +356,11 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
             <button
               key={a}
               onClick={() => setAba(a)}
-              className={`flex-1 h-9 rounded-xl text-[11px] font-bold transition-all ${
-                aba === a ? "bg-luxury-black text-white" : "bg-white text-gray-500"
+              className={`flex-1 h-9 rounded-xl text-[11px] font-bold transition-all border ${
+                aba === a ? "bg-white text-black border-white" : "bg-white/5 text-gray-300 border-white/10 hover:border-white/20"
               }`}
             >
-              {a === "pedidos" ? "Pedidos" : a === "dashboard" ? "Dashboard" : a === "cupons" ? "Cupons" : a === "fidelidade" ? "Fidelidade" : a === "relatorios" ? "Relatórios" : "Logs"}
+              {a === "pedidos" ? "Pedidos" : a === "dashboard" ? "Dashboard" : a === "cupons" ? "Cupons" : a === "fidelidade" ? "Fidelidade" : a === "notificacoes" ? "Notificações" : a === "relatorios" ? "Relatórios" : "Logs"}
             </button>
           ))}
         </div>
@@ -374,22 +372,22 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
           {aba === "pedidos" && (
             <>
               {/* Filtros em card */}
-              <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
                 <div className="flex gap-2">
                   <div className="flex-1 relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">🔍</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40">🔍</span>
                     <input
                       value={busca}
                       onChange={(e) => setBusca(e.target.value)}
                       onKeyDown={(e) => e.key === "Enter" && carregar()}
                       placeholder="Buscar por nº, nome ou e-mail..."
-                      className="w-full h-10 pl-9 pr-3 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-gold"
+                      className="w-full h-10 pl-9 pr-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold"
                     />
                   </div>
                   <select
                     value={filtroStatus}
                     onChange={(e) => setFiltroStatus(e.target.value)}
-                    className="h-10 px-3 rounded-xl border border-gray-200 text-xs bg-white focus:outline-none focus:border-gold"
+                    className="h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs focus:outline-none focus:border-gold"
                   >
                     <option value="todos">Todos os status</option>
                     {situacoes.map((s) => (
@@ -402,18 +400,18 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                     type="date"
                     value={filtroDataInicio}
                     onChange={(e) => setFiltroDataInicio(e.target.value)}
-                    className="h-10 px-3 rounded-xl border border-gray-200 text-xs bg-white"
+                    className="h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs"
                   />
-                  <span className="text-[10px] text-gray-400">até</span>
+                  <span className="text-[10px] text-white/50">até</span>
                   <input
                     type="date"
                     value={filtroDataFim}
                     onChange={(e) => setFiltroDataFim(e.target.value)}
-                    className="h-10 px-3 rounded-xl border border-gray-200 text-xs bg-white"
+                    className="h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs"
                   />
                   <button
                     onClick={exportarCSV}
-                    className="ml-auto h-10 px-3 border border-gold/40 text-gold-dark text-[11px] font-bold rounded-xl active:scale-95 whitespace-nowrap"
+                    className="ml-auto h-10 px-3 border border-gold/40 text-gold-dark text-[11px] font-bold rounded-xl active:scale-95 whitespace-nowrap bg-white/5"
                   >
                     📥 Exportar CSV
                   </button>
@@ -421,12 +419,9 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
               </div>
 
               {erro && (
-                <div className="bg-amber-50 border border-amber-100 rounded-2xl p-3 flex items-center justify-between gap-2">
-                  <p className="text-[11px] text-amber-700 flex-1">{erro}</p>
-                  <button
-                    onClick={() => { setErro(null); carregar(); }}
-                    className="text-[10px] font-bold text-amber-800 border border-amber-200 rounded-lg px-2 py-1 active:scale-95 whitespace-nowrap"
-                  >
+                <div className="bg-amber-500/10 border border-amber-400/20 text-amber-200 rounded-2xl p-3 flex items-center justify-between gap-2">
+                  <p className="text-[11px] flex-1">{erro}</p>
+                  <button onClick={() => { setErro(null); carregar(); }} className="text-[10px] font-bold text-amber-100 border border-amber-300/30 rounded-lg px-2 py-1 active:scale-95 whitespace-nowrap">
                     Tentar de novo
                   </button>
                 </div>
@@ -439,15 +434,15 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
               )}
 
               {!loading && pedidosFiltrados.length === 0 && (
-                <div className="bg-white rounded-2xl p-6 py-10 shadow-sm text-center text-xs text-gray-400">Nenhum pedido encontrado.</div>
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 py-10 text-center text-xs text-white/50">Nenhum pedido encontrado.</div>
               )}
 
               {!loading && pedidosFiltrados.length > 0 && (
-                <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+                <div className="bg-white/5 border border-white/10 rounded-2xl shadow-sm overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left">
                       <thead>
-                        <tr className="text-[9px] uppercase tracking-wide text-gray-400 border-b border-gray-100">
+                        <tr className="text-[9px] uppercase tracking-wide text-white/40 border-b border-white/10">
                           <th className="p-3 w-8"></th>
                           <th className="p-3 font-semibold">Pedido Nº</th>
                           <th className="p-3 font-semibold">Cliente</th>
@@ -459,27 +454,31 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                       </thead>
                       <tbody>
                         {pedidosFiltrados.map((p) => (
-                          <tr key={p.id} className="border-b border-gray-50 last:border-0 hover:bg-ice/40 transition-colors">
+                          <tr key={p.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03] transition-colors">
                             <td className="p-3">
-                              <input type="checkbox" className="accent-luxury-black" />
+                              <input type="checkbox" className="accent-white" />
                             </td>
                             <td className="p-3">
-                              <span className="text-xs font-bold text-luxury-black">#{p.numero}</span>
-                              {p.verificado && <span className="ml-1 text-[9px] text-green-600 font-bold">• Verificado</span>}
+                              <span className="text-xs font-bold text-white">#{p.numero}</span>
+                              {p.verificado && <span className="ml-1 text-[9px] text-emerald-400 font-bold">• Verificado</span>}
                             </td>
                             <td className="p-3">
-                              <p className="text-[11px] font-semibold text-luxury-black truncate max-w-[140px]">{p.cliente_nome}</p>
-                              <p className="text-[9px] text-gray-400 truncate max-w-[140px]">{p.cliente_email}</p>
+                              <p className="text-[11px] font-semibold text-white truncate max-w-[140px]">{p.cliente_nome}</p>
+                              <p className="text-[9px] text-white/40 truncate max-w-[140px]">{p.cliente_email}</p>
                             </td>
-                            <td className="p-3 text-[11px] text-gray-500 whitespace-nowrap">{p.data}</td>
+                            <td className="p-3 text-[11px] text-white/70 whitespace-nowrap">{p.data}</td>
                             <td className="p-3">
-                              <span className={`inline-block px-2 py-0.5 text-[9px] font-bold rounded-full ${p.status === "Entregue" ? "bg-green-100 text-green-700" : p.status === "Em produção" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-600"}`}>{p.status}</span>
+                              <span className={`inline-block px-2 py-0.5 text-[9px] font-bold rounded-full border ${
+                                p.status === "Entregue" ? "bg-emerald-400/10 text-emerald-300 border-emerald-400/20" :
+                                p.status === "Em produção" ? "bg-indigo-400/10 text-indigo-300 border-indigo-400/20" :
+                                "bg-white/5 text-gray-300 border-white/10"
+                              }`}>{p.status}</span>
                             </td>
-                            <td className="p-3 text-right text-xs font-bold text-luxury-black whitespace-nowrap">{formatPrice(p.total)}</td>
+                            <td className="p-3 text-right text-xs font-bold text-white whitespace-nowrap">{formatPrice(p.total)}</td>
                             <td className="p-3 text-right">
                               <button
                                 onClick={() => abrirDetalhe(p.id)}
-                                className="w-8 h-8 rounded-xl bg-ice text-luxury-black text-[10px] font-bold active:scale-95 inline-flex items-center justify-center"
+                                className="w-8 h-8 rounded-xl bg-white/10 text-white text-[10px] font-bold active:scale-95 inline-flex items-center justify-center border border-white/10"
                                 title="Ver"
                               >
                                 👁️
@@ -490,140 +489,120 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                       </tbody>
                     </table>
                   </div>
-                  <div className="flex items-center justify-between px-4 py-3 border-t border-gray-100">
-                    <div className="flex items-center gap-2 text-[10px] text-gray-400">
-                      <button className="w-7 h-7 rounded-lg border border-gray-200 flex items-center justify-center disabled:opacity-40" disabled>◀</button>
+                  <div className="flex items-center justify-between px-4 py-3 border-t border-white/10">
+                    <div className="flex items-center gap-2 text-[10px] text-white/40">
+                      <button className="w-7 h-7 rounded-lg border border-white/10 flex items-center justify-center disabled:opacity-40" disabled>◀</button>
                       <span>Página 1 de 1</span>
-                      <button className="w-7 h-7 rounded-lg border border-gray-200 flex items-center justify-center disabled:opacity-40" disabled>▶</button>
+                      <button className="w-7 h-7 rounded-lg border border-white/10 flex items-center justify-center disabled:opacity-40" disabled>▶</button>
                     </div>
-                    <span className="text-[10px] text-gray-400">Exibindo {pedidosFiltrados.length} de {total} pedidos</span>
+                    <span className="text-[10px] text-white/40">Exibindo {pedidosFiltrados.length} de {total} pedidos</span>
                   </div>
                 </div>
               )}
             </>
           )}
 
+          {aba === "dashboard" && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <KpiCard label="Pedidos" value={relatorio ? String(relatorio.totalPedidos) : "—"} />
+                <KpiCard label="Faturamento" value={relatorio ? formatPrice(relatorio.faturamentoTotal) : "—"} />
+                <KpiCard label="Ticket Médio" value={relatorio ? formatPrice(relatorio.ticketMedio) : "—"} accent="#D4A853" />
+                <KpiCard label="Aprovado" value={relatorio ? formatPrice(relatorio.faturamentoAprovado) : "—"} accent="#10B981" />
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                <p className="text-xs font-bold text-white mb-2">Faturamento por dia</p>
+                <BarChart data={(relatorio?.serieDiaria || []).slice(-10)} color="#D4A853" />
+              </div>
+            </div>
+          )}
+
           {aba === "cupons" && <CuponsAdmin />}
+
           {aba === "fidelidade" && <FidelidadeAdmin />}
+
           {aba === "notificacoes" && <NotificacoesAdmin />}
+
           {aba === "relatorios" && (
-            <>
-              {relLoading && (
-                <div className="flex justify-center py-10">
-                  <div className="w-7 h-7 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+            <div className="space-y-3">
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                <p className="text-xs font-bold text-white mb-2">Origem (app vs site)</p>
+                <div className="h-40">
+                  <PieChart data={[
+                    { label: "Site", value: relatorio?.porCanal.site || 0, color: "#6366F1" },
+                    { label: "App", value: relatorio?.porCanal.app || 0, color: "#D4A853" },
+                  ]} size={140} />
                 </div>
-              )}
-              {relatorio && (
-                <>
-                  <p className="text-[11px] font-semibold text-luxury-black mb-2">Visão Geral</p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <KpiCard label="Pedidos" value={String(relatorio.totalPedidos)} trend="up" delta="total" />
-                    <KpiCard label="Ticket Médio" value={formatPrice(relatorio.ticketMedio)} accent="#D4A853" sub="por pedido" />
-                    <KpiCard label="Faturamento" value={formatPrice(relatorio.faturamentoTotal)} accent="#10B981" trend="up" delta="bruto" />
-                    <KpiCard label="Aprovado" value={formatPrice(relatorio.faturamentoAprovado)} accent="#6366F1" sub="confirmado" />
-                  </div>
-
-                  <div className="bg-white rounded-2xl p-4 shadow-sm">
-                    <p className="text-[11px] font-semibold text-luxury-black mb-2">Faturamento por dia</p>
-                    <BarChart
-                      data={relatorio.serieDiaria.map((s) => ({ label: s.dia.slice(5), value: s.total }))}
-                    />
-                  </div>
-
-                  <div className="bg-white rounded-2xl p-4 shadow-sm">
-                    <p className="text-[11px] font-semibold text-luxury-black mb-2">Pedidos por status</p>
-                    <PieChart
-                      data={Object.entries(relatorio.porStatus).map(([k, v], i) => ({
-                        label: k,
-                        value: v,
-                        color: coresStatus[i % coresStatus.length],
-                      }))}
-                    />
-                  </div>
-
-                  <div className="bg-white rounded-2xl p-4 shadow-sm">
-                    <p className="text-[11px] font-semibold text-luxury-black mb-2">Origem (app vs site)</p>
-                    <PieChart
-                      data={[
-                        { label: "Site", value: relatorio.porCanal.site, color: "#D4A853" },
-                        { label: "App", value: relatorio.porCanal.app, color: "#3B82F6" },
-                      ]}
-                    />
-                  </div>
-
-                  <div className="bg-white rounded-2xl p-4 shadow-sm">
-                    <p className="text-[11px] font-semibold text-luxury-black mb-2">
-                      Clientes ({clientes.length}) — top gastadores
-                    </p>
-                    <div className="space-y-2">
-                      {clientes.slice(0, 10).map((c, i) => (
-                        <button
-                          key={c.email}
-                          onClick={() => abrirCliente(c.email)}
-                          className="w-full flex items-center gap-2 text-[11px] text-left hover:bg-ice/60 rounded-xl p-1.5 transition-colors"
-                        >
-                          <span className="w-5 h-5 rounded-full bg-ice flex items-center justify-center text-[9px] font-bold text-gray-500 flex-shrink-0">
-                            {i + 1}
-                          </span>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-luxury-black truncate">{c.nome}</p>
-                            <p className="text-[9px] text-gray-400 truncate">{c.email}</p>
-                          </div>
-                          <div className="text-right flex-shrink-0">
-                            <p className="font-bold text-luxury-black">{formatPrice(c.total ?? 0)}</p>
-                            <p className="text-[9px] text-gray-400">{(c.pedidos ?? 0)} pedidos</p>
-                          </div>
-                        </button>
+              </div>
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                <p className="text-xs font-bold text-white mb-2">Clientes</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="text-[9px] uppercase tracking-wide text-white/40 border-b border-white/10">
+                        <th className="p-3 font-semibold">Cliente</th>
+                        <th className="p-3 font-semibold text-right">Pedidos</th>
+                        <th className="p-3 font-semibold text-right">Total</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {clientes.map((c) => (
+                        <tr key={c.email} className="border-b border-white/5 last:border-0">
+                          <td className="p-3">
+                            <p className="text-xs font-semibold text-white">{c.nome}</p>
+                            <p className="text-[9px] text-white/40">{c.email}</p>
+                          </td>
+                          <td className="p-3 text-right text-[11px] text-white/70">{c.pedidos ?? 0}</td>
+                          <td className="p-3 text-right text-xs font-bold text-white whitespace-nowrap">{formatPrice(Number(c.total || 0))}</td>
+                        </tr>
                       ))}
-                      {clientes.length === 0 && <p className="text-[11px] text-gray-400">Sem clientes.</p>}
-                    </div>
-                  </div>
-                </>
-              )}
-            </>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
           )}
 
           {aba === "logs" && (
             <div className="space-y-3">
-              <div className="bg-white rounded-2xl p-4 shadow-sm space-y-2">
-                <p className="text-[11px] font-semibold text-luxury-black">Logs de auditoria</p>
-                <div className="flex gap-2">
-                  <input
-                    value={logsFiltroEmail}
-                    onChange={(e) => setLogsFiltroEmail(e.target.value)}
-                    placeholder="admin_email"
-                    className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-gold"
-                  />
-                  <input
-                    value={logsFiltroAcao}
-                    onChange={(e) => setLogsFiltroAcao(e.target.value)}
-                    placeholder="acao"
-                    className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-gold"
-                  />
-                </div>
-                <div className="flex gap-2">
-                  <input
-                    type="date"
-                    value={logsDataInicio}
-                    onChange={(e) => setLogsDataInicio(e.target.value)}
-                    className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-xs bg-white"
-                  />
-                  <input
-                    type="date"
-                    value={logsDataFim}
-                    onChange={(e) => setLogsDataFim(e.target.value)}
-                    className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-xs bg-white"
-                  />
-                  <button
-                    onClick={carregarLogs}
-                    className="h-10 px-3 bg-luxury-black text-white text-[11px] font-bold rounded-xl active:scale-95 whitespace-nowrap"
-                  >
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-3 space-y-2">
+                <div className="flex gap-2 items-center flex-wrap">
+                  <div className="flex-1 min-w-[180px]">
+                    <input
+                      value={logsFiltroEmail}
+                      onChange={(e) => setLogsFiltroEmail(e.target.value)}
+                      placeholder="E-mail do admin"
+                      className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold"
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[180px]">
+                    <input
+                      value={logsFiltroAcao}
+                      onChange={(e) => setLogsFiltroAcao(e.target.value)}
+                      placeholder="Ação"
+                      className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="date"
+                      value={logsDataInicio}
+                      onChange={(e) => setLogsDataInicio(e.target.value)}
+                      className="h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs"
+                    />
+                  </div>
+                  <div>
+                    <input
+                      type="date"
+                      value={logsDataFim}
+                      onChange={(e) => setLogsDataFim(e.target.value)}
+                      className="h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs"
+                    />
+                  </div>
+                  <button onClick={carregarLogs} className="h-10 px-3 bg-white text-black text-[11px] font-bold rounded-xl active:scale-95 whitespace-nowrap">
                     Filtrar
                   </button>
-                  <button
-                    onClick={exportarLogsCSV}
-                    className="h-10 px-3 border border-gold/40 text-gold-dark text-[11px] font-bold rounded-xl active:scale-95 whitespace-nowrap"
-                  >
+                  <button onClick={exportarLogsCSV} className="h-10 px-3 border border-gold/40 text-gold-dark text-[11px] font-bold rounded-xl active:scale-95 whitespace-nowrap bg-white/5">
                     Exportar CSV
                   </button>
                 </div>
@@ -636,18 +615,18 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
               )}
 
               {!logsLoading && logs.length === 0 && (
-                <div className="bg-white rounded-2xl p-6 shadow-sm text-center text-xs text-gray-400">Nenhum log encontrado.</div>
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 text-center text-xs text-white/50">Nenhum log encontrado.</div>
               )}
 
               <div className="space-y-2">
                 {logs.map((l) => (
-                  <div key={l.id} className="bg-white rounded-2xl p-3 shadow-sm space-y-1">
+                  <div key={l.id} className="bg-white/5 border border-white/10 rounded-2xl p-3 space-y-1">
                     <div className="flex items-center justify-between">
-                      <p className="text-[11px] font-bold text-luxury-black">{l.acao}</p>
-                      <span className="text-[10px] text-gray-400">{new Date(l.created_at).toLocaleString("pt-BR")}</span>
+                      <p className="text-[11px] font-bold text-white">{l.acao}</p>
+                      <span className="text-[10px] text-white/40">{new Date(l.created_at).toLocaleString("pt-BR")}</span>
                     </div>
-                    <p className="text-[10px] text-gray-500 truncate">{l.admin_email} {l.ip ? `· ${l.ip}` : ""}</p>
-                    <pre className="text-[10px] text-gray-600 whitespace-pre-wrap break-words">{JSON.stringify(l.detalhe || {}, null, 2)}</pre>
+                    <p className="text-[10px] text-white/50 truncate">{l.admin_email} {l.ip ? `· ${l.ip}` : ""}</p>
+                    <pre className="text-[10px] text-white/60 whitespace-pre-wrap break-words">{JSON.stringify(l.detalhe || {}, null, 2)}</pre>
                   </div>
                 ))}
               </div>
@@ -657,13 +636,13 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
       </div>
 
       {selecionado !== null && (
-        <div className="fixed inset-0 z-40 bg-black/40 flex items-end justify-center" onClick={() => setSelecionado(null)}>
+        <div className="fixed inset-0 z-40 bg-black/60 flex items-end justify-center" onClick={() => setSelecionado(null)}>
           <div
-            className="w-full max-w-lg bg-white rounded-t-3xl max-h-[90vh] overflow-y-auto"
+            className="w-full max-w-lg bg-[#0b0b0b] border border-white/10 rounded-t-3xl max-h-[90vh] overflow-y-auto"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="sticky top-0 bg-white px-5 py-3 flex items-center justify-between border-b border-gray-100">
-              <h3 className="text-sm font-bold text-luxury-black">Pedido #{detalhe?.numero ?? selecionado}</h3>
+            <div className="sticky top-0 bg-[#0b0b0b]/90 px-5 py-3 flex items-center justify-between border-b border-white/10 backdrop-blur">
+              <h3 className="text-sm font-bold text-white">Pedido #{detalhe?.numero ?? selecionado}</h3>
               <button onClick={() => setSelecionado(null)} className="text-gray-400 text-xl leading-none">×</button>
             </div>
 
@@ -677,24 +656,26 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
               <div className="p-5 space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-lg font-bold text-luxury-black">{formatPrice(detalhe.total)}</p>
-                    <p className="text-[10px] text-gray-400">{detalhe.data} · {detalhe.items} itens · {detalhe.status}</p>
+                    <p className="text-lg font-bold text-white">{formatPrice(detalhe.total)}</p>
+                    <p className="text-[10px] text-white/50">{detalhe.data} · {detalhe.items} itens · {detalhe.status}</p>
                   </div>
                   <button
                     onClick={alternarVerificado}
-                    className={`px-3 py-2 rounded-xl text-[11px] font-bold active:scale-95 ${detalhe.verificado ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-600"}`}
+                    className={`px-3 py-2 rounded-xl text-[11px] font-bold active:scale-95 border ${
+                      detalhe.verificado ? "bg-emerald-400/10 text-emerald-300 border-emerald-400/20" : "bg-white/5 text-gray-300 border-white/10"
+                    }`}
                   >
                     {detalhe.verificado ? "✓ Verificado" : "Marcar verificado"}
                   </button>
                 </div>
 
-                <div className="bg-ice rounded-2xl p-3">
-                  <p className="text-[11px] font-semibold text-luxury-black mb-2">Mudar status</p>
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                  <p className="text-xs font-bold text-white mb-2">Mudar status</p>
                   <div className="flex gap-2">
                     <select
                       value={statusSelecionado}
                       onChange={(e) => setStatusSelecionado(e.target.value)}
-                      className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-xs bg-white focus:outline-none focus:border-gold"
+                      className="flex-1 h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs focus:outline-none focus:border-gold"
                     >
                       <option value="">Selecione...</option>
                       {situacoes.map((s) => (
@@ -704,7 +685,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                     <button
                       onClick={salvarStatus}
                       disabled={salvandoStatus || !statusSelecionado}
-                      className="h-10 px-4 bg-luxury-black text-white text-[11px] font-bold rounded-xl disabled:opacity-50 active:scale-95"
+                      className="h-10 px-4 bg-white text-black text-[11px] font-bold rounded-xl disabled:opacity-50 active:scale-95"
                     >
                       {salvandoStatus ? "Salvando..." : "Salvar"}
                     </button>
@@ -720,211 +701,118 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
 
       {/* Modal detalhe do cliente (A5) */}
       {clienteDetalhe && (
-        <div className="fixed inset-0 z-40 bg-black/40 flex items-end justify-center" onClick={() => setClienteDetalhe(null)}>
-          <div className="w-full max-w-lg bg-white rounded-t-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="sticky top-0 bg-white px-5 py-3 flex items-center justify-between border-b border-gray-100">
-              <h3 className="text-sm font-bold text-luxury-black">Detalhe do Cliente</h3>
+        <div className="fixed inset-0 z-40 bg-black/60 flex items-end justify-center" onClick={() => setClienteDetalhe(null)}>
+          <div className="w-full max-w-lg bg-[#0b0b0b] border border-white/10 rounded-t-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="sticky top-0 bg-[#0b0b0b]/90 px-5 py-3 flex items-center justify-between border-b border-white/10 backdrop-blur">
+              <h3 className="text-sm font-bold text-white">Cliente: {clienteDetalhe.email}</h3>
               <button onClick={() => setClienteDetalhe(null)} className="text-gray-400 text-xl leading-none">×</button>
             </div>
-            <div className="p-5 space-y-4">
-              {clienteDetalhe.loading && (
-                <div className="flex justify-center py-10">
-                  <div className="w-7 h-7 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+
+            {clienteDetalhe.loading && (
+              <div className="flex justify-center py-10">
+                <div className="w-7 h-7 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+
+            {!clienteDetalhe.loading && clienteDetalhe.dados && (
+              <div className="p-5 space-y-4">
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2">
+                  <p className="text-xs font-bold text-white">Satus</p>
+                  <p className="text-[11px] text-white/70">{clienteDetalhe.dados.cliente?.status || "—"}</p>
+                  <p className="text-xs font-bold text-white">Pedidos</p>
+                  <p className="text-[11px] text-white/70">{(clienteDetalhe.dados.pedidos || []).length}</p>
                 </div>
-              )}
-              {clienteDetalhe.erro && <p className="text-[11px] text-red-500">{clienteDetalhe.erro}</p>}
-              {clienteDetalhe.dados && (
-                <>
-                  <div className="bg-white border border-gray-100 rounded-2xl p-3">
-                    <p className="text-[11px] font-semibold text-luxury-black mb-1">Dados</p>
-                    <p className="text-[11px] text-gray-600">{clienteDetalhe.dados.cliente?.nome || "—"}</p>
-                    <p className="text-[11px] text-gray-400">{clienteDetalhe.email}</p>
-                    {clienteDetalhe.dados.cliente?.telefone && (
-                      <p className="text-[11px] text-gray-400">{clienteDetalhe.dados.cliente.telefone}</p>
-                    )}
-                  </div>
-                  <div className="bg-white border border-gray-100 rounded-2xl p-3">
-                    <p className="text-[11px] font-semibold text-luxury-black mb-1">Fidelidade</p>
-                    <p className="text-[11px] text-gray-600 font-bold text-gold">{clienteDetalhe.dados.fidelidade?.pontos ?? 0} pontos</p>
-                  </div>
-                  <div className="bg-white border border-gray-100 rounded-2xl p-3">
-                    <p className="text-[11px] font-semibold text-luxury-black mb-2">Pedidos ({clienteDetalhe.dados.pedidos?.length ?? 0})</p>
-                    <div className="space-y-2">
-                      {(clienteDetalhe.dados.pedidos || []).slice(0, 10).map((p: any) => (
-                        <div key={p.id} className="flex items-center justify-between gap-2 pb-2 border-b border-gray-50 last:border-0 last:pb-0">
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[11px] font-medium text-luxury-black truncate">#{p.numero}</p>
-                            <p className="text-[10px] text-gray-400">{p.situacao?.nome || p.status}</p>
-                          </div>
-                          <span className="text-[11px] font-bold text-luxury-black flex-shrink-0">
-                            {formatPrice(Number(p.valor_total) || 0)}
-                          </span>
-                        </div>
-                      ))}
-                      {(clienteDetalhe.dados.pedidos || []).length === 0 && (
-                        <p className="text-[11px] text-gray-400">Nenhum pedido.</p>
-                      )}
+
+                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2">
+                  <p className="text-xs font-bold text-white">Fidelidade</p>
+                  <p className="text-[11px] text-white/70">Pontos: {clienteDetalhe.dados.fidelidade?.pontos ?? "—"}</p>
+                  <pre className="text-[10px] text-white/60 whitespace-pre-wrap break-words">{JSON.stringify(clienteDetalhe.dados.fidelidade?.historico || [], null, 2)}</pre>
+                </div>
+
+                <div className="space-y-2">
+                  {(clienteDetalhe.dados.pedidos || []).map((p: any) => (
+                    <div key={p.id || p.numero} className="bg-white/5 border border-white/10 rounded-2xl p-3 flex items-center justify-between text-[11px]">
+                      <div>
+                        <p className="font-semibold text-white">#{p.numero}</p>
+                        <p className="text-white/50">{p.status}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="font-bold text-white">{formatPrice(Number(p.valor_total || p.total || 0))}</p>
+                        <p className="text-white/40">{new Date(p.data_criacao || p.data).toLocaleDateString("pt-BR")}</p>
+                      </div>
                     </div>
-                  </div>
-                </>
-              )}
-            </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {clienteDetalhe.erro && (
+              <div className="p-5 text-xs text-red-300">{clienteDetalhe.erro}</div>
+            )}
           </div>
         </div>
       )}
-
     </div>
   );
 }
+
+/** @todo mover para componentes/admin quando estabilizar */
 function DetalhePedido({ id }: { id: number | string }) {
-  const [pedido, setPedido] = useState<any>(null);
+  const [raw, setRaw] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    let cancelado = false;
-    setLoading(true);
-    buscarPedidoAdmin(id)
-      .then((p) => {
-        if (!cancelado) setPedido(p);
-      })
-      .finally(() => {
-        if (!cancelado) setLoading(false);
-      });
-    return () => {
-      cancelado = true;
-    };
+    (async () => {
+      try {
+        const r = await fetch(`/api/admin/pedidos/${encodeURIComponent(String(id))}`);
+        const j = await r.json();
+        setRaw(j);
+      } catch {
+        setRaw(null);
+      } finally {
+        setLoading(false);
+      }
+    })();
   }, [id]);
 
-  if (loading) return <div className="text-center text-xs text-gray-400 py-4">Carregando detalhes...</div>;
-  if (!pedido) return null;
+  if (loading) return <div className="text-[11px] text-white/50">Carregando detalhe...</div>;
+  if (!raw) return <div className="text-[11px] text-red-300">Falha ao carregar detalhe.</div>;
+
+  const itens = raw.itens || raw.items || [];
+  const endereco = raw.endereco_entrega || raw.endereco || null;
 
   return (
-    <div className="space-y-3">
-      <div className="bg-white border border-gray-100 rounded-2xl p-3">
-        <p className="text-[11px] font-semibold text-luxury-black mb-2">Itens do pedido</p>
-        <div className="space-y-2">
-          {(pedido.itens || []).map((i: any) => (
-            <div key={i.id} className="flex items-center justify-between gap-2 pb-2 border-b border-gray-50 last:border-0 last:pb-0">
-              <div className="flex-1 min-w-0">
-                <p className="text-[11px] font-medium text-luxury-black truncate">{i.nome}</p>
-                <p className="text-[10px] text-gray-400">{i.quantidade}x · {formatPrice(Number(i.preco_venda) || 0)}</p>
-              </div>
-              <span className="text-[11px] font-bold text-luxury-black flex-shrink-0">
-                {formatPrice((Number(i.quantidade) || 0) * (Number(i.preco_venda) || 0))}
-              </span>
+    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
+      <div>
+        <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Itens</p>
+        <div className="space-y-1">
+          {itens.map((it: any, i: number) => (
+            <div key={i} className="flex items-center justify-between text-[11px]">
+              <span className="text-white">{it.nome || it.produto || `Item ${i + 1}`}</span>
+              <span className="text-white/60">x{it.quantidade || it.quantity || 1}</span>
             </div>
           ))}
+          {itens.length === 0 && <p className="text-[11px] text-white/50">Sem itens.</p>}
         </div>
       </div>
 
-      {pedido.cliente_nome && (
-        <div className="bg-white border border-gray-100 rounded-2xl p-3">
-          <p className="text-[11px] font-semibold text-luxury-black mb-1">Cliente</p>
-          <p className="text-[11px] text-gray-600">{pedido.cliente_nome}</p>
-          <p className="text-[11px] text-gray-400">{pedido.cliente_email}</p>
+      {endereco && (
+        <div>
+          <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Endereço</p>
+          <p className="text-[11px] text-white/70">
+            {endereco.logradouro || endereco.endereco || ""} {endereco.numero || ""} {endereco.complemento || ""}
+            <br />
+            {endereco.bairro || ""} {endereco.cidade || ""} {endereco.estado || ""} {endereco.cep || ""}
+          </p>
         </div>
       )}
 
-      {(pedido.pagamentos || []).length > 0 && (
-        <div className="bg-white border border-gray-100 rounded-2xl p-3">
-          <p className="text-[11px] font-semibold text-luxury-black mb-1">Pagamento</p>
-          {(pedido.pagamentos || []).map((pg: any, idx: number) => (
-            <p key={idx} className="text-[11px] text-gray-600">
-              {pg.forma_pagamento?.nome} · {formatPrice(Number(pg.valor) || 0)}
-            </p>
-          ))}
+      {raw.note && (
+        <div>
+          <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Nota</p>
+          <p className="text-[11px] text-white/70">{raw.note}</p>
         </div>
       )}
-
-      {(pedido.envios || []).length > 0 && (
-        <div className="bg-white border border-gray-100 rounded-2xl p-3">
-          <p className="text-[11px] font-semibold text-luxury-black mb-1">Envio</p>
-          {(pedido.envios || []).map((ev: any, idx: number) => (
-            <p key={idx} className="text-[11px] text-gray-600">
-              {ev.forma_envio?.nome} · prazo {ev.prazo}d{ev.objeto ? ` · rastreio ${ev.objeto}` : ""}
-            </p>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Painel de configuração das APIs (Loja Integrada + Mercado Pago).
-// ---------------------------------------------------------------------------
-function ApiConfigPanel({ onClose }: { onClose: () => void }) {
-  const [liApp, setLiApp] = useState("");
-  const [liApi, setLiApi] = useState("");
-  const [mpToken, setMpToken] = useState("");
-  const [ytKey, setYtKey] = useState("");
-  const [ytChannel, setYtChannel] = useState("");
-  const [salvando, setSalvando] = useState(false);
-  const [msg, setMsg] = useState<string | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
-
-  const salvar = async () => {
-    setSalvando(true);
-    setErro(null);
-    setMsg(null);
-    try {
-      await saveApiConfig({
-        ...(liApp ? { LI_APP_KEY: liApp } : {}),
-        ...(liApi ? { LI_API_KEY: liApi } : {}),
-        ...(mpToken ? { MP_ACCESS_TOKEN: mpToken } : {}),
-        ...(ytKey ? { YT_API_KEY: ytKey } : {}),
-        ...(ytChannel ? { YT_CHANNEL_ID: ytChannel } : {}),
-      });
-      setMsg("Chaves salvas com sucesso.");
-      setLiApp(""); setLiApi(""); setMpToken(""); setYtKey(""); setYtChannel("");
-    } catch (e: any) {
-      setErro(e.message || "Falha ao salvar.");
-    } finally {
-      setSalvando(false);
-    }
-  };
-
-  const field = (label: string, value: string, set: (v: string) => void, ph: string, type = "password") => (
-    <div>
-      <p className="text-[11px] font-semibold text-luxury-black mb-1">{label}</p>
-      <input
-        type={type}
-        value={value}
-        onChange={(e) => set(e.target.value)}
-        placeholder={ph}
-        className="w-full h-11 px-3 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-gold"
-      />
-    </div>
-  );
-
-  return (
-    <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-bold text-luxury-black">Configurar APIs</h3>
-        <button onClick={onClose} className="text-gray-400 text-lg leading-none">×</button>
-      </div>
-      <p className="text-[10px] text-gray-400">Cole as chaves das integrações. Elas ficam guardadas com segurança e nunca expostas no app.</p>
-
-      {field("Loja Integrada — Chave de Aplicação", liApp, setLiApp, "APP_KEY da Loja Integrada")}
-      {field("Loja Integrada — Chave de API", liApi, setLiApi, "API_KEY da Loja Integrada")}
-      {field("Mercado Pago — Access Token", mpToken, setMpToken, "Access Token do Mercado Pago")}
-
-      <div className="pt-1 border-t border-gray-100">
-        <p className="text-[10px] font-semibold text-gold-dark mt-1 mb-1">YouTube (seção "D'Griffe no YouTube")</p>
-        {field("YouTube — API Key (Data API v3)", ytKey, setYtKey, "Chave da YouTube Data API v3")}
-        {field("YouTube — Channel ID", ytChannel, setYtChannel, "Ex.: UCiJZLyvcFQPxSxZaK2PynWg", "text")}
-      </div>
-
-      <button
-        onClick={salvar}
-        disabled={salvando}
-        className="w-full h-11 bg-luxury-black text-white text-xs font-bold rounded-xl disabled:opacity-50 active:scale-95"
-      >
-        {salvando ? "Salvando..." : "Salvar chaves"}
-      </button>
-
-      {msg && <p className="text-[11px] text-green-600">{msg}</p>}
-      {erro && <p className="text-[11px] text-red-500">{erro}</p>}
     </div>
   );
 }
