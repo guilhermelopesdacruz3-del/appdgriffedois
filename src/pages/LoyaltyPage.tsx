@@ -62,14 +62,13 @@ export default function LoyaltyPage({ fidelidade: info, historicoFidelidade: his
     setMissoesErro(null);
     setMissoesSucesso(null);
     try {
-      const r = await fetch("/api/fidelidade/missao/concluir", {
+      const j = await (await fetch("/api/fidelidade/missao/concluir", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, tipo }),
-      });
-      const j = await r.json();
-      if (!r.ok || !j.ok) {
-        const mensagem = j.erro || `Falha ao concluir missão (HTTP ${r.status}).`;
+      })).json();
+      if (!j.ok) {
+        const mensagem = j.erro || `Falha ao concluir missão.`;
         setMissoesErro(mensagem);
         alert(mensagem);
         return;
@@ -83,7 +82,6 @@ export default function LoyaltyPage({ fidelidade: info, historicoFidelidade: his
     } catch (e: any) {
       const mensagem = e.message || "Não foi possível concluir a missão.";
       setMissoesErro(mensagem);
-      alert(mensagem);
     } finally {
       setMissoesLoading(false);
     }
