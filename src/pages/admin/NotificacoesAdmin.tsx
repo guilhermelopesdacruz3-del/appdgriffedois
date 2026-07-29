@@ -4,6 +4,21 @@ import { notificarClientesAdmin, type FiltrosNotificar } from "../../services/no
 
 type Tipo = "cupom" | "promocao" | "produto" | "carrinho" | "geral";
 
+const TIPOS: { value: Tipo; label: string; color: string; icon: string }[] = [
+  { value: "cupom", label: "Cupom", color: "bg-amber-50 border-amber-200 text-amber-800", icon: "🎟️" },
+  { value: "promocao", label: "Promoção", color: "bg-rose-50 border-rose-200 text-rose-800", icon: "🔥" },
+  { value: "produto", label: "Produto exclusivo", color: "bg-violet-50 border-violet-200 text-violet-800", icon: "✨" },
+  { value: "carrinho", label: "Aviso de carrinho", color: "bg-sky-50 border-sky-200 text-sky-800", icon: "🛒" },
+  { value: "geral", label: "Geral", color: "bg-gray-50 border-gray-200 text-gray-800", icon: "📣" },
+];
+
+const TEMPLATES = [
+  { label: "Cupom 10% OFF", titulo: "Cupom de 10% OFF", corpo: "Use o cupom SAUDE10 e ganhe 10% em óculos de grau e solar.", tipo: "cupom" as Tipo },
+  { label: "Frete grátis", titulo: "Frete grátis hoje", corpo: "Aproveite: hoje o frete é por nossa conta para todo o Brasil.", tipo: "promocao" as Tipo },
+  { label: "Novidade", titulo: "Novidade na D'Griffe", corpo: "Chegou uma coleção nova de armações. Venha conferir.", tipo: "produto" as Tipo },
+  { label: "Carrinho abandonado", titulo: "Faltou pouco!", corpo: "Você deixou itens no carrinho. Finalize agora e garanta sua preferência.", tipo: "carrinho" as Tipo },
+];
+
 export default function NotificacoesAdmin() {
   const [clientes, setClientes] = useState<ClienteRelatorio[]>([]);
   const [titulo, setTitulo] = useState("");
@@ -14,6 +29,7 @@ export default function NotificacoesAdmin() {
   const [fPontosMin, setFPontosMin] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [enviando, setEnviando] = useState(false);
+  const [historico, setHistorico] = useState<{ titulo: string; tipo: Tipo; enviadas: number; ts: string }[]>([]);
 
   useEffect(() => {
     listarClientesAdmin()
@@ -47,6 +63,10 @@ export default function NotificacoesAdmin() {
       setStatus(`Enviado para ${r.enviadas} cliente(s).`);
       setTitulo("");
       setCorpo("");
+      setHistorico((prev) => [
+        ...prev,
+        { titulo, tipo, enviadas: r.enviadas, ts: new Date().toLocaleString("pt-BR") },
+      ].slice(-40));
     } catch (e: any) {
       setStatus(e.message || "Falha ao enviar.");
     } finally {
@@ -54,80 +74,102 @@ export default function NotificacoesAdmin() {
     }
   };
 
+  const tipoAtivo = TIPOS.find((t) => t.value === tipo);
+
   return (
     <div className="px-4 py-4 space-y-4">
-      <h2 className="text-base font-bold text-luxury-black">Enviar notificação</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-base font-bold text-luxury-black">Notificações</h2>
+        <span className="text-[10px] text-gray-500">Envio custa 1 notificação por cliente</span>
+      </div>
 
       <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
-        <div>
-          <label className="text-[11px] text-gray-500">Tipo</label>
-          <select
-            value={tipo}
-            onChange={(e) => setTipo(e.target.value as Tipo)}
-            className="w-full h-10 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
-          >
-            <option value="cupom">Cupom</option>
-            <option value="promocao">Promoção</option>
-            <option value="produto">Produto exclusivo</option>
-            <option value="carrinho">Aviso de carrinho</option>
-            <option value="geral">Geral</option>
-          </select>
+        <p className="text-[11px] font-bold text-gray-500">Modelos rápidos</p>
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {TEMPLATES.map((tpl) => (
+            <button
+              key={tpl.label}
+              onClick={() => { setTitulo(tpl.titulo); setCorpo(tpl.corpo); setTipo(tpl.tipo); }}
+              className="shrink-0 px-3 py-2 rounded-xl border border-ice-dark/60 text-[10px] font-semibold text-luxury-black bg-ice"
+            >
+              {tpl.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+        <div className="flex gap-2">
+          {TIPOS.map((item) => (
+            <button
+              key={item.value}
+              onClick={() => setTipo(item.value)}
+              className={`flex-1 py-2 rounded-xl border text-[10px] font-bold transition-all ${tipo === item.value ? `${item.color} border-current` : "border-ice-dark/60 text-gray-600"}`}
+            >
+              <span className="block text-sm leading-none mb-1">{item.icon}</span>
+              {item.label}
+            </button>
+          ))}
         </div>
         <div>
           <label className="text-[11px] text-gray-500">Título</label>
-          <input
-            value={titulo}
-            onChange={(e) => setTitulo(e.target.value)}
-            placeholder="Ex: Cupom de 10% OFF"
-            className="w-full h-10 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
-          />
+          <input value={titulo} onChange={(e) => setTitulo(e.target.value)} placeholder="Ex: Cupom de 10% OFF" className="w-full h-10 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold" />
         </div>
         <div>
           <label className="text-[11px] text-gray-500">Mensagem</label>
-          <textarea
-            value={corpo}
-            onChange={(e) => setCorpo(e.target.value)}
-            placeholder="Ex: Use o cupom SAUDE10 e ganhe 10%..."
-            rows={3}
-            className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
-          />
+          <textarea value={corpo} onChange={(e) => setCorpo(e.target.value)} placeholder="Ex: Use o cupom SAUDE10..." rows={3} className="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold" />
+        </div>
+
+        {/* Pré-visualização mobile */}
+        <div className="rounded-2xl border border-ice-dark/60 bg-ice p-3">
+          <p className="text-[10px] font-bold text-gray-500 mb-2">Pré-visualização</p>
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-4 py-3 border-b border-gray-50">
+              <p className="text-[11px] font-bold text-luxury-black leading-tight">{titulo || "Título da notificação"}</p>
+            </div>
+            <div className="px-4 py-3">
+              <p className="text-[10px] text-gray-500 leading-relaxed">{corpo || "Mensagem aparecerá aqui..."}</p>
+            </div>
+            <div className="px-4 py-2 border-t border-gray-50 flex items-center justify-between">
+              <span className={`text-[9px] font-bold px-2 py-0.5 rounded-lg border ${tipoAtivo?.color || "bg-gray-100 border-gray-200 text-gray-700"}`}>{tipoAtivo?.icon} {tipoAtivo?.label ?? tipo}</span>
+              <span className="text-[9px] text-gray-400">Agora</span>
+            </div>
+          </div>
         </div>
       </div>
 
       <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
         <p className="text-[11px] font-bold text-gray-500">Destinatários (filtros)</p>
-        <input
-          value={fEmail}
-          onChange={(e) => setFEmail(e.target.value)}
-          placeholder="Filtrar por e-mail (parte)"
-          className="w-full h-10 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
-        />
-        <input
-          value={fNome}
-          onChange={(e) => setFNome(e.target.value)}
-          placeholder="Filtrar por nome"
-          className="w-full h-10 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
-        />
-        <input
-          value={fPontosMin}
-          onChange={(e) => setFPontosMin(e.target.value.replace(/\D/g, ""))}
-          placeholder="Nível mínimo de fidelidade (pontos)"
-          className="w-full h-10 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
-        />
-        <p className="text-[11px] text-gray-400">
-          {preview.length} cliente(s) correspondem aos filtros.
-        </p>
+        <input value={fEmail} onChange={(e) => setFEmail(e.target.value)} placeholder="Filtrar por e-mail (parte)" className="w-full h-10 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold" />
+        <input value={fNome} onChange={(e) => setFNome(e.target.value)} placeholder="Filtrar por nome" className="w-full h-10 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold" />
+        <input value={fPontosMin} onChange={(e) => setFPontosMin(e.target.value.replace(/\D/g, ""))} placeholder="Nível mínimo de fidelidade (pontos)" className="w-full h-10 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold" />
+        <p className="text-[11px] text-gray-400">{preview.length} cliente(s) correspondem aos filtros.</p>
       </div>
 
       {status && <p className="text-[11px] text-center text-gold">{status}</p>}
 
-      <button
-        onClick={enviar}
-        disabled={enviando}
-        className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl disabled:opacity-60"
-      >
+      <button onClick={enviar} disabled={enviando} className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl disabled:opacity-60">
         {enviando ? "Enviando..." : "Enviar notificação"}
       </button>
+
+      {historico.length > 0 && (
+        <div className="bg-white rounded-2xl p-4 shadow-sm space-y-2">
+          <p className="text-[11px] font-bold text-gray-500">Histórico recente</p>
+          <div className="space-y-2">
+            {historico.map((h, idx) => (
+              <div key={idx} className="flex items-center justify-between rounded-xl border border-ice-dark/60 px-3 py-2">
+                <div>
+                  <p className="text-xs font-semibold text-luxury-black leading-tight">{h.titulo}</p>
+                  <p className="text-[10px] text-gray-500">{h.ts} • {h.enviadas} destinatário(s)</p>
+                </div>
+                <span className={`text-[9px] font-bold px-2 py-1 rounded-lg border ${TIPOS.find((t) => t.value === h.tipo)?.color ?? "bg-gray-100 border-gray-200 text-gray-700"}`}>
+                  {TIPOS.find((t) => t.value === h.tipo)?.label ?? h.tipo}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
