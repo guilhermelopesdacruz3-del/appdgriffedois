@@ -81,6 +81,7 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
         setPasso("sucesso");
       }
       onSuccess?.(resultado);
+      window.dispatchEvent(new Event("fidelidade-atualizada"));
     } catch (e: any) {
       setErro(e.message || "Falha ao iniciar o pagamento.");
       setPasso("erro");
