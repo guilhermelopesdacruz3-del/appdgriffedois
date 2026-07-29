@@ -1,21 +1,21 @@
 import type { LIPedido } from "./lojaIntegrada/types";
 import { mapPedidoParaApp } from "./lojaIntegrada/mappers";
+import {
+  getAdminToken as getCookieAdminToken,
+  setAdminToken as setCookieAdminToken,
+  clearAdminToken as deleteCookieAdminToken,
+} from "../utils/cookies";
 
-const TOKEN_KEY = "dg_admin_token";
-
-// O proxy de admin usa URL RELATIVA (/api/admin) para que, em produção, a
-// Netlify faça o proxy (netlify.toml: /api/* -> Render) sem problemas de CORS.
-// Em dev, o Vite já redireciona /api para o backend local.
 const ADMIN_BASE_URL: string = "/api/admin";
 
 export function getAdminToken(): string | null {
-  return sessionStorage.getItem(TOKEN_KEY);
+  return getCookieAdminToken();
 }
 export function setAdminToken(token: string): void {
-  sessionStorage.setItem(TOKEN_KEY, token);
+  setCookieAdminToken(token);
 }
 export function clearAdminToken(): void {
-  sessionStorage.removeItem(TOKEN_KEY);
+  deleteCookieAdminToken();
 }
 
 export class AdminError extends Error {
