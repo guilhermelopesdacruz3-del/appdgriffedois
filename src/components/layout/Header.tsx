@@ -9,9 +9,10 @@ interface HeaderProps {
   onSearch?: (query: string) => void;
   notifNaoLidas?: number;
   onNotifClick?: () => void;
+  onToggleTheme?: () => void;
 }
 
-export default function Header({ cartCount, onCartClick, onBack, title, dark = false, onSearch, notifNaoLidas = 0, onNotifClick }: HeaderProps) {
+export default function Header({ cartCount, onCartClick, onBack, title, dark = false, onSearch, notifNaoLidas = 0, onNotifClick, onToggleTheme }: HeaderProps) {
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
@@ -106,6 +107,17 @@ export default function Header({ cartCount, onCartClick, onBack, title, dark = f
               </span>
             )}
           </button>
+
+          {onToggleTheme && (
+            <button
+              onClick={onToggleTheme}
+              className={`w-9 h-9 flex items-center justify-center rounded-full transition-all duration-300 ${
+                dark ? 'bg-luxury-gray text-white hover:bg-luxury-gray/80' : 'bg-ice text-luxury-black hover:bg-ice-dark'
+              }`}
+            >
+              {dark ? '🌙' : '☀️'}
+            </button>
+          )}
         </div>
       </div>
 
