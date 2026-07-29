@@ -63,95 +63,110 @@ export default function LoyaltyPage({ fidelidade: info, historicoFidelidade: his
   return (
     <div className="pb-4">
       {/* VIP Card */}
-      <div className="mx-4 mt-2 relative overflow-hidden rounded-3xl bg-luxury-black p-5">
-        <div className="absolute top-0 right-0 w-40 h-40">
-          <div className="absolute -top-10 -right-10 w-40 h-40 border rounded-full" style={{ borderColor: `${nivel.cor}22` }} />
-          <div className="absolute -top-4 -right-4 w-28 h-28 border rounded-full" style={{ borderColor: `${nivel.cor}18` }} />
+      <div className="mx-4 mt-2 relative overflow-hidden rounded-[28px] bg-luxury-black p-5 shadow-xl shadow-black/10 ring-1 ring-white/10">
+        <div className="absolute inset-0 opacity-60">
+          <div className="absolute -top-10 -right-10 w-56 h-56 rounded-full border border-white/10" />
+          <div className="absolute -top-20 right-10 w-72 h-72 rounded-full bg-gradient-to-br from-white/10 to-transparent" />
+          <div className="absolute -bottom-24 -left-16 w-60 h-60 rounded-full bg-gradient-to-tr from-gold/10 to-transparent" />
         </div>
         <div className="relative z-10">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-5">
             <div>
-              <p className="text-[10px] font-bold uppercase tracking-widest mb-0.5" style={{ color: nivel.cor }}>Clube D'Griffe</p>
-              <h2 className="text-white text-xl font-bold">{nivel.nome}</h2>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] mb-1 text-gold/90">Clube D'Griffe</p>
+              <h2 className="text-white text-[22px] font-bold leading-tight">{nivel.nome}</h2>
             </div>
-            <div className="w-12 h-12 bg-gradient-to-br from-gold to-gold-dark rounded-full flex items-center justify-center shadow-lg shadow-gold/20">
-              <span className="text-xl">👑</span>
+            <div className="w-14 h-14 bg-gradient-to-br from-gold to-yellow-600 rounded-full flex items-center justify-center shadow-xl shadow-gold/20 border border-white/10">
+              <span className="text-2xl">👑</span>
             </div>
           </div>
 
-          <div className="bg-luxury-gray/50 rounded-2xl p-4 mb-3 border" style={{ borderColor: `${nivel.cor}22` }}>
+          <div className="bg-white/5 rounded-2xl p-4 mb-3 border border-white/10 backdrop-blur-sm">
             <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Pontos Acumulados</p>
-            <p className="text-3xl font-bold text-gold-gradient">{pontos.toLocaleString('pt-BR')}</p>
+            <p className="text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-white to-gold">{pontos.toLocaleString('pt-BR')}</p>
             {prox ? (
-              <div className="mt-3">
-                <div className="flex justify-between items-center mb-1">
-                  <span className="text-[9px] text-gray-500">Progresso para {prox.nome}</span>
-                  <span className="text-[9px] font-semibold" style={{ color: nivel.cor }}>{prox.min.toLocaleString('pt-BR')} pts</span>
+              <div className="mt-4">
+                <div className="flex justify-between items-center mb-1.5">
+                  <span className="text-[10px] text-gray-500">Progresso para {prox.nome}</span>
+                  <span className="text-[10px] font-semibold text-gold/90">{prox.min.toLocaleString('pt-BR')} pts</span>
                 </div>
-                <div className="h-1.5 bg-luxury-gray rounded-full overflow-hidden">
-                  <div className="h-full rounded-full transition-all duration-1000" style={{ width: `${progresso}%`, background: nivel.cor }} />
+                <div className="h-2 bg-white/10 rounded-full overflow-hidden border border-white/10">
+                  <div className="h-full rounded-full bg-gradient-to-r from-gold to-yellow-400 transition-all duration-1000" style={{ width: `${Math.min(progresso, 100)}%` }} />
                 </div>
-                <p className="text-[9px] text-gray-500 mt-1">Faltam {ptsParaProx.toLocaleString('pt-BR')} pts</p>
+                <p className="text-[10px] text-gray-400 mt-1.5">Faltam {ptsParaProx.toLocaleString('pt-BR')} pts</p>
               </div>
             ) : (
-              <p className="text-[9px] text-gray-500 mt-2">Nível máximo alcançado 🎉</p>
+              <p className="text-[10px] text-gray-400 mt-2">Nível máximo alcançado 🎉</p>
             )}
           </div>
 
-          <div className="flex gap-3">
-            <div className="flex-1 bg-luxury-gray/50 rounded-xl p-3 border border-gold/10">
-              <p className="text-[9px] text-gray-400 uppercase tracking-wider">Cashback</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white/5 rounded-2xl p-3 border border-white/10">
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Cashback Disponível</p>
               <p className="text-lg font-bold text-white">{cashbackDisp.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</p>
             </div>
-            <div className="flex-1 bg-luxury-gray/50 rounded-xl p-3 border border-gold/10">
-              <p className="text-[9px] text-gray-400 uppercase tracking-wider">Desconto Atual</p>
-              <p className="text-lg font-bold text-white">{descontoMax}<span className="text-gold text-sm">%</span></p>
+            <div className="bg-white/5 rounded-2xl p-3 border border-white/10">
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Desconto Atual</p>
+              <p className="text-lg font-bold text-white">{descontoMax}<span className="text-gold text-sm ml-0.5">%</span></p>
             </div>
           </div>
         </div>
       </div>
 
       {/* Faixas de nível */}
-      <div className="px-5 mt-5 mb-2">
-        <h3 className="text-sm font-bold text-luxury-black">Níveis de Relacionamento</h3>
+      <div className="px-5 mt-6 mb-2">
+        <h3 className="text-[13px] font-bold text-luxury-black">Níveis de Relacionamento</h3>
         <p className="text-[10px] text-gray-500">Acumule pontos e desbloqueie benefícios</p>
       </div>
-      <div className="px-4 space-y-1.5">
+      <div className="px-4 space-y-2">
         {niveisLista.map((n: any) => {
           const idx = NIVEIS.findIndex((x) => x.id === n.id);
           const ativo = idx === indiceAtual;
           const alcancado = idx <= indiceAtual;
           return (
-            <div key={n.id} className={`flex items-center justify-between px-4 py-2.5 rounded-xl border ${ativo ? 'bg-luxury-black' : 'bg-white border-ice-dark/50'}`}>
-              <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full" style={{ background: NIVEIS[idx]?.cor || '#ccc' }} />
+            <div key={n.id} className={`flex items-center justify-between px-4 py-3 rounded-2xl border transition-all ${ativo ? 'bg-luxury-black shadow-lg shadow-black/10 border-luxury-black' : 'bg-white border-ice-dark/60'}`}>
+              <div className="flex items-center gap-2.5">
+                <span className="w-3 h-3 rounded-full shrink-0 ring-2 ring-white/60" style={{ background: NIVEIS[idx]?.cor || '#ccc' }} />
                 <span className={`text-xs font-semibold ${ativo ? 'text-white' : alcancado ? 'text-luxury-black' : 'text-gray-400'}`}>{n.nome}</span>
               </div>
-              <span className={`text-[9px] ${ativo ? 'text-gold' : 'text-gray-400'}`}>
-                {n.min?.toLocaleString('pt-BR')}{n.max ? `–${n.max.toLocaleString('pt-BR')}` : '+'} pts
-              </span>
+              <div className="text-right">
+                <span className={`text-[10px] font-bold uppercase tracking-wider ${ativo ? 'text-gold' : ativo ? 'text-gold' : 'text-gray-400'}`}>
+                  {n.min?.toLocaleString('pt-BR')}{n.max ? `–${n.max.toLocaleString('pt-BR')}` : '+'} pts
+                </span>
+                {ativo && <p className="text-[10px] text-white/70 mt-0.5">Seu nível atual</p>}
+              </div>
             </div>
           );
         })}
       </div>
 
       {/* Benefícios do nível */}
-      <div className="px-5 mt-5 mb-2">
-        <h3 className="text-sm font-bold text-luxury-black">Benefícios {nivel.nome}</h3>
+      <div className="px-5 mt-7 mb-2">
+        <h3 className="text-[13px] font-bold text-luxury-black">Benefícios {nivel.nome}</h3>
       </div>
-      <div className="px-4 space-y-2">
-        <div className="rounded-2xl bg-white shadow-sm border border-gold/10 p-3 flex items-center justify-between">
-          <span className="text-xs text-luxury-black">Benefício base</span>
-          <span className="text-xs font-bold text-gold">{BENEFICIO_BASE.parcelado}% parc. / {BENEFICIO_BASE.pix}% Pix</span>
+      <div className="px-4 space-y-2.5">
+        <div className="rounded-2xl bg-white shadow-sm border border-gold/10 p-4 flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-xl shrink-0">💎</div>
+          <div>
+            <p className="text-xs font-semibold text-luxury-black">Benefício base</p>
+            <p className="text-[10px] text-gray-500 mt-0.5">{BENEFICIO_BASE.parcelado}% parc. / {BENEFICIO_BASE.pix}% Pix</p>
+          </div>
         </div>
-        <div className="rounded-2xl bg-white shadow-sm border border-gold/10 p-3 flex items-center justify-between">
-          <span className="text-xs text-luxury-black">Cashback Grau / Solar / Joias</span>
-          <span className="text-xs font-bold text-gold">{cashbackPerc}%</span>
+        <div className="rounded-2xl bg-white shadow-sm border border-gold/10 p-4 flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-xl shrink-0">🏷️</div>
+          <div>
+            <p className="text-xs font-semibold text-luxury-black">Cashback Grau / Solar / Joias</p>
+            <p className="text-[10px] text-gray-500 mt-0.5">Aplicado automaticamente no carrinho</p>
+            <span className="text-[10px] font-bold text-gold">{cashbackPerc}%</span>
+          </div>
         </div>
         {nivel.cupomAniversario > 0 && (
-          <div className="rounded-2xl bg-white shadow-sm border border-gold/10 p-3 flex items-center justify-between">
-            <span className="text-xs text-luxury-black">Cupom de aniversário</span>
-            <span className="text-xs font-bold text-gold">R$ {nivel.cupomAniversario},00</span>
+          <div className="rounded-2xl bg-white shadow-sm border border-gold/10 p-4 flex items-center gap-3.5">
+            <div className="w-10 h-10 rounded-xl bg-gold/10 flex items-center justify-center text-xl shrink-0">🎂</div>
+            <div>
+              <p className="text-xs font-semibold text-luxury-black">Cupom de aniversário</p>
+              <p className="text-[10px] text-gray-500 mt-0.5">Valor do cupom</p>
+              <span className="text-[10px] font-bold text-gold">R$ {nivel.cupomAniversario},00</span>
+            </div>
           </div>
         )}
       </div>
