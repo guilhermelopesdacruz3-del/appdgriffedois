@@ -67,6 +67,7 @@ export default function NotificacoesAdmin() {
         ...prev,
         { titulo, tipo, enviadas: r.enviadas, ts: new Date().toLocaleString("pt-BR") },
       ].slice(-40));
+      window.dispatchEvent(new Event("notificacoes-atualizadas"));
     } catch (e: any) {
       setStatus(e.message || "Falha ao enviar.");
     } finally {

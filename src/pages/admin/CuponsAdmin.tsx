@@ -62,6 +62,7 @@ export default function CuponsAdmin() {
       setFim("");
       setDestinatarios("");
       await carregar();
+      window.dispatchEvent(new Event("cupons-atualizados"));
     } catch (e: any) {
       setErro(e.message);
     }
@@ -72,6 +73,7 @@ export default function CuponsAdmin() {
     try {
       await enviarCupom(id, { grupo: grupo as any, emails });
       await carregar();
+      window.dispatchEvent(new Event("cupons-atualizados"));
     } catch (e: any) {
       setErro(e.message);
     }
