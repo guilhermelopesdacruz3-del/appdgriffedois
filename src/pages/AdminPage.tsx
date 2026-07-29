@@ -284,73 +284,73 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
   const exportarCSV = () => downloadCSV(pedidoParaCSV(pedidosFiltrados), "pedidos-dgriffe.csv");
 
   // -------------------- Tela de login --------------------
-  if (!token) {
+    if (!token) {
+      return (
+        <div className="min-h-screen bg-ice flex items-center justify-center px-6">
+          <div className="w-full max-w-sm bg-white/10 border border-white/20 rounded-[2rem] p-6 shadow-[0_0_40px_rgba(212,168,83,0.15)] backdrop-blur">
+            <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-gold to-gold-dark flex items-center justify-center shadow-lg shadow-gold/20 mb-4">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0A0A0A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              </svg>
+            </div>
+            <h2 className="text-base font-bold text-luxury-black text-center">Painel Admin</h2>
+            <p className="text-xs text-luxury-black/60 mt-1 text-center">Acesso restrito — informe a senha</p>
+
+            <form className="mt-5 space-y-3" onSubmit={fazerLogin}>
+              <input
+                type="password"
+                required
+                value={senha}
+                onChange={(e) => setSenha(e.target.value)}
+                placeholder="Senha de administrador"
+                className="w-full h-12 px-4 rounded-2xl border border-white/20 bg-white/30 text-luxury-black text-sm placeholder:text-luxury-black/50 focus:outline-none focus:border-gold"
+              />
+              <button
+                type="submit"
+                disabled={loginLoading}
+                className="w-full h-12 bg-white text-luxury-black text-xs font-bold rounded-2xl disabled:opacity-50 active:scale-[0.98] transition-all"
+              >
+                {loginLoading ? "Entrando..." : "Entrar"}
+              </button>
+            </form>
+
+            {loginErro && <p className="text-[11px] text-red-400 mt-3 text-center">{loginErro}</p>}
+            <button onClick={onExit} className="w-full text-[10px] font-bold text-luxury-black/60 hover:text-luxury-black mt-4">
+              ← Voltar à loja
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    // -------------------- Painel --------------------
+    const coresStatus = ["#D4A853", "#6366F1", "#10B981", "#F59E0B", "#3B82F6", "#EF4444", "#8B5CF6", "#EC4899"];
+
     return (
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center px-6">
-        <div className="w-full max-w-sm bg-white/5 border border-white/10 rounded-[2rem] p-6 shadow-[0_0_40px_rgba(212,168,83,0.15)] backdrop-blur">
-          <div className="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-br from-gold to-gold-dark flex items-center justify-center shadow-lg shadow-gold/20 mb-4">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0A0A0A" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
-            </svg>
-          </div>
-          <h2 className="text-base font-bold text-white text-center">Painel Admin</h2>
-          <p className="text-xs text-white/60 mt-1 text-center">Acesso restrito — informe a senha</p>
-
-          <form className="mt-5 space-y-3" onSubmit={fazerLogin}>
-            <input
-              type="password"
-              required
-              value={senha}
-              onChange={(e) => setSenha(e.target.value)}
-              placeholder="Senha de administrador"
-              className="w-full h-12 px-4 rounded-2xl border border-white/10 bg-black/40 text-white text-sm placeholder:text-white/30 focus:outline-none focus:border-gold"
-            />
-            <button
-              type="submit"
-              disabled={loginLoading}
-              className="w-full h-12 bg-white text-black text-xs font-bold rounded-2xl disabled:opacity-50 active:scale-[0.98] transition-all"
-            >
-              {loginLoading ? "Entrando..." : "Entrar"}
-            </button>
-          </form>
-
-          {loginErro && <p className="text-[11px] text-red-400 mt-3 text-center">{loginErro}</p>}
-          <button onClick={onExit} className="w-full text-[10px] font-bold text-white/60 hover:text-white mt-4">
-            ← Voltar à loja
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // -------------------- Painel --------------------
-  const coresStatus = ["#D4A853", "#6366F1", "#10B981", "#F59E0B", "#3B82F6", "#EF4444", "#8B5CF6", "#EC4899"];
-
-  return (
-    <div className="min-h-screen bg-[#050505] text-white">
-      <div className="max-w-6xl mx-auto min-h-screen bg-[#050505] relative">
-        <div className="sticky top-0 z-20 bg-black/80 border-b border-white/10 px-5 py-3 flex items-center justify-between backdrop-blur">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.6)]" />
-            <div>
-              <h1 className="text-sm font-bold leading-tight">Painel Admin</h1>
-              <p className="text-[10px] text-gold-dark font-semibold">{total} pedidos no total</p>
+      <div className="min-h-screen bg-ice text-luxury-black">
+        <div className="max-w-6xl mx-auto min-h-screen bg-ice relative">
+          <div className="sticky top-0 z-20 bg-white/5 border-b border-white/20 px-5 py-3 flex items-center justify-between backdrop-blur">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(52,211,153,0.6)]" />
+              <div>
+                <h1 className="text-sm font-bold leading-tight">Painel Admin</h1>
+                <p className="text-[10px] text-gold-dark font-semibold">{total} pedidos no total</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold text-luxury-black bg-white/10 border border-white/20 rounded-full pl-2 pr-3 py-1">
+                <span>👤</span>
+                <span>Admin</span>
+                <span className="text-[8px] opacity-60">▾</span>
+              </div>
+              <button onClick={() => setMostrarConfig((v) => !v)} className="text-[11px] font-bold text-gold-dark hover:text-gold flex items-center gap-1 border border-white/20 bg-white/5 rounded-full px-3 py-1" title="APIs">
+                <span>⚙️</span><span className="hidden sm:inline">APIs</span>
+              </button>
+              <button onClick={sair} className="text-[11px] font-bold text-gray-400 hover:text-luxury-black flex items-center gap-1 border border-white/20 bg-white/5 rounded-full px-3 py-1" title="Sair">
+                <span>🚪</span><span className="hidden sm:inline">Sair</span>
+              </button>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-white/90 bg-white/10 border border-white/10 rounded-full pl-2 pr-3 py-1">
-              <span>👤</span>
-              <span>Admin</span>
-              <span className="text-[8px] opacity-60">▾</span>
-            </div>
-            <button onClick={() => setMostrarConfig((v) => !v)} className="text-[11px] font-bold text-gold-dark hover:text-gold flex items-center gap-1 border border-white/10 bg-white/5 rounded-full px-3 py-1" title="APIs">
-              <span>⚙️</span><span className="hidden sm:inline">APIs</span>
-            </button>
-            <button onClick={sair} className="text-[11px] font-bold text-gray-300 hover:text-white flex items-center gap-1 border border-white/10 bg-white/5 rounded-full px-3 py-1" title="Sair">
-              <span>🚪</span><span className="hidden sm:inline">Sair</span>
-            </button>
-          </div>
-        </div>
 
         <div className="flex gap-1 px-4 pt-3">
           {(["pedidos", "dashboard", "cupons", "fidelidade", "notificacoes", "relatorios", "logs"] as Aba[]).map((a) => (
