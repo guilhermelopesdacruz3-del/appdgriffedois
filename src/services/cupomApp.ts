@@ -2,11 +2,11 @@ const BASE_URL =
   (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, "") ||
   "";
 
+import { getAdminToken, clearAdminToken } from "./admin";
+import { getClienteToken, clearClienteToken } from "../utils/cookies";
+
 async function request<T>(path: string, opts: { method?: string; body?: unknown; auth?: boolean } = {}): Promise<T> {
-  // As rotas de cupom JÁ incluem /api no próprio caminho (ex: /api/admin/cupons,
-  // /api/cupons/...), então a base é vazia — o proxy /api/* da Cloudflare
-  // repassa para o Render. Usar "/api" aqui geraria /api/api/... (404).
-  const token = opts.auth !== false ? sessionStorage.getItem("dg_admin_token") : null;
+  const token = opts.auth !== false ? getAdminToken() : null;
   const headers: Record<string, string> = { Accept: "application/json" };
   if (opts.body !== undefined) headers["Content-Type"] = "application/json";
   if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -17,7 +17,7 @@ async function request<T>(path: string, opts: { method?: string; body?: unknown;
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
   });
 
-  if (res.status === 401) sessionStorage.removeItem("dg_admin_token");
+  if (res.status === 401) clearAdminToken();
   if (!res.ok) {
     const txt = await res.text().catch(() => "");
     throw new Error(`Falha (${res.status}): ${txt.slice(0, 200)}`);
@@ -77,15 +77,12 @@ export async function enviarCupom(id: string, dados: EnviarCupomPayload): Promis
 }
 
 export async function meusCupons(): Promise<CupomUsuario[]> {
-  // Tela do CLIENTE (nao admin): usa o token de sessao do cliente
-  // (dgriffe:cliente_token), salvo no login OTP. Nao depende do cliente
-  // Supabase do front (que pode nao estar configurado no deploy).
-  const token = window.localStorage.getItem("dgriffe:cliente_token") || "";
+  const token = getClienteToken() || "";
   const headers: Record<string, string> = { Accept: "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`${BASE_URL}/api/cupons/meus`, { method: "GET", headers });
   if (res.status === 401) {
-    try { window.localStorage.removeItem("dgriffe:cliente_token"); } catch { /* ignora */ }
+    try { clearClienteToken(); } catch { /* ignora */ }
   }
   if (!res.ok) {
     const txt = await res.text().catch(() => "");

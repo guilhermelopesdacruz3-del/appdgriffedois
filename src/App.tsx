@@ -58,6 +58,12 @@ function AppInner() {
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
 
+  const navigate = useCallback((page: string) => {
+    setCurrentPage(page);
+    setSelectedProduct(null);
+    try { history.pushState({ page }, ""); } catch { /* ignore */ }
+  }, []);
+
   useEffect(() => {
     const onPop = () => {
       setCheckoutOpen(false);
@@ -65,10 +71,10 @@ function AppInner() {
       setTryOnOpen(false);
       setDrawerOpen(false);
       setSelectedProduct(null);
-      setCurrentPage('home');
+      setCurrentPage("home");
     };
-    window.addEventListener('popstate', onPop);
-    return () => window.removeEventListener('popstate', onPop);
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
   }, []);
 
   const { isFavorite, toggleFavorite } = useFavorites();
