@@ -570,8 +570,8 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                             <p className="text-[9px] text-gray-400 truncate">{c.email}</p>
                           </div>
                           <div className="text-right flex-shrink-0">
-                            <p className="font-bold text-luxury-black">{formatPrice(c.total)}</p>
-                            <p className="text-[9px] text-gray-400">{c.pedidos} pedidos</p>
+                            <p className="font-bold text-luxury-black">{formatPrice(c.total ?? 0)}</p>
+                            <p className="text-[9px] text-gray-400">{(c.pedidos ?? 0)} pedidos</p>
                           </div>
                         </button>
                       ))}

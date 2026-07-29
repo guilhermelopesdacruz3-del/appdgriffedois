@@ -74,7 +74,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: appdgriffedois
-          directory: ./dist
+          directory: .
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
   # 3) Deploy do PROXY no Render.

@@ -165,8 +165,9 @@ export async function relatorioAdmin(): Promise<RelatorioAdmin> {
 export interface ClienteRelatorio {
   email: string;
   nome: string;
-  pedidos: number;
-  total: number;
+  pontos?: number;
+  pedidos?: number;
+  total?: number;
 }
 
 export interface ListarClientesAdminResult {
