@@ -1,77 +1,65 @@
-# D'Griffe — Pacote de Submissão Play Store
-
-Pronto para colar no Play Console. Não altere o package name: `com.dgriffe.app`.
-
----
-
-## 1. Nome do app
+# D'Griffe — Submissão Play Store
+## Título (max 30)
 D'Griffe — Ótica de Luxo
 
-## 2. Descrição curta (máx 80 chars)
-Óculos originais, fidelidade e cupons exclusivos.
+## Descrição curta (max 80)
+Óculos originais, fidelidade com pontos, cupons e indicações. Peça online, retire na loja.
 
-## 3. Descrição completa
-A D'Griffe Ótica traz os óculos mais desejados — Ray-Ban, Michael Kors, Vogue, Armani, Grazi Massafera — com até 5x sem juros e desconto no Pix.
+## Descrição longa
+Bem-vindo à D'Griffe, a ótica de luxo que une estilo, tecnologia e benefícios exclusivos.
 
-No app você:
-• Navega o catálogo completo por marca, categoria (sol, grau, infantil) e preço
-• Entra no Clube de Fidelidade: acumula pontos, libera descontos, frete grátis e benefícios VIP
-• Recebe cupons exclusivos enviados direto para o seu e-mail
-• Acompanha pedidos e histórico de compras
-• Fala com a loja pelo WhatsApp em um toque
+O que você encontra no app:
+- Catálogo completo de óculos de grau, sol e infantil, com filtros por estilo e marca.
+- Prova virtual: veja como os óculos ficam no seu rosto antes de comprar.
+- Programa de fidelidade: ganhe pontos em cada compra, complete missões e resgate descontos no checkout.
+- Cupons exclusivos: ative ofertas personalizadas diretamente pelo app.
+- Indicação premiada: compartilhe o app e ganhe pontos para ambos os lados.
+- Clube de fidelidade: acompanhe níveis, créditos e vantagens em tempo real.
 
-Seus dados de cliente e pedidos vêm diretamente da sua loja na Loja Integrada — é só entrar com o e-mail usado nas compras.
+Perfil do cliente:
+- Cadastro simplificado por e-mail/telefone.
+- Histórico de pedidos, endereços salvos e preferências.
 
-D'Griffe Ótica — qualidade, estilo e economia nos seus óculos.
+Checkout:
+- PIX rápido e seguro.
+- Cartão de crédito com Mercado Pago.
+- Aplicação automática de pontos e cupons no valor final.
 
-## 4. Categoria
-Compras / Estilo de vida
+Suporte:
+- Chat, notificações de pedido e exclusão de conta em Perfil.
 
-## 5. URL da Política de Privacidade
-https://appdgriffedois.pages.dev/privacidade.html
+Privacidade:
+- Protegemos seus dados conforme a LGPD. Veja a Política de Privacidade completa no app.
 
-## 6. E-mail de contato do desenvolvedor
-webfinal.dgriffe@gmail.com
+## Classificação de conteúdo
+- Não contém violência, conteúdo sexual, linguagem inadequada, álcool/tabaco, apostas ou dados sensíveis.
+- Direcionado a todas as idades.
 
-## 7. Site
-https://appdgriffedois.pages.dev
+## Acessibilidade offline
+- Sim, app funciona offline após o primeiro acesso.
 
-## 8. Classificação indicativa
-Conteúdo livre para todas as idades (loja de varejo ótica).
+## Privacidade e dados
+- Coletamos e-mail, nome, telefone e CPF para cadastro e pedidos; histórico de pedidos e pontos para fidelidade.
+- Dados são compartilhados com parceiros essenciais (Loja Integrada e Mercado Pago).
+- Não vendemos dados pessoais.
+- Direitos LGPD: solicite acesso, retificação ou exclusão por e-mail ou por "Perfil → Excluir minha conta".
 
----
+## Contato
+- Email: webfinal.dgriffe@gmail.com
+- Privacidade: https://dgriffe-app.pages.dev/privacidade.html
 
-## 9. Dados do Usuário (formulário LGPD do Play Console)
-Marque "Sim" e descreva:
-- Tipo de dados: E-mail, Nome, Telefone, Endereço, IDs de conta, Histórico de compras, Pontos de fidelidade
-- Uso: Criar conta, processar pedidos, programa de fidelidade, atendimento e comunicações sobre pedidos
-- Política: https://appdgriffedois.pages.dev/privacidade.html
+## Screenshots
+- phone1, phone2, phone3 (narrow) — smartphone 1080x2340+
+- tablet1 (wide) — tablet 2048x2732 ou 1920x1200
 
-## 10. Arquivo a enviar
-twa-project/app/build/outputs/bundle/release/app-release.aab
+## Itens técnicos obrigatórios
+- Manisfest web com related_applications/play link: SIM
+- PACKAGE_NAME: com.dgriffe.app
+- AAB: app-release.aab em twa-project/app/build/outputs/bundle/release/
+- Permissões: INTERNET
 
-## 11. Ícone (512x512)
-public/icon-512.png (já no projeto)
-
-## 12. Screenshots (pasta screenshots/)
-- 01-home.png
-- 02-catalogo.png
-- 03-clube.png
-- 04-perfil.png
-
----
-
-## Próximos passos (lado Google — sua conta)
-1. Criar conta em play.google.com/console (taxa US$ 25)
-2. Criar app "D'Griffe — Ótica de Luxo"
-3. Upload do app-release.aab
-4. Colar os textos acima
-5. Subir os 4 screenshots + ícone 512
-6. Preencher Dados do Usuário (item 9) e classificação
-7. Enviar para revisão (1–7 dias úteis)
-
-## Pendência conhecida (não bloqueia)
-Digital Asset Links (fullscreen puro do TWA) exige domínio próprio onde o
-.well-known/assetlinks.json seja servido. Sem ele o app publica normalmente,
-apenas abre com barra de URL mínima. Resolva com CNAME de domínio próprio
-apontando para o Pages.
+## Questões de autoria
+- App oficial?
+  - SIM: uso de PWA/TWA oficial, marca registrada D'Griffe.
+- Possuo direitos?
+  - SIM: conteúdo visual, marca e nome da loja desta loja.

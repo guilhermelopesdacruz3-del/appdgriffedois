@@ -1,0 +1,13 @@
+# D'Griffe — Checklist Play Store
+- [ ] 1) Screenshots: phone x3, tablet x1 (form_factor narrow/wide)
+- [ ] 2) URL pública de Política de Privacidade
+- [ ] 3) Título da listagem (max 30)
+- [ ] 4) Descrição curta (max 80)
+- [ ] 5) Descrição longa
+- [ ] 6) Classificação de conteúdo (questionário ESRB/PEGI)
+- [ ] 7) Targeting: idade, países
+- [ ] 8) App acessível off-line = true
+- [ ] 9) Dados de contato, email, site, telefone
+- [ ] 10) AAB buildada e assinada na pasta: twa-project/app/build/outputs/bundle/release/app-release.aab
+- [ ] 11) Assinatura upgrade/rollout
+- [ ] 12) Revisão e submissão
