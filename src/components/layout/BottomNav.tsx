@@ -1,6 +1,7 @@
 interface BottomNavProps {
   activePage: string;
   onNavigate: (page: string) => void;
+  dark?: boolean;
 }
 
 const navItems = [
@@ -47,19 +48,26 @@ const navItems = [
   },
 ];
 
-export default function BottomNav({ activePage, onNavigate }: BottomNavProps) {
+export default function BottomNav({ activePage, onNavigate, dark = false }: BottomNavProps) {
+  const isDark = dark;
+  const containerClass = isDark
+    ? "border-white/10 bg-[#050505]/90"
+    : "border-ice-dark/50 bg-ice/90";
+  const activeText = isDark ? "text-white" : "text-luxury-black";
+  const inactiveText = isDark ? "text-gray-400 hover:text-gray-300" : "text-gray-500 hover:text-gray-700";
+  const underlineBg = isDark ? "bg-white" : "bg-luxury-black";
+
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-ice-dark/50 bg-ice/90 dark:bg-[#050505]/90 dark:border-white/10 backdrop-blur">
+    <nav className={`fixed bottom-0 left-0 right-0 z-50 border-t backdrop-blur ${containerClass}`}>
       <div className="flex items-center justify-around h-16 px-2 max-w-lg mx-auto">
         {navItems.map((item) => {
           const isActive = activePage === item.id;
+          const textClass = isActive ? activeText : inactiveText;
           return (
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
-              className={`flex flex-col items-center justify-center gap-0.5 flex-1 py-1 rounded-xl transition-all duration-200 ${
-                isActive ? "text-luxury-black dark:text-white" : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
-              }`}
+              className={`flex flex-col items-center justify-center gap-0.5 flex-1 py-1 rounded-xl transition-all duration-200 ${textClass}`}
             >
               <div className={`relative ${isActive ? "scale-110" : ""} transition-transform duration-200`}>
                 {item.icon(isActive)}
@@ -67,11 +75,11 @@ export default function BottomNav({ activePage, onNavigate }: BottomNavProps) {
                   <span className="absolute -top-1 -right-1 w-2 h-2 bg-gold rounded-full" />
                 )}
               </div>
-              <span className={`text-[10px] font-medium ${isActive ? "text-luxury-black dark:text-white" : "text-gray-500 dark:text-gray-400"}`}>
+              <span className={`text-[10px] font-medium ${textClass}`}>
                 {item.label}
               </span>
               {isActive && (
-                <div className="absolute -bottom-1 w-6 h-0.5 bg-luxury-black dark:bg-white rounded-full" />
+                <div className={`absolute -bottom-1 w-6 h-0.5 rounded-full ${underlineBg}`} />
               )}
             </button>
           );

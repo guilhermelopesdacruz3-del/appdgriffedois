@@ -308,7 +308,7 @@ function AppInner() {
 
       {/* Bottom Navigation */}
       {!isProductPage && (
-        <BottomNav activePage={currentPage} onNavigate={handleNavigate} />
+        <BottomNav activePage={currentPage} onNavigate={handleNavigate} dark={dark} />
       )}
 
       {/* Scroll to Top */}
