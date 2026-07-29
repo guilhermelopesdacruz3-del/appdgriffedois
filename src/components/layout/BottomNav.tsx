@@ -49,7 +49,7 @@ const navItems = [
 
 export default function BottomNav({ activePage, onNavigate }: BottomNavProps) {
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-50 glass border-t border-ice-dark/50">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 border-t border-ice-dark/50 bg-ice/90 dark:bg-[#050505]/90 dark:border-white/10 backdrop-blur">
       <div className="flex items-center justify-around h-16 px-2 max-w-lg mx-auto">
         {navItems.map((item) => {
           const isActive = activePage === item.id;
@@ -58,9 +58,7 @@ export default function BottomNav({ activePage, onNavigate }: BottomNavProps) {
               key={item.id}
               onClick={() => onNavigate(item.id)}
               className={`flex flex-col items-center justify-center gap-0.5 flex-1 py-1 rounded-xl transition-all duration-200 ${
-                isActive
-                  ? "text-luxury-black"
-                  : "text-gray-400 hover:text-gray-600"
+                isActive ? "text-luxury-black dark:text-white" : "text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-300"
               }`}
             >
               <div className={`relative ${isActive ? "scale-110" : ""} transition-transform duration-200`}>
@@ -69,11 +67,11 @@ export default function BottomNav({ activePage, onNavigate }: BottomNavProps) {
                   <span className="absolute -top-1 -right-1 w-2 h-2 bg-gold rounded-full" />
                 )}
               </div>
-              <span className={`text-[10px] font-medium ${isActive ? "text-luxury-black" : "text-gray-400"}`}>
+              <span className={`text-[10px] font-medium ${isActive ? "text-luxury-black dark:text-white" : "text-gray-500 dark:text-gray-400"}`}>
                 {item.label}
               </span>
               {isActive && (
-                <div className="absolute -bottom-1 w-6 h-0.5 bg-luxury-black rounded-full" />
+                <div className="absolute -bottom-1 w-6 h-0.5 bg-luxury-black dark:bg-white rounded-full" />
               )}
             </button>
           );
