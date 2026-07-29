@@ -60,15 +60,16 @@ function AppInner() {
 
   useEffect(() => {
     const onPop = () => {
-      if (checkoutOpen) { setCheckoutOpen(false); return; }
-      if (cartDrawerOpen) { setCartDrawerOpen(false); return; }
-      if (tryOnOpen) { setTryOnOpen(false); return; }
-      if (drawerOpen) { setDrawerOpen(false); return; }
-      if (selectedProduct) { setSelectedProduct(null); setCurrentPage(previousPage); return; }
+      setCheckoutOpen(false);
+      setCartDrawerOpen(false);
+      setTryOnOpen(false);
+      setDrawerOpen(false);
+      setSelectedProduct(null);
+      setCurrentPage('home');
     };
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
-  }, [selectedProduct, previousPage, drawerOpen, cartDrawerOpen, tryOnOpen, checkoutOpen]);
+  }, []);
 
   const { isFavorite, toggleFavorite } = useFavorites();
   const { recentIds, registerView } = useRecentlyViewed();
