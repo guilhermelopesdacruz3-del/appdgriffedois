@@ -1,0 +1,179 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>D'Griffe — Dados para Play Console</title>
+  <style>
+    :root {
+      --bg: #050505;
+      --panel: rgba(255,255,255,0.05);
+      --border: rgba(255,255,255,0.08);
+      --text: #f5f5f5;
+      --muted: #a1a1aa;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0; padding: 0;
+      background:
+        radial-gradient(circle at 15% 25%, rgba(212,168,83,0.10), transparent 22%),
+        radial-gradient(circle at 85% 75%, rgba(212,168,83,0.10), transparent 22%),
+        linear-gradient(180deg, #030303 0%, #050505 60%, #070707 100%);
+      color: var(--text);
+      font-family: Inter, -apple-system, Segoe UI, Roboto, sans-serif;
+      line-height: 1.6;
+    }
+    .container { max-width: 900px; margin: 0 auto; padding: 28px 22px; }
+    .header { text-align: center; margin-bottom: 24px; }
+    .header h1 { letter-spacing: 0.25em; font-size: 22px; margin: 0; }
+    .header p { color: var(--muted); font-size: 13px; margin-top: 6px; }
+    .card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 18px 20px;
+      margin-bottom: 18px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+      backdrop-filter: blur(18px) saturate(140%);
+    }
+    .card h2 { margin: 0 0 8px; font-size: 15px; color: #D4A853; letter-spacing: 0.15em; }
+    .field { margin-bottom: 12px; }
+    .field .label { font-size: 12px; color: var(--muted); letter-spacing: 0.1em; }
+    .field .value { font-size: 14px; margin-top: 4px; word-break: break-word; }
+    .copy {
+      display: inline-block;
+      margin-top: 8px;
+      padding: 10px 14px;
+      border-radius: 9999px;
+      border: none;
+      background: #D4A853;
+      color: #0A0A0A;
+      font-weight: 700;
+      letter-spacing: 0.18em;
+      cursor: pointer;
+    }
+    .note { color: var(--muted); font-size: 12px; margin-top: 8px; }
+    .hr { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>D'GRIFFE</h1>
+      <p>Dados prontos para colar no Play Console</p>
+    </div>
+
+    <div class="card">
+      <h2>TÍTULO</h2>
+      <div class="field">
+        <div class="label">Nome do app</div>
+        <div class="value">D'Griffe — Ótica de Luxo</div>
+      </div>
+      <button class="copy" onclick="copyText('title','D\'Griffe — Ótica de Luxo')">Copiar título</button>
+    </div>
+
+    <div class="card">
+      <h2>DESCRIÇÃO CURTA</h2>
+      <div class="field">
+        <div class="label">Até 80 caracteres</div>
+        <div class="value">Óculos originais, fidelidade com pontos, cupons e indicações. Peça online, retire na loja.</div>
+      </div>
+      <button class="copy" onclick="copyText('short_desc','Óculos originais, fidelidade com pontos, cupons e indicações. Peça online, retire na loja.')">Copiar descrição curta</button>
+    </div>
+
+    <div class="card">
+      <h2>DESCRIÇÃO COMPLETA</h2>
+      <div class="field">
+        <div class="label">Cole no campo de descrição longa</div>
+        <div class="value">
+Bem-vindo à D'Griffe, a ótica de luxo que une estilo, tecnologia e benefícios exclusivos.
+
+O que você encontra no app:
+- Catálogo completo de óculos de grau, sol e infantil, com filtros por estilo e marca.
+- Prova virtual: veja como os óculos ficam no seu rosto antes de comprar.
+- Programa de fidelidade: ganhe pontos em cada compra, complete missões e resgate descontos no checkout.
+- Cupons exclusivos: ative ofertas personalizadas diretamente pelo app.
+- Indicação premiada: compartilhe o app e ganhe pontos para ambos os lados.
+- Clube de fidelidade: acompanhe níveis, créditos e vantagens em tempo real.
+
+Perfil do cliente:
+- Cadastro simplificado por e-mail/telefone.
+- Histórico de pedidos, endereços salvos e preferências.
+
+Checkout:
+- PIX rápido e seguro.
+- Cartão de crédito com Mercado Pago.
+- Aplicação automática de pontos e cupons no valor final.
+
+Suporte:
+- Chat, notificações de pedido e exclusão de conta em Perfil.
+
+Privacidade:
+- Protegemos seus dados conforme a LGPD. Veja a Política de Privacidade completa no app.
+        </div>
+      </div>
+      <button class="copy" onclick="copyText('long_desc',`Bem-vindo à D'Griffe, a ótica de luxo que une estilo, tecnologia e benefícios exclusivos.\n\nO que você encontra no app:\n- Catálogo completo de óculos de grau, sol e infantil, com filtros por estilo e marca.\n- Prova virtual: veja como os óculos ficam no seu rosto antes de comprar.\n- Programa de fidelidade: ganhe pontos em cada compra, complete missões e resgate descontos no checkout.\n- Cupons exclusivos: ative ofertas personalizadas diretamente pelo app.\n- Indicação premiada: compartilhe o app e ganhe pontos para ambos os lados.\n- Clube de fidelidade: acompanhe níveis, créditos e vantagens em tempo real.\n\nPerfil do cliente:\n...`)">Copiar descrição completa</button>
+      <p class="note">Dica: no Play Console, clique dentro do campo e use Ctrl+V / Cmd+V.</p>
+    </div>
+
+    <div class="card">
+      <h2>CONTATO E PRIVACIDADE</h2>
+      <div class="field">
+        <div class="label">URL da política deprivacidade</div>
+        <div class="value">https://dgriffe-app.pages.dev/privacidade.html</div>
+      </div>
+      <div class="field">
+        <div class="label">E-mail de suporte</div>
+        <div class="value">webfinal.dgriffe@gmail.com</div>
+      </div>
+      <div class="field">
+        <div class="label">Site</div>
+        <div class="value">https://dgriffe-app.pages.dev</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>CLASSIFICAÇÃO E TARGETING</h2>
+      <div class="field">
+        <div class="label">Classificação</div>
+        <div class="value">Livre / Todos os públicos</div>
+      </div>
+      <div class="field">
+        <div class="label">Acessibilidade offline</div>
+        <div class="value">Sim</div>
+      </div>
+      <div class="field">
+        <div class="label">Categorias</div>
+        <div class="value">Shopping / Lifestyle</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>CHECKLIST</h2>
+      <div class="field">
+        <div class="value">
+- [ ] Colar título, descrição curta e longa<br/>
+- [ ] Confirmar política de privacidade acessível ao público<br/>
+- [ ] Subir screenshots (3 phone + 1 tablet)<br/>
+- [ ] Responder classificação de conteúdo<br/>
+- [ ] Selecionar targeting/países<br/>
+- [ ] Gerar AAB do TWA em <code>twa-project/app/build/outputs/bundle/release/app-release.aab</code><br/>
+- [ ] Fazer upload do AAB e revisar antes de publicar
+        </div>
+      </div>
+    </div>
+
+    <p class="note">Salve esta página como PDF ou deixe aberta em outra tela para copiar os trechos.</p>
+  </div>
+
+  <script>
+    function copyText(id, text) {
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Copiado: ' + id);
+      }).catch(() => {
+        prompt('Copie manualmente:', text);
+      });
+    }
+  </script>
+</body>
+</html>
