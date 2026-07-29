@@ -65,14 +65,6 @@ function AppInner() {
     }
   });
 
-  const toggleTheme = useCallback(() => {
-    setDark((prev) => {
-      const next = !prev;
-      try { window.localStorage.setItem("dgriffe:theme", next ? "dark" : "light"); } catch {}
-      return next;
-    });
-  }, []);
-
   const navigate = useCallback((page: string) => {
     setCurrentPage(page);
     setSelectedProduct(null);
@@ -241,7 +233,6 @@ function AppInner() {
         onBack={isProductPage ? handleBackFromProduct : undefined}
         title={isProductPage ? "" : undefined}
         dark={dark}
-        onToggleTheme={toggleTheme}
         onSearch={handleSearch}
         notifNaoLidas={notif.naoLidas}
         onNotifClick={() => notif.setAberto(true)}
