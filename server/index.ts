@@ -985,6 +985,17 @@ app.post("/api/admin/fidelidade/ajustar", requireAdmin, async (req, res) => {
   }
 });
 
+// GET regras de fidelidade (para admin panel)
+app.get("/api/admin/fidelidade/regras", requireAdmin, async (_req, res) => {
+  try {
+    const regras = await segredos.getRegrasFidelidade();
+    return res.json({ regras });
+  } catch (err) {
+    console.error("[admin] falha ao ler regras fidelidade:", err);
+    return res.status(500).json({ erro: "Falha ao ler regras." });
+  }
+});
+
 // Salva as regras do programa de fidelidade.
 app.post("/api/admin/fidelidade/regras", requireAdmin, async (req, res) => {
   const pontosPorReal = Number(req.body?.pontosPorReal);

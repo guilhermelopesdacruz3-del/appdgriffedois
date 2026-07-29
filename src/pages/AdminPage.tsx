@@ -21,6 +21,7 @@ import {
 } from "../services/admin";
 import { saveApiConfig } from "../services/apiConfig";
 import { BarChart, PieChart, KpiCard } from "../components/admin/AdminCharts";
+import { ApiConfigPanel } from "../components/admin/ApiConfigPanel";
 import CuponsAdmin from "./admin/CuponsAdmin";
 import FidelidadeAdmin from "./admin/FidelidadeAdmin";
 import NotificacoesAdmin from "./admin/NotificacoesAdmin";

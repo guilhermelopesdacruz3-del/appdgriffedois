@@ -25,10 +25,8 @@ export interface RegrasFidelidade {
 }
 
 export async function getRegrasFidelidadeAdmin(): Promise<RegrasFidelidade> {
-  // Reusa o endpoint público de fidelidade (só leitura de regras).
-  const email = "cliente@demo.com.br";
-  const d = await (await fetch(`${ADMIN_BASE_URL.replace("/api/admin", "")}/api/fidelidade?email=${encodeURIComponent(email)}`)).json();
-  return d.regras as RegrasFidelidade;
+  const { regras } = await adminRequest<{ regras: RegrasFidelidade }>("/fidelidade/regras", { method: "GET" });
+  return regras;
 }
 
 export async function ajustarPontosFidelidade(
