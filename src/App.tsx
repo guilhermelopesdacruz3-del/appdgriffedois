@@ -57,6 +57,21 @@ function AppInner() {
   const [showCartNotification, setShowCartNotification] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [dark, setDark] = useState<boolean>(() => {
+    try {
+      return window.localStorage.getItem("dgriffe:theme") === "dark";
+    } catch {
+      return false;
+    }
+  });
+
+  const toggleTheme = useCallback(() => {
+    setDark((prev) => {
+      const next = !prev;
+      try { window.localStorage.setItem("dgriffe:theme", next ? "dark" : "light"); } catch {}
+      return next;
+    });
+  }, []);
 
   const navigate = useCallback((page: string) => {
     setCurrentPage(page);
@@ -106,6 +121,7 @@ function AppInner() {
   const { produtos: products, loading: loadingProducts, error: productsError, reload: reloadProducts } = useProdutos({ limit: 120 });
 
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
+
 
   const handleSelectProduct = useCallback((product: Product) => {
     setSelectedProduct(product);
@@ -207,6 +223,15 @@ function AppInner() {
 
   const isProductPage = currentPage === "product";
 
+  useEffect(() => {
+    try {
+      const root = document.documentElement;
+      if (dark) { root.classList.add("dark"); } else { root.classList.remove("dark"); }
+      root.setAttribute("data-theme", dark ? "dark" : "light");
+      root.style.setProperty("--bg-page", dark ? "#050505" : "#F0F0F5");
+    } catch {}
+  }, [dark]);
+
   return (
     <div className="max-w-lg mx-auto min-h-screen bg-ice relative">
       {/* Header */}
@@ -215,7 +240,8 @@ function AppInner() {
         onCartClick={handleCartClick}
         onBack={isProductPage ? handleBackFromProduct : undefined}
         title={isProductPage ? "" : undefined}
-        dark={false}
+        dark={dark}
+        onToggleTheme={toggleTheme}
         onSearch={handleSearch}
         notifNaoLidas={notif.naoLidas}
         onNotifClick={() => notif.setAberto(true)}
