@@ -29,15 +29,29 @@ export default function LoyaltyPage({ fidelidade: info, historicoFidelidade: his
   const descontoMax = info?.desconto_max ?? 0;
   const [missoes, setMissoes] = useState<{id:string; descricao:string; pontos:number; feito:boolean}[]>([]);
   const [missoesLoading, setMissoesLoading] = useState(false);
+  const [missoesErro, setMissoesErro] = useState<string | null>(null);
+  const [missoesSucesso, setMissoesSucesso] = useState<string | null>(null);
 
   useEffect(() => {
     if (!email) return;
     let mounted = true;
     setMissoesLoading(true);
+    setMissoesErro(null);
     fetch(`/api/fidelidade/missao?email=${encodeURIComponent(email)}`)
-      .then((r) => r.json())
-      .then((j) => { if (mounted) setMissoes(j.missoes || []); })
-      .catch(() => {})
+      .then((r) => {
+        if (!mounted) return;
+        if (!r.ok) throw new Error(`Falha ao carregar missões (HTTP ${r.status}).`);
+        return r.json();
+      })
+      .then((j) => {
+        if (!mounted) return;
+        const lista = Array.isArray(j.missoes) ? j.missoes : [];
+        setMissoes(lista);
+        setMissoesErro(lista.length ? null : "Nenhuma missão disponível no momento.");
+      })
+      .catch((e) => {
+        if (mounted) setMissoesErro(e.message || "Não foi possível carregar missões.");
+      })
       .finally(() => { if (mounted) setMissoesLoading(false); });
     return () => { mounted = false; };
   }, [email]);
@@ -45,6 +59,8 @@ export default function LoyaltyPage({ fidelidade: info, historicoFidelidade: his
   const concluirMissao = async (tipo: string) => {
     if (!email) return;
     setMissoesLoading(true);
+    setMissoesErro(null);
+    setMissoesSucesso(null);
     try {
       const r = await fetch("/api/fidelidade/missao/concluir", {
         method: "POST",
@@ -52,12 +68,25 @@ export default function LoyaltyPage({ fidelidade: info, historicoFidelidade: his
         body: JSON.stringify({ email, tipo }),
       });
       const j = await r.json();
-      if (!r.ok || !j.ok) { alert(j.erro || "Não foi possível concluir."); return; }
-      // Atualiza o estado local: marca como feito.
+      if (!r.ok || !j.ok) {
+        const mensagem = j.erro || `Falha ao concluir missão (HTTP ${r.status}).`;
+        setMissoesErro(mensagem);
+        alert(mensagem);
+        return;
+      }
       setMissoes((prev: {id:string; descricao:string; pontos:number; feito:boolean}[]) => prev.map((m: {id:string; descricao:string; pontos:number; feito:boolean}) => (m.id === tipo ? { ...m, feito: true } : m)));
-      // Recarrega saldo e histórico (frontome também expõe info, então não mexemos aqui).
-    } catch { alert("Não foi possível concluir a missão."); }
-    setMissoesLoading(false);
+      if (j.jaConcedida) {
+        setMissoesSucesso("Missão já havia sido concluída anteriormente.");
+      } else if (j.pontosConcedidos > 0) {
+        setMissoesSucesso(`+${j.pontosConcedidos} pontos concedidos!`);
+      }
+    } catch (e: any) {
+      const mensagem = e.message || "Não foi possível concluir a missão.";
+      setMissoesErro(mensagem);
+      alert(mensagem);
+    } finally {
+      setMissoesLoading(false);
+    }
   };
 
   return (
@@ -208,6 +237,8 @@ export default function LoyaltyPage({ fidelidade: info, historicoFidelidade: his
         <div className="px-4 mt-5">
           <h3 className="text-sm font-bold text-luxury-black mb-2">Missões</h3>
           {missoesLoading && <p className="text-[11px] text-gray-400 text-center py-2">Carregando missões…</p>}
+        {missoesErro && !missoesLoading && <p className="text-[11px] text-red-600 text-center py-2 bg-red-50 border border-red-200 rounded-xl">{missoesErro}</p>}
+        {missoesSucesso && !missoesLoading && <p className="text-[11px] text-green-700 text-center py-2 bg-green-50 border border-green-200 rounded-xl">{missoesSucesso}</p>}
           <div className="space-y-2">
             {missoes.map((m) => (
               <div key={m.id} className={`flex items-center gap-3 p-3 rounded-xl ${m.feito ? "bg-green-50 border border-green-200" : "bg-white border border-ice-dark/40"}`}>
