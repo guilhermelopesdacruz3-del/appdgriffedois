@@ -28,6 +28,9 @@ export default function MeusCupons({ onLogin }: { onLogin?: () => void }) {
 
   useEffect(() => {
     carregar();
+    const handler = () => carregar();
+    window.addEventListener("cupons-atualizados", handler);
+    return () => window.removeEventListener("cupons-atualizados", handler);
   }, []);
 
   return (

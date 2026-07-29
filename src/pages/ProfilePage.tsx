@@ -214,6 +214,11 @@ function EnderecosPage({ voltar }: { voltar: () => void }) {
   const [erro, setErro] = useState<string | null>(null);
 
   useEffect(() => { carregarEnderecos(); }, [carregarEnderecos]);
+  useEffect(() => {
+    const handler = () => carregarEnderecos();
+    window.addEventListener("enderecos-atualizados", handler);
+    return () => window.removeEventListener("enderecos-atualizados", handler);
+  }, [carregarEnderecos]);
 
   const submit = async () => {
     setErro(null);
@@ -321,6 +326,17 @@ function PreferenciasPage({ voltar }: { voltar: () => void }) {
 export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNavigate?: (page: string) => void; fidelidade?: any }) {
   const { cliente, loading: loadingCliente, error: erroCliente, entrarComEmail, sair, atualizarCliente } = useCliente();
   const [email, setEmail] = useState("");
+  const { carregarPerfil, carregarPreferencias } = useCliente();
+  useEffect(() => {
+    const h1 = () => carregarPerfil();
+    window.addEventListener("cliente-atualizado", h1);
+    return () => window.removeEventListener("cliente-atualizado", h1);
+  }, [carregarPerfil]);
+  useEffect(() => {
+    const h2 = () => carregarPreferencias();
+    window.addEventListener("preferencias-atualizadas", h2);
+    return () => window.removeEventListener("preferencias-atualizadas", h2);
+  }, [carregarPreferencias]);
   const { pedidos, loading: loadingPedidos, error: erroPedidos } = usePedidos(cliente?.id ?? null);
   const [subTela, setSubTela] = useState<SubTela | null>(null);
   const [pedidoSelecionado, setPedidoSelecionado] = useState<string | number | null>(null);

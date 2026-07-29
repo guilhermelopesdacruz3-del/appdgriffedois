@@ -172,21 +172,25 @@ export function ClienteProvider({ children }: { children: ReactNode }) {
   const salvarPerfil = useCallback(async (nome?: string, telefone?: string) => {
     await clienteApi.putPerfil(nome, telefone);
     await carregarPerfil();
+    window.dispatchEvent(new Event("cliente-atualizado"));
   }, [carregarPerfil]);
 
   const salvarEndereco = useCallback(async (e: Omit<EnderecoCliente, "id" | "email">) => {
     await clienteApi.postEndereco(e);
     await carregarEnderecos();
+    window.dispatchEvent(new Event("enderecos-atualizados"));
   }, [carregarEnderecos]);
 
   const removerEndereco = useCallback(async (id: string) => {
     await clienteApi.deleteEndereco(id);
     await carregarEnderecos();
+    window.dispatchEvent(new Event("enderecos-atualizados"));
   }, [carregarEnderecos]);
 
   const salvarPreferencias = useCallback(async (prefs: Record<string, boolean>) => {
     await clienteApi.putPreferencias(prefs);
     setPreferencias(prefs);
+    window.dispatchEvent(new Event("preferencias-atualizadas"));
   }, []);
 
   // Ao logar/restaurar, carrega perfil/endereços/preferências se houver token.
