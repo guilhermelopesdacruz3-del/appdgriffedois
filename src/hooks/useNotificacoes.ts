@@ -23,9 +23,14 @@ export function useNotificacoes(email: string | null | undefined) {
 
   useEffect(() => {
     recarregar();
-    // Recarrega a cada 30s enquanto o app está aberto.
     const t = setInterval(recarregar, 30000);
     return () => clearInterval(t);
+  }, [recarregar]);
+
+  useEffect(() => {
+    const handler = () => recarregar();
+    window.addEventListener("notificacoes-atualizadas", handler);
+    return () => window.removeEventListener("notificacoes-atualizadas", handler);
   }, [recarregar]);
 
   const marcarLida = useCallback(
