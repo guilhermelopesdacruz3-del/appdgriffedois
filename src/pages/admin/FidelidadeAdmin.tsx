@@ -7,11 +7,6 @@ import {
   type RegrasFidelidade,
 } from "../../services/fidelidadeAdmin";
 
-function formatarData(iso?: string): string {
-  if (!iso) return "";
-  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
-}
-
 export default function FidelidadeAdmin() {
   const [clientes, setClientes] = useState<{ email: string; nome: string }[]>([]);
   const [email, setEmail] = useState("");
@@ -122,7 +117,7 @@ export default function FidelidadeAdmin() {
             <label className="block text-[9px] text-gray-400 mb-0.5 px-1">Pontos por R$</label>
             <input
               value={regras.pontosPorReal}
-              onChange={(e) => setRegras((r) => ({ ...r, pontosPorReal: e.target.value }))}
+              onChange={(e) => setRegras((r) => ({ ...r, pontosPorReal: Number(e.target.value) }))}
               type="number"
               step="0.1"
               className="w-full h-10 px-3 rounded-xl border border-gray-200 text-xs"
@@ -132,7 +127,7 @@ export default function FidelidadeAdmin() {
             <label className="block text-[9px] text-gray-400 mb-0.5 px-1">Pontos = R$ (desconto)</label>
             <input
               value={regras.pontosPorDesconto}
-              onChange={(e) => setRegras((r) => ({ ...r, pontosPorDesconto: e.target.value }))}
+              onChange={(e) => setRegras((r) => ({ ...r, pontosPorDesconto: Number(e.target.value) }))}
               type="number"
               className="w-full h-10 px-3 rounded-xl border border-gray-200 text-xs"
             />

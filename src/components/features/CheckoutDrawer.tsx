@@ -22,7 +22,7 @@ type Passo = "escolher" | "processando" | "pix" | "cartao" | "sucesso" | "erro";
 
 export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fidelidade: fid }: CheckoutDrawerProps & { fidelidade?: any }) {
   const { cliente } = useCliente();
-  const email = cliente?.email || "";
+  const [email, setEmail] = useState(cliente?.email || "");
   const [passo, setPasso] = useState<Passo>("escolher");
   const [erro, setErro] = useState<string | null>(null);
   const [pix, setPix] = useState<{ qr: string; copia: string } | null>(null);
@@ -71,13 +71,13 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
         setPix({ qr: resultado.pix_qr_base64 || "", copia: resultado.pix_copia_cola || "" });
         // No demo o PIX é simulado e já confirma; em produção o webhook confirma depois.
         if (resultado.demo) {
-          setPontosC(resultado.pontos_creditados || 0);
+          setPontosC(Number(resultado.pontos_creditados || 0));
           setPasso("sucesso");
         } else {
           setPasso("pix");
         }
       } else {
-        setPontosC(resultado.pontos_creditados || 0);
+        setPontosC(Number(resultado.pontos_creditados || 0));
         setPasso("sucesso");
       }
       onSuccess?.(resultado);
@@ -228,7 +228,7 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
                       email: email || undefined,
                       card_token: cardToken,
                     });
-                    setPontosC(resultado.pontos_creditados || 0);
+                    setPontosC(Number(resultado.pontos_creditados || 0));
                     setPasso("sucesso");
                     onSuccess?.(resultado);
                   } catch (e: any) {

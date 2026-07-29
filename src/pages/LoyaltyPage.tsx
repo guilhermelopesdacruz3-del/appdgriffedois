@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { useCliente } from "../hooks/useCliente";
 import { NIVEIS, BENEFICIO_BASE, TETO_BENEFICIOS_PERC } from "../data/fidelidade";
 
@@ -53,7 +54,7 @@ export default function LoyaltyPage({ fidelidade: info, historicoFidelidade: his
       const j = await r.json();
       if (!r.ok || !j.ok) { alert(j.erro || "Não foi possível concluir."); return; }
       // Atualiza o estado local: marca como feito.
-      setMissoes((prev) => prev.map((m) => (m.id === tipo ? { ...m, feito: true } : m)));
+      setMissoes((prev: {id:string; descricao:string; pontos:number; feito:boolean}[]) => prev.map((m: {id:string; descricao:string; pontos:number; feito:boolean}) => (m.id === tipo ? { ...m, feito: true } : m)));
       // Recarrega saldo e histórico (frontome também expõe info, então não mexemos aqui).
     } catch { alert("Não foi possível concluir a missão."); }
     setMissoesLoading(false);

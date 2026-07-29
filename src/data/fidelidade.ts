@@ -60,7 +60,7 @@ export const VALIDADE_CASHBACK_DIAS_ADICIONAIS = 180;
 export function msgCashbackDisponivel(valor: number): string {
   return `Você possui R$ ${valor.toFixed(2).replace(".", ",")} de cashback disponível.`;
 }
-export function msgPtsParaNivel(pontos: number, proxNome: string, ptsParaProx: number): string {
+export function msgPtsParaNivel(_pontos: number, proxNome: string, ptsParaProx: number): string {
   return `Faltam apenas ${ptsParaProx.toLocaleString("pt-BR")} pontos para atingir o nível ${proxNome}.`;
 }
 export function msgCashbackReducaoPrazo(): string {

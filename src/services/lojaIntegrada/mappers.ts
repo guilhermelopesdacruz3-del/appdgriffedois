@@ -218,7 +218,7 @@ export function mapClienteParaApp(cliente: LICliente): ClienteApp {
     cpf: cliente.cpf,
     telefone: cliente.telefone_celular || cliente.telefone_principal,
     dataCriacao: cliente.data_criacao,
-    rua: enderecoPrincipal?.logradouro,
+    rua: enderecoPrincipal?.endereco,
     numero: enderecoPrincipal?.numero,
     bairro: enderecoPrincipal?.bairro,
     cidade: enderecoPrincipal?.cidade,

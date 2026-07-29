@@ -25,7 +25,7 @@ export default function NotificacoesAdmin() {
     return clientes.filter((c) => {
       if (fEmail && !c.email.toLowerCase().includes(fEmail.toLowerCase())) return false;
       if (fNome && !c.nome.toLowerCase().includes(fNome.toLowerCase())) return false;
-      if (fPontosMin && Number(fPontosMin) > 0 && (c.pontos || 0) < Number(fPontosMin)) return false;
+      if (fPontosMin && Number(fPontosMin) > 0 && ((c as any).pontos ?? 0) < Number(fPontosMin)) return false;
       return true;
     });
   };
