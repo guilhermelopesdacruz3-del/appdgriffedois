@@ -37,18 +37,54 @@
       "purpose": "maskable"
     }
   ],
+  "screenshots": [
+    {
+      "src": "/screenshots/phone1.png",
+      "sizes": "1170x2532",
+      "type": "image/png",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/screenshots/phone2.png",
+      "sizes": "1170x2532",
+      "type": "image/png",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/screenshots/tablet1.png",
+      "sizes": "2048x2732",
+      "type": "image/png",
+      "form_factor": "wide"
+    }
+  ],
   "shortcuts": [
     {
       "name": "Catálogo",
-      "url": "/?rota=catalogo"
+      "url": "/",
+      "description": "Ver catálogo de óculos"
     },
     {
       "name": "Meus Cupons",
-      "url": "/?rota=cupons"
+      "url": "/?rota=cupons",
+      "description": "Ver meus cupons"
     },
     {
-      "name": "Clube de Fidelidade",
-      "url": "/?rota=clube"
+      "name": "Fidelidade",
+      "url": "/?rota=clube",
+      "description": "Programa de fidelidade"
+    },
+    {
+      "name": "Perfil",
+      "url": "/?rota=perfil",
+      "description": "Meu perfil"
+    }
+  ],
+  "prefer_related_applications": true,
+  "related_applications": [
+    {
+      "platform": "play",
+      "url": "https://play.google.com/store/apps/details?id=com.dgriffe.app",
+      "id": "com.dgriffe.app"
     }
   ]
 }

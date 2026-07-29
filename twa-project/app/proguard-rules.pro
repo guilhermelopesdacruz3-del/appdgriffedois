@@ -1,0 +1,2 @@
+-keep class androidx.browser.** { *; }
+-dontwarn androidx.browser.**
