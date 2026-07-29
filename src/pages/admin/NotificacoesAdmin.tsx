@@ -142,7 +142,7 @@ export default function NotificacoesAdmin() {
         <p className="text-[11px] font-bold text-gray-500">Destinatários (filtros)</p>
         <input value={fEmail} onChange={(e) => setFEmail(e.target.value)} placeholder="Filtrar por e-mail (parte)" className="w-full h-10 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold" />
         <input value={fNome} onChange={(e) => setFNome(e.target.value)} placeholder="Filtrar por nome" className="w-full h-10 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold" />
-        <input value={fPontosMin} onChange={(e) => setFPontosMin(e.target.value.replace(/\D/g, ""))} placeholder="Nível mínimo de fidelidade (pontos)" className="w-full h-10 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold" />
+        <input value={fPontosMin} onChange={(e) => setFPontosMin((e.target.value || "").replace(/\D+/g, "").slice(0, 20))} placeholder="Nível mínimo de fidelidade (pontos)" className="w-full h-10 px-3 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold" />
         <p className="text-[11px] text-gray-400">{preview.length} cliente(s) correspondem aos filtros.</p>
       </div>
 
