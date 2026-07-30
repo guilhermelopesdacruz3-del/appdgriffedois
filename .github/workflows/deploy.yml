@@ -56,7 +56,7 @@ jobs:
 
   # 2) Deploy do FRONT no Cloudflare Pages.
   deploy-front:
-    needs: [test, sync-supabase]
+    needs: test
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -74,7 +74,7 @@ jobs:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: appdgriffedois
-          directory: .
+          directory: dist
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
   # 3) Deploy do PROXY no Render.

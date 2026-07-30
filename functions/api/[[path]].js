@@ -1,9 +1,16 @@
 // Cloudflare Pages Function: proxy reverso de /api/* -> backend Render.
 export async function onRequest(context) {
-  const { request, params } = context;
-  const path = Array.isArray(params.path) ? params.path.join("/") : (params.path || "");
+  const { request } = context;
   const url = new URL(request.url);
-  const target = "https://appdgriffedois.onrender.com/api/" + path + url.search;
+  const pathname = url.pathname;
+
+  if (!pathname.startsWith("/api/")) {
+    return new Response("NOT API", { status: 404 });
+  }
+
+  const target = new URL("https://appdgriffedois.onrender.com");
+  target.pathname = pathname;
+  target.search = url.search;
 
   const headers = new Headers(request.headers);
   headers.delete("host");
@@ -15,13 +22,14 @@ export async function onRequest(context) {
     redirect: "follow",
     signal: AbortSignal.timeout(55000),
   };
+
   if (request.method !== "GET" && request.method !== "HEAD") {
     init.body = request.body;
     init.duplex = "half";
   }
 
   try {
-    const resp = await fetch(target, init);
+    const resp = await fetch(target.toString(), init);
     const out = new Headers(resp.headers);
     out.delete("content-encoding");
     out.delete("transfer-encoding");

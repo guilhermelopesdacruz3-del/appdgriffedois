@@ -64,12 +64,16 @@ export function hasAdminCookieSupport(): boolean {
   return COOKIE_SUPPORTED && !!getCookie("dg_admin_token");
 }
 
+const TOKEN_KEY = "dgriffe:cliente_token";
 export function getClienteToken(): string | null {
-  return getCookie("dgriffe:cliente_token");
+  try { return window.localStorage.getItem(TOKEN_KEY); } catch { return null; }
 }
 export function setClienteToken(token: string): void {
-  setCookie("dgriffe:cliente_token", token, 60 * 60 * 24 * 90);
+  try { window.localStorage.setItem(TOKEN_KEY, token); } catch { /* ignore */ }
 }
 export function clearClienteToken(): void {
-  deleteCookie("dgriffe:cliente_token");
+  try { window.localStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
+}
+export function hasClienteToken(): boolean {
+  return !!getClienteToken();
 }

@@ -2,15 +2,16 @@ import { useState, useEffect } from "react";
 import { Product } from "../data";
 import { getProductImage, formatPrice, formatInstallment } from "../utils";
 import ImageViewer from "../components/ui/ImageViewer";
+import CheckoutOtica from "../components/features/CheckoutOtica";
 
 interface ProductPageProps {
   product: Product;
   onBack: () => void;
-  onAddToCart: (product: Product) => void;
+  onIniciarCheckoutOtica: (product: Product) => void;
   onTryOn: (product: Product) => void;
 }
 
-export default function ProductPage({ product, onBack, onAddToCart, onTryOn }: ProductPageProps) {
+export default function ProductPage({ product, onBack, onIniciarCheckoutOtica, onTryOn }: ProductPageProps) {
   const [selectedColor, setSelectedColor] = useState(0);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [show3D, setShow3D] = useState(false);
@@ -20,6 +21,7 @@ export default function ProductPage({ product, onBack, onAddToCart, onTryOn }: P
   const [rotation, setRotation] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartX, setDragStartX] = useState(0);
+  const [checkoutAberto, setCheckoutAberto] = useState(false);
 
   const discount = product.originalPrice
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
@@ -92,9 +94,9 @@ export default function ProductPage({ product, onBack, onAddToCart, onTryOn }: P
         {/* Favorite button */}
         <button onClick={() => setIsFavorite(!isFavorite)} className="absolute top-4 right-4 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-sm hover:bg-white transition-colors z-10">
           {isFavorite ? (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="#D4A853" stroke="#D4A853" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" /></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="#D4A853" stroke="#D4A853" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06 1.06a5.5 5.5 0 000-7.78z" /></svg>
           ) : (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" /></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06 1.06a5.5 5.5 0 000-7.78z" /></svg>
           )}
         </button>
 
@@ -212,7 +214,7 @@ export default function ProductPage({ product, onBack, onAddToCart, onTryOn }: P
         <button onClick={() => setEnhanced(!enhanced)} className={`w-full h-10 rounded-xl border flex items-center justify-center gap-2 text-xs font-semibold transition-all mb-5 ${enhanced ? "border-gold bg-gold/10 text-gold" : "border-ice-dark text-gray-500 hover:border-gold/30 hover:text-gold"}`}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <circle cx="12" cy="12" r="3" />
-            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" />
+            <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 01-2 2 2 2 0 012 2h.09a1.65 1.65 0 001.51 1 1.65 1.65 0 001.82-.33l.06.06a2 2 0 012.83 0 2 2 0 010-2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 012 2h-.09a1.65 1.65 0 00-1.51 1z" />
           </svg>
           {enhanced ? "Foto HD Ativada" : "Melhorar Foto"}
         </button>
@@ -236,12 +238,20 @@ export default function ProductPage({ product, onBack, onAddToCart, onTryOn }: P
             ))}
           </div>
         </div>
+
+        {/* Checkout ótica */}
+        <button
+          onClick={() => setCheckoutAberto(true)}
+          className="w-full h-12 bg-luxury-black text-white font-bold rounded-xl hover:bg-luxury-dark active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-sm"
+        >
+          Montar meu pedido
+        </button>
       </div>
 
       {/* Fixed Bottom CTA */}
       <div className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-4 max-w-lg mx-auto">
         <div className="glass rounded-2xl p-3 shadow-lg">
-          <div className="flex items-center gap-3 mb-2">
+          <div className="flex items-center gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-baseline gap-2">
                 <span className="text-lg font-bold text-luxury-black">{formatPrice(product.price)}</span>
@@ -249,20 +259,17 @@ export default function ProductPage({ product, onBack, onAddToCart, onTryOn }: P
               </div>
               <p className="text-[9px] text-gray-400">{formatInstallment(product.installmentCount, product.installmentValue)} s/ juros</p>
             </div>
-            <button
-              onClick={() => onAddToCart(product)}
-              className="flex-1 h-12 bg-luxury-black text-white font-bold rounded-xl hover:bg-luxury-dark active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-sm"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z" />
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <path d="M16 10a4 4 0 01-8 0" />
-              </svg>
-              Comprar
-            </button>
           </div>
         </div>
       </div>
+
+      {/* Checkout detalhado da ótica */}
+      <CheckoutOtica
+        produto={product}
+        isOpen={checkoutAberto}
+        onClose={() => setCheckoutAberto(false)}
+        onFinalizar={() => onIniciarCheckoutOtica(product)}
+      />
 
       {/* Fullscreen Image Viewer */}
       <ImageViewer

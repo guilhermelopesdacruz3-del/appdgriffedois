@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { getApiConfigStatus, saveApiConfig, type ApiConfigStatus } from "../../services/apiConfig";
 
-export default function ApiConfigPanel({ onClose }: { onClose: () => void }) {
+export function ApiConfigPanel({ onClose }: { onClose: () => void }) {
   const [status, setStatus] = useState<ApiConfigStatus[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

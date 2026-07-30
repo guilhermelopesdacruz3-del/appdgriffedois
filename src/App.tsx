@@ -293,7 +293,7 @@ function AppInner() {
           <ProductPage
             product={selectedProduct}
             onBack={handleBackFromProduct}
-            onAddToCart={handleAddToCart}
+            onIniciarCheckoutOtica={handleAddToCart}
             onTryOn={handleTryOn}
           />
         )}
