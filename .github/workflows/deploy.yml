@@ -68,13 +68,21 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
+      - name: Prepare deployment package
+        run: |
+          DEPLOY_DIR=$RUNNER_TEMP/dgriffe-deploy
+          rm -rf "$DEPLOY_DIR"
+          mkdir -p "$DEPLOY_DIR"
+          cp -r dist/. "$DEPLOY_DIR/"
+          cp -r functions/. "$DEPLOY_DIR/functions/"
+          echo "DEPLOY_DIR=$DEPLOY_DIR" >> $GITHUB_ENV
       - name: Deploy to Cloudflare Pages
         uses: cloudflare/pages-action@v1
         with:
           apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           projectName: appdgriffedois
-          directory: dist
+          directory: ${{ env.DEPLOY_DIR }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
   # 3) Deploy do PROXY no Render.
