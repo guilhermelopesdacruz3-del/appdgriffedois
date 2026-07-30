@@ -110,7 +110,8 @@ receitasApp.delete("/:id", async (req: Request, res: Response) => {
   const email = String(req.query.email || "").trim().toLowerCase();
   if (!email) return res.status(400).json({ erro: "E-mail obrigatório." });
 
-  if (DEMO || MOCK) {
+  const isDemo = process.env.DEMO_MODE === "true" || process.env.DEMO_MODE === "1" || process.env.ADMIN_MOCK === "1" || process.env.ADMIN_MOCK === "true";
+  if (isDemo) {
     return res.json({ ok: true });
   }
 

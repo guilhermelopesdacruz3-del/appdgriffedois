@@ -1,6 +1,6 @@
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
-import type { NotificacaoPayload } from "../server/notificacaoQueue";
+import type { NotificacaoPayload } from "./notificacaoQueue";
 
 const redisUrl = process.env.REDIS_URL || process.env.UPSTASH_REDIS_REST_URL || "";
 if (!redisUrl) {

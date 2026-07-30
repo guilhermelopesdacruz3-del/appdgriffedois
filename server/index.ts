@@ -1215,7 +1215,7 @@ app.all("/api/loja-integrada/:resource/:id?", async (req, res) => {
     }
     try {
       const { status, payload } = await chamarLI("GET", "cliente", id, {});
-      const atual = JSON.parse(payload || "{}");
+      const atual = typeof payload === "string" ? JSON.parse(payload || "{}") : payload || {};
       const obj = Array.isArray(atual.objects) ? atual.objects[0] : atual;
       const donoEmail = (obj.email || (obj.cliente && obj.cliente.email) || "").toString().trim().toLowerCase();
       console.error(`[seguranca-put] id=${id} status=${status} dono=${donoEmail} body=${emailBody}`);
