@@ -9,8 +9,3 @@ src/pages/.hermes-tmp.*
 dist/
 .env
 server/.env
-
-.env
-server/.env
-supabase/final.sql
-supabase/completo.sql

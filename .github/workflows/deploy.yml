@@ -80,7 +80,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           echo "Tentando deploy via wrangler..."
-          npx wrangler pages deploy "$DEPLOY_DIR" --project-name=appdgriffedois --branch=main
+          npx @cloudflare/wrangler pages deploy "$DEPLOY_DIR" --project-name=appdgriffedois --branch=main
           echo "Exit code: $?"
 
   deploy-backend:
