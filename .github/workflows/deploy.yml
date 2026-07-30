@@ -65,20 +65,19 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run build
-      - name: Prepare deployment package
-        run: |
-          DEPLOY_DIR=$RUNNER_TEMP/dgriffe-deploy
-          rm -rf "$DEPLOY_DIR"
-          mkdir -p "$DEPLOY_DIR"
-          cp -r dist/. "$DEPLOY_DIR/"
-          echo "DEPLOY_DIR=$DEPLOY_DIR" >> $GITHUB_ENV
-      - name: Deploy to Cloudflare Pages
+      - name: Deploy to Cloudflare Pages via API
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          echo "=== deploy ==="
-          npx wrangler pages deploy "$DEPLOY_DIR" --project-name=appdgriffedois --branch=main
+          set -x
+          cd "$DEPLOY_DIR"
+          echo "=== Test upload ==="
+          hash=$(sha256sum index.html | cut -d' ' -f1)
+          curl -v -X POST "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/appdgriffedois/deployments" \
+            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
+            -F "manifest={\"index.html\":\"$hash\"}" \
+            -F "index.html=@index.html;type=text/html" 2>&1
 
   deploy-backend:
     needs: [test, sync-supabase]
