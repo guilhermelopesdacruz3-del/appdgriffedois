@@ -80,7 +80,21 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           set -x
-          npx wrangler pages deploy "$DEPLOY_DIR" --project-name=appdgriffedois --branch=main 2>&1
+          echo "=== node version ==="
+          node --version
+          echo "=== npm version ==="
+          npm --version
+          echo "=== wrangler location ==="
+          which wrangler 2>&1 || echo "no wrangler in PATH"
+          echo "=== wrangler version ==="
+          npx wrangler --version 2>&1 || echo "version check failed"
+          echo "=== direct wrangler ==="
+          ./node_modules/.bin/wrangler --version 2>&1 || echo "direct failed"
+          echo "=== npm exec ==="
+          npm exec -- wrangler --version 2>&1 || echo "npm exec failed"
+          echo "=== run deploy ==="
+          npx wrangler pages deploy "$DEPLOY_DIR" --project-name=appdgriffedois --branch=main
+          echo "=== exit: $? ==="
 
   deploy-backend:
     needs: [test, sync-supabase]
