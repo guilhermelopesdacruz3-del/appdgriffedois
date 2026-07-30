@@ -73,13 +73,13 @@ jobs:
           cp -r functions/. "$DEPLOY_DIR/functions/"
           echo "DEPLOY_DIR=$DEPLOY_DIR" >> $GITHUB_ENV
       - name: Deploy to Cloudflare Pages
-        uses: cloudflare/pages-action@v1
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          projectName: appdgriffedois
-          directory: ${{ env.DEPLOY_DIR }}
-          gitHubToken: ${{ secrets.GITHUB_TOKEN }}
+        env:
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          echo "Tentando deploy via wrangler..."
+          npx @cloudflare/wrangler pages deploy "$DEPLOY_DIR" --project-name=appdgriffedois --branch=main
+          echo "Exit code: $?"
 
   deploy-backend:
     needs: [test, sync-supabase]
