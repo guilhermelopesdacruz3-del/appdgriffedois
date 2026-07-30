@@ -79,20 +79,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          echo "Tentando deploy via wrangler..."
-          npx --yes wrangler@3 pages deploy "$DEPLOY_DIR" --project-name=appdgriffedois --branch=main 2>&1; echo "EXIT: $?"
-          echo "Exit code: $?"
-          fi
-          echo "Deployment ID: $DEPLOY_ID"
-          echo "=== Upload files ==="
-          for f in "$DEPLOY_DIR"/* "$DEPLOY_DIR"/**/*; do
-            [ -f "$f" ] || continue
-            REL_PATH="${f#$DEPLOY_DIR/}"
-            echo "Upload: $REL_PATH"
-            curl -sS -o /dev/null -w "%{http_code}" -X PUT \
-              "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/appdgriffedois/deployments/$DEPLOY_ID" \
-              -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" && echo ""
-          done
+          npx --yes wrangler pages deploy "$DEPLOY_DIR" --project-name=appdgriffedois --branch=main 2>&1
 
   deploy-backend:
     needs: [test, sync-supabase]
