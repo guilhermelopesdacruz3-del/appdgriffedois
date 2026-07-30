@@ -25,6 +25,7 @@ jobs:
   sync-supabase:
     needs: test
     runs-on: ubuntu-latest
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - name: Aplicar schema no Supabase

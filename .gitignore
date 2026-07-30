@@ -7,3 +7,10 @@ twa-project/app/dgriffe-release.keystore
 twa-project/local.properties
 src/pages/.hermes-tmp.*
 dist/
+.env
+server/.env
+
+.env
+server/.env
+supabase/final.sql
+supabase/completo.sql
