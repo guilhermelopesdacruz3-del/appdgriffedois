@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { formatPrice, isValidEmail } from "../../utils";
+import { formatPrice } from "../../utils";
 import { useCliente } from "../../hooks/useCliente";
 import { validarCupom, usarCupom } from "../../services/cupomApp";
 import { iniciarCheckout } from "../../services/apiConfig";

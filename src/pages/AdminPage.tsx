@@ -11,7 +11,6 @@ import {
   listarClientesAdmin,
   listarPedidosAdmin,
   listarSituacoes,
-  buscarClienteAdmin,
   pedidoParaCSV,
   relatorioAdmin,
   type AdminPedido,
@@ -19,23 +18,12 @@ import {
   type RelatorioAdmin,
   type SituacaoPedido,
 } from "../services/admin";
-import { saveApiConfig } from "../services/apiConfig";
 import { BarChart, PieChart, KpiCard } from "../components/admin/AdminCharts";
 import { ApiConfigPanel } from "../components/admin/ApiConfigPanel";
 import CuponsAdmin from "./admin/CuponsAdmin";
 import FidelidadeAdmin from "./admin/FidelidadeAdmin";
 import NotificacoesAdmin from "./admin/NotificacoesAdmin";
 import AdminDashboard from "./AdminDashboard";
-
-function downloadCSV(csv: string, filename: string) {
-  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = filename;
-  a.click();
-  URL.revokeObjectURL(url);
-}
 
 type Aba = "pedidos" | "dashboard" | "cupons" | "fidelidade" | "notificacoes" | "relatorios" | "logs";
 
@@ -48,7 +36,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
   const [aba, setAba] = useState<Aba>("pedidos");
   const [pedidos, setPedidos] = useState<AdminPedido[]>([]);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [carregandoPedidos, setCarregandoPedidos] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   const [busca, setBusca] = useState("");
@@ -56,28 +44,17 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
   const [filtroDataInicio, setFiltroDataInicio] = useState("");
   const [filtroDataFim, setFiltroDataFim] = useState("");
   const [situacoes, setSituacoes] = useState<SituacaoPedido[]>([]);
-  const [mostrarConfig, setMostrarConfig] = useState(false);
+  const [mostrarApi, setMostrarApi] = useState(false);
 
   const [selecionado, setSelecionado] = useState<number | string | null>(null);
   const [detalhe, setDetalhe] = useState<AdminPedido | null>(null);
   const [detalheLoading, setDetalheLoading] = useState(false);
   const [salvandoStatus, setSalvandoStatus] = useState(false);
-  const [statusSelecionado, setStatusSelecionado] = useState<string>("");
+  const [statusSelecionado, setStatusSelecionado] = useState("");
 
-  // Relatórios
   const [relatorio, setRelatorio] = useState<RelatorioAdmin | null>(null);
   const [clientes, setClientes] = useState<ClienteRelatorio[]>([]);
-  const [relLoading, setRelLoading] = useState(false);
 
-  // Cliente detalhe
-  const [clienteDetalhe, setClienteDetalhe] = useState<{
-    email: string;
-    dados: any | null;
-    loading: boolean;
-    erro: string | null;
-  } | null>(null);
-
-  // Logs (A8)
   const [logs, setLogs] = useState<any[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsFiltroEmail, setLogsFiltroEmail] = useState("");
@@ -85,18 +62,8 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
   const [logsDataInicio, setLogsDataInicio] = useState("");
   const [logsDataFim, setLogsDataFim] = useState("");
 
-  const abrirCliente = useCallback(async (email: string) => {
-    setClienteDetalhe({ email, dados: null, loading: true, erro: null });
-    try {
-      const d = await buscarClienteAdmin(email);
-      setClienteDetalhe({ email, dados: d, loading: false, erro: null });
-    } catch (e: any) {
-      setClienteDetalhe({ email, dados: null, loading: false, erro: e?.message || "Erro" });
-    }
-  }, []);
-
-  const carregar = useCallback(async () => {
-    setLoading(true);
+  const carregarPedidos = useCallback(async () => {
+    setCarregandoPedidos(true);
     setErro(null);
     try {
       const termo = busca.trim();
@@ -113,46 +80,44 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
     } catch (e) {
       setErro((e as Error).message);
     } finally {
-      setLoading(false);
+      setCarregandoPedidos(false);
     }
   }, [busca, filtroStatus, filtroDataInicio, filtroDataFim]);
 
-  const carregarSituacoes = useCallback(async () => {
-    try {
-      setSituacoes(await listarSituacoes());
-    } catch {
-      /* ignora */
-    }
-  }, []);
-
   const carregarRelatorio = useCallback(async () => {
-    setRelLoading(true);
     try {
       const [r, c] = await Promise.all([relatorioAdmin(), listarClientesAdmin()]);
       setRelatorio(r);
       setClientes(c.clientes);
     } catch (e) {
       setErro((e as Error).message);
-    } finally {
-      setRelLoading(false);
+    }
+  }, []);
+
+  const carregarSituacoes = useCallback(async () => {
+    try {
+      setSituacoes(await listarSituacoes());
+    } catch {
+      // silencioso
     }
   }, []);
 
   const carregarLogs = useCallback(async () => {
     setLogsLoading(true);
     try {
-      const q: Record<string, unknown> = { limit: 50 };
+      const q: Record<string, string> = { limit: "50" };
       if (logsFiltroEmail) q.admin_email = logsFiltroEmail;
       if (logsFiltroAcao) q.acao = logsFiltroAcao;
       if (logsDataInicio) q.inicio = logsDataInicio;
       if (logsDataFim) q.fim = logsDataFim;
 
-      const res = await fetch("/api/admin/logs?" + new URLSearchParams(q as any).toString(), {
-        headers: { Authorization: `Bearer ${getAdminToken()}` },
+      const autorizacao = `Bearer ${getAdminToken()}`;
+      const res = await fetch("/api/admin/logs?" + new URLSearchParams(q).toString(), {
+        headers: { Authorization: autorizacao },
       });
-      const json = await res.json();
-      if (!res.ok) throw new Error((json as any)?.erro || "Falha ao carregar logs");
-      setLogs((json as any).logs || []);
+      const json = (await res.json().catch(() => ({}))) as any;
+      if (!res.ok) throw new Error(json?.erro || `Falha ao carregar logs (${res.status})`);
+      setLogs(json.logs || []);
     } catch (e) {
       setErro((e as Error).message);
     } finally {
@@ -163,20 +128,25 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
   const exportarLogsCSV = () => {
     const linhas = [
       ["id", "admin_email", "acao", "detalhe", "ip", "created_at"].join(";"),
-      ...(logs as any[]).map((l) =>
+      ...logs.map((l: any) =>
         [l.id, l.admin_email, l.acao, JSON.stringify(l.detalhe || {}), l.ip || "", l.created_at || ""].join(";")
       ),
     ];
-    downloadCSV(linhas.join("\n"), "logs-admin.csv");
+    const blob = new Blob(["\uFEFF" + linhas.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "logs-admin.csv";
+    a.click();
+    URL.revokeObjectURL(url);
   };
 
   useEffect(() => {
-    if (token) {
-      carregar();
-      carregarSituacoes();
-      carregarRelatorio();
-    }
-  }, [token, carregar, carregarSituacoes, carregarRelatorio, aba]);
+    if (!token) return;
+    carregarPedidos();
+    carregarSituacoes();
+    carregarRelatorio();
+  }, [token, carregarPedidos, carregarSituacoes, carregarRelatorio]);
 
   const fazerLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,11 +163,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
   };
 
   const sair = async () => {
-    try {
-      await adminLogout();
-    } catch {
-      /* ignora falha de rede no logout */
-    }
+    try { await adminLogout(); } catch { /* ignorar */ }
     clearAdminToken();
     setToken(null);
     setPedidos([]);
@@ -205,6 +171,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
     setDetalhe(null);
     setRelatorio(null);
     setClientes([]);
+    setLogs([]);
   };
 
   const abrirDetalhe = async (id: number | string) => {
@@ -220,18 +187,14 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
         status: p.situacao?.nome || "—",
         status_id: p.situacao?.id,
         status_uri: p.situacao?.resource_uri,
-        data: new Date(p.data_criacao).toLocaleDateString("pt-BR", {
-          day: "2-digit",
-          month: "short",
-          year: "numeric",
-        }),
+        data: new Date(p.data_criacao).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }),
         total: Number(p.valor_total) || 0,
         items: (p.itens || []).reduce((s, i) => s + (i.quantidade || 0), 0),
-        verificado: Boolean((p as { verificado?: boolean }).verificado),
-        verificado_em: (p as { verificado_em?: string | null }).verificado_em || null,
+        verificado: Boolean((p as any).verificado),
+        verificado_em: (p as any).verificado_em || null,
       };
       setDetalhe(mapeado);
-      setStatusSelecionado(String(p.situacao?.id ?? ""));
+      setStatusSelecionado(String((p.situacao?.id ?? "") as any));
     } catch (e) {
       setErro((e as Error).message);
     } finally {
@@ -245,7 +208,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
     try {
       const sit = situacoes.find((s) => String(s.id) === statusSelecionado);
       await atualizarStatusPedido(detalhe.id, sit?.resource_uri || sit?.id || statusSelecionado);
-      await carregar();
+      await carregarPedidos();
       setDetalhe({ ...detalhe, status: sit?.nome || detalhe.status, status_id: sit?.id, status_uri: sit?.resource_uri });
     } catch (e) {
       setErro((e as Error).message);
@@ -281,9 +244,6 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
     return true;
   });
 
-  const exportarCSV = () => downloadCSV(pedidoParaCSV(pedidosFiltrados), "pedidos-dgriffe.csv");
-
-  // -------------------- Tela de login --------------------
   if (!token) {
     return (
       <div className="min-h-screen bg-luxury-black flex items-center justify-center px-6">
@@ -304,26 +264,16 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
               placeholder="Senha de administrador"
               className="w-full h-12 px-4 rounded-2xl border border-white/20 bg-black/40 text-white text-sm placeholder:text-white/40 focus:outline-none focus:border-gold"
             />
-            <button
-              type="submit"
-              disabled={loginLoading}
-              className="w-full h-12 bg-white text-black text-xs font-bold rounded-2xl disabled:opacity-50 active:scale-[0.98] transition-all"
-            >
+            <button type="submit" disabled={loginLoading} className="w-full h-12 bg-white text-black text-xs font-bold rounded-2xl disabled:opacity-50 active:scale-[0.98] transition-all">
               {loginLoading ? "Entrando..." : "Entrar"}
             </button>
           </form>
-
           {loginErro && <p className="text-[11px] text-amber-300 mt-3 text-center">{loginErro}</p>}
-          <button onClick={onExit} className="w-full text-[10px] font-bold text-white/60 hover:text-white mt-4">
-            ← Voltar à loja
-          </button>
+          <button onClick={onExit} className="w-full text-[10px] font-bold text-white/60 hover:text-white mt-4">← Voltar à loja</button>
         </div>
       </div>
     );
   }
-
-  // -------------------- Painel --------------------
-  const coresStatus = ["#D4A853", "#6366F1", "#10B981", "#F59E0B", "#3B82F6", "#EF4444", "#8B5CF6", "#EC4899"];
 
   return (
     <div className="min-h-screen bg-luxury-black text-white">
@@ -337,12 +287,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-white bg-white/10 border border-white/20 rounded-full pl-2 pr-3 py-1">
-              <span>👤</span>
-              <span>Admin</span>
-              <span className="text-[8px] opacity-60">▾</span>
-            </div>
-            <button onClick={() => setMostrarConfig((v) => !v)} className="text-[11px] font-bold text-amber-200 hover:text-amber-100 flex items-center gap-1 border border-gold/20 bg-white/5 rounded-full px-3 py-1" title="APIs">
+            <button onClick={() => setMostrarApi((v) => !v)} className="text-[11px] font-bold text-amber-200 hover:text-amber-100 flex items-center gap-1 border border-gold/20 bg-white/5 rounded-full px-3 py-1" title="APIs">
               <span>⚙️</span><span className="hidden sm:inline">APIs</span>
             </button>
             <button onClick={sair} className="text-[11px] font-bold text-gray-300 hover:text-white flex items-center gap-1 border border-white/20 bg-white/5 rounded-full px-3 py-1" title="Sair">
@@ -353,92 +298,50 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
 
         <div className="flex gap-1 px-4 pt-3">
           {(["pedidos", "dashboard", "cupons", "fidelidade", "notificacoes", "relatorios", "logs"] as Aba[]).map((a) => (
-            <button
-              key={a}
-              onClick={() => setAba(a)}
-              className={`flex-1 h-9 rounded-xl text-[11px] font-bold transition-all border ${
-                aba === a ? "bg-white text-black border-white" : "bg-white/5 text-gray-300 border-white/10 hover:border-white/20"
-              }`}
-            >
+            <button key={a} onClick={() => setAba(a)} className={`flex-1 h-9 rounded-xl text-[11px] font-bold transition-all border ${aba === a ? "bg-white text-black border-white" : "bg-white/5 text-gray-300 border-white/10 hover:border-white/20"}`}>
               {a === "pedidos" ? "Pedidos" : a === "dashboard" ? "Dashboard" : a === "cupons" ? "Cupons" : a === "fidelidade" ? "Fidelidade" : a === "notificacoes" ? "Notificações" : a === "relatorios" ? "Relatórios" : "Logs"}
             </button>
           ))}
         </div>
 
         <div className="p-4 space-y-3">
-          {mostrarConfig && <ApiConfigPanel onClose={() => setMostrarConfig(false)} />}
+          {mostrarApi && <ApiConfigPanel onClose={() => setMostrarApi(false)} />}
 
           {aba === "dashboard" && <AdminDashboard token={token as string} />}
 
           {aba === "pedidos" && (
             <>
-              {/* Filtros em card */}
               <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
                 <div className="flex gap-2">
                   <div className="flex-1 relative">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40">🔍</span>
-                    <input
-                      value={busca}
-                      onChange={(e) => setBusca(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && carregar()}
-                      placeholder="Buscar por nº, nome ou e-mail..."
-                      className="w-full h-10 pl-9 pr-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold"
-                    />
+                    <input value={busca} onChange={(e) => setBusca(e.target.value)} onKeyDown={(e) => e.key === "Enter" && carregarPedidos()} placeholder="Buscar por nº, nome ou e-mail..." className="w-full h-10 pl-9 pr-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold" />
                   </div>
-                  <select
-                    value={filtroStatus}
-                    onChange={(e) => setFiltroStatus(e.target.value)}
-                    className="h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs focus:outline-none focus:border-gold"
-                  >
+                  <select value={filtroStatus} onChange={(e) => setFiltroStatus(e.target.value)} className="h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs focus:outline-none focus:border-gold">
                     <option value="todos">Todos os status</option>
-                    {situacoes.map((s) => (
-                      <option key={s.id} value={s.nome}>{s.nome}</option>
-                    ))}
+                    {situacoes.map((s) => (<option key={s.id} value={s.nome}>{s.nome}</option>))}
                   </select>
                 </div>
                 <div className="flex gap-2 items-center flex-wrap">
-                  <input
-                    type="date"
-                    value={filtroDataInicio}
-                    onChange={(e) => setFiltroDataInicio(e.target.value)}
-                    className="h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs"
-                  />
+                  <input type="date" value={filtroDataInicio} onChange={(e) => setFiltroDataInicio(e.target.value)} className="h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs" />
                   <span className="text-[10px] text-white/50">até</span>
-                  <input
-                    type="date"
-                    value={filtroDataFim}
-                    onChange={(e) => setFiltroDataFim(e.target.value)}
-                    className="h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs"
-                  />
-                  <button
-                    onClick={exportarCSV}
-                    className="ml-auto h-10 px-3 border border-gold/40 text-gold-dark text-[11px] font-bold rounded-xl active:scale-95 whitespace-nowrap bg-white/5"
-                  >
-                    📥 Exportar CSV
-                  </button>
+                  <input type="date" value={filtroDataFim} onChange={(e) => setFiltroDataFim(e.target.value)} className="h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs" />
+                  <button onClick={() => { const blob = new Blob([pedidoParaCSV(pedidosFiltrados)], { type: "text/csv;charset=utf-8;" }); const url = URL.createObjectURL(blob); const a = document.createElement("a"); a.href = url; a.download = "pedidos-dgriffe.csv"; a.click(); URL.revokeObjectURL(url); }} className="ml-auto h-10 px-3 border border-gold/40 text-gold-dark text-[11px] font-bold rounded-xl active:scale-95 whitespace-nowrap bg-white/5">📥 Exportar CSV</button>
                 </div>
               </div>
 
               {erro && (
                 <div className="bg-amber-500/10 border border-amber-400/20 text-amber-200 rounded-2xl p-3 flex items-center justify-between gap-2">
                   <p className="text-[11px] flex-1">{erro}</p>
-                  <button onClick={() => { setErro(null); carregar(); }} className="text-[10px] font-bold text-amber-100 border border-amber-300/30 rounded-lg px-2 py-1 active:scale-95 whitespace-nowrap">
-                    Tentar de novo
-                  </button>
+                  <button onClick={() => { setErro(null); void carregarPedidos(); }} className="text-[10px] font-bold text-amber-100 border border-amber-300/30 rounded-lg px-2 py-1 active:scale-95 whitespace-nowrap">Tentar de novo</button>
                 </div>
               )}
 
-              {loading && (
-                <div className="flex justify-center py-10">
-                  <div className="w-7 h-7 border-2 border-gold border-t-transparent rounded-full animate-spin" />
-                </div>
-              )}
+              {carregandoPedidos && (<div className="flex justify-center py-10"><div className="w-7 h-7 border-2 border-gold border-t-transparent rounded-full animate-spin" /></div>)}
 
-              {!loading && pedidosFiltrados.length === 0 && (
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 py-10 text-center text-xs text-white/50">Nenhum pedido encontrado.</div>
-              )}
+              {!carregandoPedidos && pedidosFiltrados.length === 0 && (<div className="bg-white/5 border border-white/10 rounded-2xl p-6 py-10 text-center text-xs text-white/50">Nenhum pedido encontrado.</div>)}
 
-              {!loading && pedidosFiltrados.length > 0 && (
+              {!carregandoPedidos && pedidosFiltrados.length > 0 && (
                 <div className="bg-white/5 border border-white/10 rounded-2xl shadow-sm overflow-hidden">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left">
@@ -456,9 +359,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                       <tbody>
                         {pedidosFiltrados.map((p) => (
                           <tr key={p.id} className="border-b border-white/5 last:border-0 hover:bg-white/[0.03] transition-colors">
-                            <td className="p-3">
-                              <input type="checkbox" className="accent-white" />
-                            </td>
+                            <td className="p-3"><input type="checkbox" className="accent-white" /></td>
                             <td className="p-3">
                               <span className="text-xs font-bold text-white">#{p.numero}</span>
                               {p.verificado && <span className="ml-1 text-[9px] text-emerald-400 font-bold">• Verificado</span>}
@@ -469,34 +370,16 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                             </td>
                             <td className="p-3 text-[11px] text-white/70 whitespace-nowrap">{p.data}</td>
                             <td className="p-3">
-                              <span className={`inline-block px-2 py-0.5 text-[9px] font-bold rounded-full border ${
-                                p.status === "Entregue" ? "bg-emerald-400/10 text-emerald-300 border-emerald-400/20" :
-                                p.status === "Em produção" ? "bg-indigo-400/10 text-indigo-300 border-indigo-400/20" :
-                                "bg-white/5 text-gray-300 border-white/10"
-                              }`}>{p.status}</span>
+                              <span className={`inline-block px-2 py-0.5 text-[9px] font-bold rounded-full border ${p.status === "Entregue" ? "bg-emerald-400/10 text-emerald-300 border-emerald-400/20" : p.status === "Em produção" ? "bg-indigo-400/10 text-indigo-300 border-indigo-400/20" : "bg-white/5 text-gray-300 border-white/10"}`}>{p.status}</span>
                             </td>
                             <td className="p-3 text-right text-xs font-bold text-white whitespace-nowrap">{formatPrice(p.total)}</td>
                             <td className="p-3 text-right">
-                              <button
-                                onClick={() => abrirDetalhe(p.id)}
-                                className="w-8 h-8 rounded-xl bg-white/10 text-white text-[10px] font-bold active:scale-95 inline-flex items-center justify-center border border-white/10"
-                                title="Ver"
-                              >
-                                👁️
-                              </button>
+                              <button onClick={() => abrirDetalhe(p.id)} className="w-8 h-8 rounded-xl bg-white/10 text-white text-[10px] font-bold active:scale-95 inline-flex items-center justify-center border border-white/10" title="Ver">👁️</button>
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                  </div>
-                  <div className="flex items-center justify-between px-4 py-3 border-t border-white/10">
-                    <div className="flex items-center gap-2 text-[10px] text-white/40">
-                      <button className="w-7 h-7 rounded-lg border border-white/10 flex items-center justify-center disabled:opacity-40" disabled>◀</button>
-                      <span>Página 1 de 1</span>
-                      <button className="w-7 h-7 rounded-lg border border-white/10 flex items-center justify-center disabled:opacity-40" disabled>▶</button>
-                    </div>
-                    <span className="text-[10px] text-white/40">Exibindo {pedidosFiltrados.length} de {total} pedidos</span>
                   </div>
                 </div>
               )}
@@ -513,15 +396,13 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
               </div>
               <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
                 <p className="text-xs font-bold text-white mb-2">Faturamento por dia</p>
-                <BarChart data={(relatorio?.serieDiaria || []).slice(-10)} color="#D4A853" />
+                <BarChart data={(relatorio?.serieDiaria || []).slice(-10).map((d) => ({ label: d.dia, value: d.total }))} color="#D4A853" />
               </div>
             </div>
           )}
 
           {aba === "cupons" && <CuponsAdmin />}
-
           {aba === "fidelidade" && <FidelidadeAdmin />}
-
           {aba === "notificacoes" && <NotificacoesAdmin />}
 
           {aba === "relatorios" && (
@@ -529,10 +410,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
               <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
                 <p className="text-xs font-bold text-white mb-2">Origem (app vs site)</p>
                 <div className="h-40">
-                  <PieChart data={[
-                    { label: "Site", value: relatorio?.porCanal.site || 0, color: "#6366F1" },
-                    { label: "App", value: relatorio?.porCanal.app || 0, color: "#D4A853" },
-                  ]} size={140} />
+                  <PieChart data={[{ label: "Site", value: relatorio?.porCanal.site || 0, color: "#6366F1" }, { label: "App", value: relatorio?.porCanal.app || 0, color: "#D4A853" }]} size={140} />
                 </div>
               </div>
               <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
@@ -569,58 +447,28 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
               <div className="bg-white/5 border border-white/10 rounded-2xl p-3 space-y-2">
                 <div className="flex gap-2 items-center flex-wrap">
                   <div className="flex-1 min-w-[180px]">
-                    <input
-                      value={logsFiltroEmail}
-                      onChange={(e) => setLogsFiltroEmail(e.target.value)}
-                      placeholder="E-mail do admin"
-                      className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold"
-                    />
+                    <input value={logsFiltroEmail} onChange={(e) => setLogsFiltroEmail(e.target.value)} placeholder="E-mail do admin" className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold" />
                   </div>
                   <div className="flex-1 min-w-[180px]">
-                    <input
-                      value={logsFiltroAcao}
-                      onChange={(e) => setLogsFiltroAcao(e.target.value)}
-                      placeholder="Ação"
-                      className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold"
-                    />
+                    <input value={logsFiltroAcao} onChange={(e) => setLogsFiltroAcao(e.target.value)} placeholder="Ação" className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold" />
                   </div>
                   <div>
-                    <input
-                      type="date"
-                      value={logsDataInicio}
-                      onChange={(e) => setLogsDataInicio(e.target.value)}
-                      className="h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs"
-                    />
+                    <input type="date" value={logsDataInicio} onChange={(e) => setLogsDataInicio(e.target.value)} className="h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs" />
                   </div>
                   <div>
-                    <input
-                      type="date"
-                      value={logsDataFim}
-                      onChange={(e) => setLogsDataFim(e.target.value)}
-                      className="h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs"
-                    />
+                    <input type="date" value={logsDataFim} onChange={(e) => setLogsDataFim(e.target.value)} className="h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs" />
                   </div>
-                  <button onClick={carregarLogs} className="h-10 px-3 bg-white text-black text-[11px] font-bold rounded-xl active:scale-95 whitespace-nowrap">
-                    Filtrar
-                  </button>
-                  <button onClick={exportarLogsCSV} className="h-10 px-3 border border-gold/40 text-gold-dark text-[11px] font-bold rounded-xl active:scale-95 whitespace-nowrap bg-white/5">
-                    Exportar CSV
-                  </button>
+                  <button onClick={carregarLogs} className="h-10 px-3 bg-white text-black text-[11px] font-bold rounded-xl active:scale-95 whitespace-nowrap">Filtrar</button>
+                  <button onClick={exportarLogsCSV} className="h-10 px-3 border border-gold/40 text-gold-dark text-[11px] font-bold rounded-xl active:scale-95 whitespace-nowrap bg-white/5">Exportar CSV</button>
                 </div>
               </div>
 
-              {logsLoading && (
-                <div className="flex justify-center py-10">
-                  <div className="w-7 h-7 border-2 border-gold border-t-transparent rounded-full animate-spin" />
-                </div>
-              )}
+              {logsLoading && (<div className="flex justify-center py-10"><div className="w-7 h-7 border-2 border-gold border-t-transparent rounded-full animate-spin" /></div>)}
 
-              {!logsLoading && logs.length === 0 && (
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-6 text-center text-xs text-white/50">Nenhum log encontrado.</div>
-              )}
+              {!logsLoading && logs.length === 0 && (<div className="bg-white/5 border border-white/10 rounded-2xl p-6 text-center text-xs text-white/50">Nenhum log encontrado.</div>)}
 
               <div className="space-y-2">
-                {logs.map((l) => (
+                {logs.map((l: any) => (
                   <div key={l.id} className="bg-white/5 border border-white/10 rounded-2xl p-3 space-y-1">
                     <div className="flex items-center justify-between">
                       <p className="text-[11px] font-bold text-white">{l.acao}</p>
@@ -638,20 +486,13 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
 
       {selecionado !== null && (
         <div className="fixed inset-0 z-40 bg-black/60 flex items-end justify-center" onClick={() => setSelecionado(null)}>
-          <div
-            className="w-full max-w-lg bg-[#0b0b0b] border border-white/10 rounded-t-3xl max-h-[90vh] overflow-y-auto"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <div className="w-full max-w-lg bg-[#0b0b0b] border border-white/10 rounded-t-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="sticky top-0 bg-[#0b0b0b]/90 px-5 py-3 flex items-center justify-between border-b border-white/10 backdrop-blur">
               <h3 className="text-sm font-bold text-white">Pedido #{detalhe?.numero ?? selecionado}</h3>
               <button onClick={() => setSelecionado(null)} className="text-gray-400 text-xl leading-none">×</button>
             </div>
 
-            {detalheLoading && (
-              <div className="flex justify-center py-10">
-                <div className="w-7 h-7 border-2 border-gold border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
+            {detalheLoading && (<div className="flex justify-center py-10"><div className="w-7 h-7 border-2 border-gold border-t-transparent rounded-full animate-spin" /></div>)}
 
             {detalhe && (
               <div className="p-5 space-y-4">
@@ -660,158 +501,29 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                     <p className="text-lg font-bold text-white">{formatPrice(detalhe.total)}</p>
                     <p className="text-[10px] text-white/50">{detalhe.data} · {detalhe.items} itens · {detalhe.status}</p>
                   </div>
-                  <button
-                    onClick={alternarVerificado}
-                    className={`px-3 py-2 rounded-xl text-[11px] font-bold active:scale-95 border ${
-                      detalhe.verificado ? "bg-emerald-400/10 text-emerald-300 border-emerald-400/20" : "bg-white/5 text-gray-300 border-white/10"
-                    }`}
-                  >
+                  <button onClick={alternarVerificado} className={`px-3 py-2 rounded-xl text-[11px] font-bold active:scale-95 border ${detalhe.verificado ? "bg-emerald-400/10 text-emerald-300 border-emerald-400/20" : "bg-white/5 text-gray-300 border-white/10"}`}>
                     {detalhe.verificado ? "✓ Verificado" : "Marcar verificado"}
                   </button>
                 </div>
 
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-                  <p className="text-xs font-bold text-white mb-2">Mudar status</p>
-                  <div className="flex gap-2">
-                    <select
-                      value={statusSelecionado}
-                      onChange={(e) => setStatusSelecionado(e.target.value)}
-                      className="flex-1 h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs focus:outline-none focus:border-gold"
-                    >
-                      <option value="">Selecione...</option>
-                      {situacoes.map((s) => (
-                        <option key={s.id} value={String(s.id)}>{s.nome}</option>
-                      ))}
-                    </select>
-                    <button
-                      onClick={salvarStatus}
-                      disabled={salvandoStatus || !statusSelecionado}
-                      className="h-10 px-4 bg-white text-black text-[11px] font-bold rounded-xl disabled:opacity-50 active:scale-95"
-                    >
-                      {salvandoStatus ? "Salvando..." : "Salvar"}
-                    </button>
-                  </div>
-                </div>
-
-                <DetalhePedido id={detalhe.id} />
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Modal detalhe do cliente (A5) */}
-      {clienteDetalhe && (
-        <div className="fixed inset-0 z-40 bg-black/60 flex items-end justify-center" onClick={() => setClienteDetalhe(null)}>
-          <div className="w-full max-w-lg bg-[#0b0b0b] border border-white/10 rounded-t-3xl max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <div className="sticky top-0 bg-[#0b0b0b]/90 px-5 py-3 flex items-center justify-between border-b border-white/10 backdrop-blur">
-              <h3 className="text-sm font-bold text-white">Cliente: {clienteDetalhe.email}</h3>
-              <button onClick={() => setClienteDetalhe(null)} className="text-gray-400 text-xl leading-none">×</button>
-            </div>
-
-            {clienteDetalhe.loading && (
-              <div className="flex justify-center py-10">
-                <div className="w-7 h-7 border-2 border-gold border-t-transparent rounded-full animate-spin" />
-              </div>
-            )}
-
-            {!clienteDetalhe.loading && clienteDetalhe.dados && (
-              <div className="p-5 space-y-4">
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2">
-                  <p className="text-xs font-bold text-white">Satus</p>
-                  <p className="text-[11px] text-white/70">{clienteDetalhe.dados.cliente?.status || "—"}</p>
-                  <p className="text-xs font-bold text-white">Pedidos</p>
-                  <p className="text-[11px] text-white/70">{(clienteDetalhe.dados.pedidos || []).length}</p>
-                </div>
-
-                <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2">
-                  <p className="text-xs font-bold text-white">Fidelidade</p>
-                  <p className="text-[11px] text-white/70">Pontos: {clienteDetalhe.dados.fidelidade?.pontos ?? "—"}</p>
-                  <pre className="text-[10px] text-white/60 whitespace-pre-wrap break-words">{JSON.stringify(clienteDetalhe.dados.fidelidade?.historico || [], null, 2)}</pre>
+                  <p className="text-[11px] text-white/70">Cliente</p>
+                  <p className="text-sm font-semibold text-white">{detalhe.cliente_nome}</p>
+                  <p className="text-xs text-white/60">{detalhe.cliente_email}</p>
                 </div>
 
                 <div className="space-y-2">
-                  {(clienteDetalhe.dados.pedidos || []).map((p: any) => (
-                    <div key={p.id || p.numero} className="bg-white/5 border border-white/10 rounded-2xl p-3 flex items-center justify-between text-[11px]">
-                      <div>
-                        <p className="font-semibold text-white">#{p.numero}</p>
-                        <p className="text-white/50">{p.status}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-bold text-white">{formatPrice(Number(p.valor_total || p.total || 0))}</p>
-                        <p className="text-white/40">{new Date(p.data_criacao || p.data).toLocaleDateString("pt-BR")}</p>
-                      </div>
-                    </div>
-                  ))}
+                  <p className="text-[11px] text-white/70">Atualizar status</p>
+                  <select value={statusSelecionado} onChange={(e) => setStatusSelecionado(e.target.value)} className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs">
+                    {situacoes.map((s) => <option key={s.id} value={String(s.id)}>{s.nome}</option>)}
+                  </select>
+                  <button onClick={salvarStatus} disabled={salvandoStatus} className="w-full h-12 bg-white text-black text-xs font-bold rounded-2xl disabled:opacity-50 active:scale-[0.98]">
+                    {salvandoStatus ? "Salvando..." : "Salvar status"}
+                  </button>
                 </div>
               </div>
             )}
-
-            {clienteDetalhe.erro && (
-              <div className="p-5 text-xs text-red-300">{clienteDetalhe.erro}</div>
-            )}
           </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/** @todo mover para componentes/admin quando estabilizar */
-function DetalhePedido({ id }: { id: number | string }) {
-  const [raw, setRaw] = useState<any | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        const r = await fetch(`/api/admin/pedidos/${encodeURIComponent(String(id))}`);
-        const j = await r.json();
-        setRaw(j);
-      } catch {
-        setRaw(null);
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [id]);
-
-  if (loading) return <div className="text-[11px] text-white/50">Carregando detalhe...</div>;
-  if (!raw) return <div className="text-[11px] text-red-300">Falha ao carregar detalhe.</div>;
-
-  const itens = raw.itens || raw.items || [];
-  const endereco = raw.endereco_entrega || raw.endereco || null;
-
-  return (
-    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3">
-      <div>
-        <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Itens</p>
-        <div className="space-y-1">
-          {itens.map((it: any, i: number) => (
-            <div key={i} className="flex items-center justify-between text-[11px]">
-              <span className="text-white">{it.nome || it.produto || `Item ${i + 1}`}</span>
-              <span className="text-white/60">x{it.quantidade || it.quantity || 1}</span>
-            </div>
-          ))}
-          {itens.length === 0 && <p className="text-[11px] text-white/50">Sem itens.</p>}
-        </div>
-      </div>
-
-      {endereco && (
-        <div>
-          <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Endereço</p>
-          <p className="text-[11px] text-white/70">
-            {endereco.logradouro || endereco.endereco || ""} {endereco.numero || ""} {endereco.complemento || ""}
-            <br />
-            {endereco.bairro || ""} {endereco.cidade || ""} {endereco.estado || ""} {endereco.cep || ""}
-          </p>
-        </div>
-      )}
-
-      {raw.note && (
-        <div>
-          <p className="text-[10px] text-white/40 uppercase tracking-wider mb-1">Nota</p>
-          <p className="text-[11px] text-white/70">{raw.note}</p>
         </div>
       )}
     </div>

@@ -7,11 +7,10 @@ import CheckoutOtica from "../components/features/CheckoutOtica";
 interface ProductPageProps {
   product: Product;
   onBack: () => void;
-  onIniciarCheckoutOtica: (product: Product) => void;
   onTryOn: (product: Product) => void;
 }
 
-export default function ProductPage({ product, onBack, onIniciarCheckoutOtica, onTryOn }: ProductPageProps) {
+export default function ProductPage({ product, onBack, onTryOn }: ProductPageProps) {
   const [selectedColor, setSelectedColor] = useState(0);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [show3D, setShow3D] = useState(false);
@@ -268,7 +267,6 @@ export default function ProductPage({ product, onBack, onIniciarCheckoutOtica, o
         produto={product}
         isOpen={checkoutAberto}
         onClose={() => setCheckoutAberto(false)}
-        onFinalizar={() => onIniciarCheckoutOtica(product)}
       />
 
       {/* Fullscreen Image Viewer */}

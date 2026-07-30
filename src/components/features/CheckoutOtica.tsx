@@ -2,40 +2,25 @@ import { useState, useEffect, useCallback } from "react";
 import { useCliente } from "../../hooks/useCliente";
 import type { Product } from "../../data";
 import { formatPrice } from "../../utils";
-import { validarCupom, usarCupom } from "../../services/cupomApp";
-import { getClienteToken } from "../../utils/cookies";
-
-type TipoUso = "sol" | "grau_longe" | "grau_perto" | "multifocal" | "bifocal" | "ocupacional";
 
 interface Props {
   produto: Product;
   isOpen: boolean;
   onClose: () => void;
-  onFinalizar: (product: Product) => void;
 }
 
-export default function CheckoutOtica({ produto, isOpen, onClose, onFinalizar }: Props) {
+export default function CheckoutOtica({ produto, isOpen, onClose }: Props) {
   const { cliente } = useCliente();
   const [passo, setPasso] = useState<"uso" | "receita" | "lentes" | "resumo" | "processando" | "sucesso" | "erro">("uso");
-  const [tipoUso, setTipoUso] = useState<TipoUso>("sol");
+  const [tipoUso, setTipoUso] = useState<"sol" | "grau_longe" | "grau_perto" | "multifocal" | "bifocal" | "ocupacional">("sol");
   const [temGrauLonge, setTemGrauLonge] = useState(false);
   const [temGrauPerto, setTemGrauPerto] = useState(false);
   const [temAdicao, setTemAdicao] = useState(false);
-  const [grauLongeOD, setGrauLongeOD] = useState("");
-  const [grauLongeOE, setGrauLongeOE] = useState("");
-  const [grauPertoOD, setGrauPertoOD] = useState("");
-  const [grauPertoOE, setGrauPertoOE] = useState("");
-  const [adicao, setAdicao] = useState("");
   const [lente, setLente] = useState("");
-  const [material, setMaterial] = useState("normal");
   const [erro, setErro] = useState<string | null>(null);
   const [pontosC, setPontosC] = useState(0);
-  const [cupomCodigo, setCupomCodigo] = useState("");
-  const [cupomAplicado, setCupomAplicado] = useState<{ codigo: string; tipo: string; valor: number; id: string } | null>(null);
-  const [cupomErro, setCupomErro] = useState<string | null>(null);
   const [pix, setPix] = useState<{ qr: string; copia: string } | null>(null);
 
-  const isComGrau = tipoUso !== "sol";
   const precisaReceita = temGrauLonge || temGrauPerto || temAdicao;
 
   const lentesDisponiveis = (): string[] => {
@@ -56,8 +41,7 @@ export default function CheckoutOtica({ produto, isOpen, onClose, onFinalizar }:
   };
 
   const subtotal = produto.price + valorLente();
-  const descontoCupom = cupomAplicado ? (cupomAplicado.tipo === "percentual" ? subtotal * (cupomAplicado.valor / 100) : Number(cupomAplicado.valor)) : 0;
-  const totalFinal = Math.max(0, subtotal - descontoCupom);
+  const totalFinal = subtotal;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -67,47 +51,24 @@ export default function CheckoutOtica({ produto, isOpen, onClose, onFinalizar }:
     setTemGrauPerto(false);
     setTemAdicao(false);
     setLente("");
-    setCupomAplicado(null);
-    setCupomErro(null);
     setErro(null);
     setPix(null);
   }, [isOpen]);
 
-  const aplicarCupom = useCallback(async () => {
-    setCupomErro(null);
-    if (!cupomCodigo.trim()) return;
-    const res = await validarCupom(cupomCodigo.trim());
-    if (!res.valido || !res.cupom) return setCupomErro(res.erro || "Cupom inválido.");
-    if (res.cupom.valor_minimo != null && subtotal < res.cupom.valor_minimo) return setCupomErro(`Mínimo ${formatPrice(Number(res.cupom.valor_minimo))}.`);
-    setCupomAplicado({ codigo: res.cupom.codigo, tipo: res.cupom.tipo, valor: Number(res.cupom.valor), id: res.cupom.id });
-    if (res.atribuicao_id) await usarCupom(res.cupom.id, 0).catch(() => {});
-  }, [cupomCodigo, subtotal]);
-
-  const finalizar = useCallback(async () => {
+  const confirmarPedido = useCallback(async () => {
     setErro(null);
-    const token = getClienteToken();
     const email = cliente?.email || "";
     if (!email) return setErro("Faça login para finalizar o pedido.");
 
     setPasso("processando");
     try {
-      const body = {
-        items: [{ price: totalFinal, qty: 1, sku: String(produto.id), li_uri: produto.li_uri || "" }],
-        meio: "pix",
-        email,
-        ...(cupomAplicado ? { cupom: cupomAplicado } : {}),
-      };
-
       const res = await fetch("/api/checkout", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify(body),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, meio: "pix" }),
       });
 
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as any;
       if (!res.ok) throw new Error(data?.erro || `Falha (${res.status})`);
 
       setPix({ qr: data.pix_qr_base64 || "", copia: data.pix_copia_cola || "" });
@@ -118,25 +79,47 @@ export default function CheckoutOtica({ produto, isOpen, onClose, onFinalizar }:
       setErro(e?.message || "Falha ao finalizar.");
       setPasso("erro");
     }
-  }, [cliente?.email, cupomAplicado, produto, totalFinal]);
+  }, [cliente?.email]);
+
+  const proximo = () => {
+    switch (passo) {
+      case "uso":
+        setPasso("receita");
+        break;
+      case "receita":
+        setPasso("lentes");
+        break;
+      case "lentes":
+        setPasso("resumo");
+        break;
+      default:
+        break;
+    }
+  };
 
   const voltar = () => {
-    if (passo === "resumo") setPasso("lentes");
-    else if (passo === "lentes") setPasso(precisaReceita ? "receita" : "uso");
-    else if (passo === "receita") setPasso("uso");
-    else onClose();
+    switch (passo) {
+      case "receita":
+        setPasso("uso");
+        break;
+      case "lentes":
+        setPasso("receita");
+        break;
+      case "resumo":
+        setPasso("lentes");
+        break;
+      default:
+        onClose();
+    }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[90] bg-black/70 animate-fade-in" onClick={onClose}>
-      <div className="absolute inset-x-0 bottom-0 max-h-[92vh] overflow-y-auto no-scrollbar bg-white rounded-t-[2rem] shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 bg-gray-300 rounded-full" />
-        </div>
+    <div className="fixed inset-0 z-[90] bg-black/70" onClick={onClose}>
+      <div className="absolute inset-x-0 bottom-0 max-h-[92vh] overflow-y-auto bg-white rounded-t-[2rem] shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="px-5 pb-10">
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-6 pt-4">
             <h3 className="text-base font-bold text-luxury-black">Montar pedido</h3>
             <button onClick={onClose} className="w-8 h-8 bg-ice rounded-full flex items-center justify-center text-gray-400">×</button>
           </div>
@@ -151,11 +134,12 @@ export default function CheckoutOtica({ produto, isOpen, onClose, onFinalizar }:
                   { k: "grau_perto", t: "Grau / perto" },
                   { k: "multifocal", t: "Multifocal" },
                 ].map((op) => (
-                  <button key={op.k} onClick={() => { setTipoUso(op.k as TipoUso); setPasso("receita"); }} className={`h-14 rounded-2xl border text-xs font-semibold transition-all ${tipoUso === op.k ? "border-gold bg-gold/10 text-gold" : "border-ice-dark text-gray-600 hover:border-gold/30"}`}>
+                  <button key={op.k} onClick={() => setTipoUso(op.k as typeof tipoUso)} className={`h-14 rounded-2xl border text-xs font-semibold transition-all ${tipoUso === op.k ? "border-gold bg-gold/10 text-gold" : "border-ice-dark text-gray-600"}`}>
                     {op.t}
                   </button>
                 ))}
               </div>
+              <button onClick={proximo} className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl">Continuar</button>
             </div>
           )}
 
@@ -163,8 +147,8 @@ export default function CheckoutOtica({ produto, isOpen, onClose, onFinalizar }:
             <div className="space-y-3">
               <p className="text-xs font-semibold text-luxury-black mb-1">Você tem receita?</p>
               <div className="flex gap-2">
-                <button onClick={() => { setPrecisaReceitaTrue(); setPasso("lentes"); }} className="flex-1 h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl">Sim, tenho receita</button>
-                <button onClick={() => { setTemGrauLonge(false); setTemGrauPerto(false); setTemAdicao(false); setPasso("lentes"); }} className="flex-1 h-12 border border-ice-dark text-xs font-bold rounded-2xl">Ainda não tenho</button>
+                <button onClick={() => { setTemGrauLonge(true); setTemGrauPerto(false); setTemAdicao(false); proximo(); }} className="flex-1 h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl">Sim, tenho receita</button>
+                <button onClick={() => { setTemGrauLonge(false); setTemGrauPerto(false); setTemAdicao(false); proximo(); }} className="flex-1 h-12 border border-ice-dark text-xs font-bold rounded-2xl">Ainda não tenho</button>
               </div>
             </div>
           )}
@@ -174,7 +158,7 @@ export default function CheckoutOtica({ produto, isOpen, onClose, onFinalizar }:
               <p className="text-xs font-semibold text-luxury-black mb-1">Escolha a lente</p>
               <div className="grid grid-cols-1 gap-2">
                 {lentesDisponiveis().map((op) => (
-                  <button key={op} onClick={() => { setLente(op); setPasso("resumo"); }} className={`h-12 rounded-2xl border text-left px-4 text-[11px] font-semibold transition-all ${lente === op ? "border-gold bg-gold/10 text-gold" : "border-ice-dark text-gray-700"}`}>
+                  <button key={op} onClick={() => { setLente(op); proximo(); }} className={`h-12 rounded-2xl border text-left px-4 text-[11px] font-semibold transition-all ${lente === op ? "border-gold bg-gold/10 text-gold" : "border-ice-dark text-gray-700"}`}>
                     {op}
                   </button>
                 ))}
@@ -190,13 +174,13 @@ export default function CheckoutOtica({ produto, isOpen, onClose, onFinalizar }:
               </div>
               <div className="bg-ice rounded-2xl p-3">
                 <p className="text-[10px] text-gray-500">Lente</p>
-                <p className="text-xs font-bold text-luxury-black">{isComGrau ? lente : "Sem grau — solar simples"}</p>
+                <p className="text-xs font-bold text-luxury-black">{precisaReceita ? lente : "Sem grau — solar simples"}</p>
               </div>
               <div className="bg-ice rounded-2xl p-3">
                 <p className="text-[10px] text-gray-500">Total</p>
                 <p className="text-sm font-bold text-luxury-black">{formatPrice(totalFinal)}</p>
               </div>
-              <button onClick={finalizar} className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl">Confirmar pedido</button>
+              <button onClick={confirmarPedido} className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl">Confirmar pedido</button>
             </div>
           )}
 
@@ -245,10 +229,4 @@ export default function CheckoutOtica({ produto, isOpen, onClose, onFinalizar }:
       </div>
     </div>
   );
-}
-
-function setPrecisaReceitaTrue() {
-  setTemGrauLonge(true);
-  setTemGrauPerto(false);
-  setTemAdicao(false);
 }

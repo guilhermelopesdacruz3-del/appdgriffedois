@@ -22,7 +22,6 @@ import { useNotificacoes } from "./hooks/useNotificacoes";
 import { ProductGridSkeleton } from "./components/features/ProductSkeleton";
 import { useFavorites, useRecentlyViewed } from "./hooks/useUserLists";
 
-
 interface CartItem {
   product: Product;
   colorIndex: number;
@@ -73,12 +72,6 @@ function AppInner() {
     });
   }, []);
 
-  const navigate = useCallback((page: string) => {
-    setCurrentPage(page);
-    setSelectedProduct(null);
-    try { history.pushState({ page }, ""); } catch { /* ignore */ }
-  }, []);
-
   useEffect(() => {
     const onPop = () => {
       setCheckoutOpen(false);
@@ -95,10 +88,7 @@ function AppInner() {
   const { isFavorite, toggleFavorite } = useFavorites();
   const { recentIds, registerView } = useRecentlyViewed();
 
-  // Rota de administrador (/admin) — acessada via URL com hash (#/admin).
-  const [showAdmin, setShowAdmin] = useState(
-    () => typeof window !== "undefined" && window.location.hash === "#/admin"
-  );
+  const [showAdmin, setShowAdmin] = useState(() => typeof window !== "undefined" && window.location.hash === "#/admin");
   useEffect(() => {
     const onHash = () => setShowAdmin(window.location.hash === "#/admin");
     window.addEventListener("hashchange", onHash);
@@ -106,22 +96,11 @@ function AppInner() {
   }, []);
 
   if (showAdmin) {
-    return (
-      <AdminPage
-        onExit={() => {
-          window.location.hash = "";
-        }}
-      />
-    );
+    return <AdminPage onExit={() => { window.location.hash = ""; }} />;
   }
 
-  // Produtos vindos em tempo real da Loja Integrada (veja src/services/lojaIntegrada).
-  // limit alto cobre o catálogo inteiro da ótica; as imagens usam loading="lazy"
-  // (ProductCard) então só as visíveis carregam — sem peso no 1º render.
   const { produtos: products, loading: loadingProducts, error: productsError, reload: reloadProducts } = useProdutos({ limit: 120 });
-
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
-
 
   const handleSelectProduct = useCallback((product: Product) => {
     setSelectedProduct(product);
@@ -132,9 +111,7 @@ function AppInner() {
 
   const handleSearch = useCallback((query: string) => {
     setSearchQuery(query);
-    if (query.trim()) {
-      setCurrentPage((prev) => (prev === "product" ? prev : "catalog"));
-    }
+    if (query.trim()) setCurrentPage((prev) => (prev === "product" ? prev : "catalog"));
   }, []);
 
   const handleAddToCart = useCallback((product: Product) => {
@@ -142,50 +119,26 @@ function AppInner() {
     setDrawerOpen(true);
   }, []);
 
-  const handleConfirmAddToCart = useCallback(
-    (product: Product, colorIndex: number, quantity: number) => {
-      setCartItems((prev) => {
-        const existing = prev.findIndex(
-          (item) => item.product.id === product.id && item.colorIndex === colorIndex
-        );
-        if (existing >= 0) {
-          const updated = [...prev];
-          updated[existing] = {
-            ...updated[existing],
-            quantity: updated[existing].quantity + quantity,
-          };
-          return updated;
-        }
-        return [...prev, { product, colorIndex, quantity }];
-      });
-      setShowCartNotification(true);
-      setTimeout(() => setShowCartNotification(false), 2000);
-    },
-    []
-  );
+  const handleConfirmAddToCart = useCallback((product: Product, colorIndex: number, quantity: number) => {
+    setCartItems((prev) => {
+      const existing = prev.findIndex((item) => item.product.id === product.id && item.colorIndex === colorIndex);
+      if (existing >= 0) {
+        const updated = [...prev];
+        updated[existing] = { ...updated[existing], quantity: updated[existing].quantity + quantity };
+        return updated;
+      }
+      return [...prev, { product, colorIndex, quantity }];
+    });
+    setShowCartNotification(true);
+    setTimeout(() => setShowCartNotification(false), 2000);
+  }, []);
 
-  const handleUpdateCartQuantity = useCallback(
-    (productId: number, colorIndex: number, delta: number) => {
-      setCartItems((prev) => {
-        return prev
-          .map((item) => {
-            if (item.product.id === productId && item.colorIndex === colorIndex) {
-              const newQty = item.quantity + delta;
-              if (newQty <= 0) return null;
-              return { ...item, quantity: newQty };
-            }
-            return item;
-          })
-          .filter(Boolean) as CartItem[];
-      });
-    },
-    []
-  );
+  const handleUpdateCartQuantity = useCallback((productId: number, colorIndex: number, delta: number) => {
+    setCartItems((prev) => prev.map((item) => item.product.id === productId && item.colorIndex === colorIndex ? { ...item, quantity: Math.max(0, item.quantity + delta) } : item).filter((item) => item.quantity > 0));
+  }, []);
 
   const handleRemoveCartItem = useCallback((productId: number, colorIndex: number) => {
-    setCartItems((prev) =>
-      prev.filter((item) => !(item.product.id === productId && item.colorIndex === colorIndex))
-    );
+    setCartItems((prev) => prev.filter((item) => !(item.product.id === productId && item.colorIndex === colorIndex)));
   }, []);
 
   const handleNavigate = useCallback((page: string) => {
@@ -198,27 +151,12 @@ function AppInner() {
     setCurrentPage(previousPage);
   }, [previousPage]);
 
-  const handleCartClick = useCallback(() => {
-    setCartDrawerOpen(true);
-  }, []);
+  const handleCartClick = useCallback(() => setCartDrawerOpen(true), []);
+  const handleTryOn = useCallback((product: Product) => { setTryOnProduct(product); setTryOnOpen(true); }, []);
+  const handleCloseTryOn = useCallback(() => { setTryOnOpen(false); setTimeout(() => setTryOnProduct(null), 300); }, []);
 
-  const handleTryOn = useCallback((product: Product) => {
-    setTryOnProduct(product);
-    setTryOnOpen(true);
-  }, []);
-
-  const handleCloseTryOn = useCallback(() => {
-    setTryOnOpen(false);
-    setTimeout(() => setTryOnProduct(null), 300);
-  }, []);
-
-  // Persiste o carrinho no localStorage (sobrevive a recarregamentos).
   useEffect(() => {
-    try {
-      window.localStorage.setItem("dgriffe:carrinho", JSON.stringify(cartItems));
-    } catch {
-      /* ignora quota/privado */
-    }
+    try { window.localStorage.setItem("dgriffe:carrinho", JSON.stringify(cartItems)); } catch {}
   }, [cartItems]);
 
   const isProductPage = currentPage === "product";
@@ -234,7 +172,6 @@ function AppInner() {
 
   return (
     <div className="max-w-lg mx-auto min-h-screen bg-ice relative">
-      {/* Header */}
       <Header
         cartCount={cartCount}
         onCartClick={handleCartClick}
@@ -247,55 +184,25 @@ function AppInner() {
         onNotifClick={() => notif.setAberto(true)}
       />
 
-      {/* Page Content */}
       <main className="pt-14 pb-16">
         {productsError && (
           <div className="mx-4 mt-3 bg-red-50 border border-red-100 rounded-2xl p-4 text-center">
             <p className="text-xs font-semibold text-red-600">Não foi possível carregar os produtos da loja.</p>
             <p className="text-[10px] text-red-400 mt-1">{productsError}</p>
-            <button
-              onClick={reloadProducts}
-              className="mt-3 text-[10px] font-bold text-red-600 underline"
-            >
-              Tentar novamente
-            </button>
+            <button onClick={reloadProducts} className="mt-3 text-[10px] font-bold text-red-600 underline">Tentar novamente</button>
           </div>
         )}
         {loadingProducts && products.length === 0 && !productsError && (currentPage === "home" || currentPage === "catalog") && (
-          <div className="pt-4">
-            <ProductGridSkeleton count={6} />
-          </div>
+          <div className="pt-4"><ProductGridSkeleton count={6} /></div>
         )}
         {currentPage === "home" && !(loadingProducts && products.length === 0) && (
-          <HomePage
-            products={products}
-            onSelectProduct={handleSelectProduct}
-            onAddToCart={handleAddToCart}
-            onNavigate={handleNavigate}
-            onTryOn={handleTryOn}
-            recentIds={recentIds}
-            isFavorite={isFavorite}
-            onToggleFavorite={toggleFavorite}
-          />
+          <HomePage products={products} onSelectProduct={handleSelectProduct} onAddToCart={handleAddToCart} onNavigate={handleNavigate} onTryOn={handleTryOn} recentIds={recentIds} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} />
         )}
         {currentPage === "catalog" && !(loadingProducts && products.length === 0) && (
-          <CatalogPage
-            products={products}
-            onSelectProduct={handleSelectProduct}
-            onAddToCart={handleAddToCart}
-            onTryOn={handleTryOn}
-            searchQuery={searchQuery}
-            isFavorite={isFavorite}
-            onToggleFavorite={toggleFavorite}
-          />
+          <CatalogPage products={products} onSelectProduct={handleSelectProduct} onAddToCart={handleAddToCart} onTryOn={handleTryOn} searchQuery={searchQuery} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} />
         )}
         {currentPage === "product" && selectedProduct && (
-          <ProductPage
-            product={selectedProduct}
-            onBack={handleBackFromProduct}
-            onIniciarCheckoutOtica={handleAddToCart}
-            onTryOn={handleTryOn}
-          />
+          <ProductPage product={selectedProduct} onBack={handleBackFromProduct} onTryOn={handleTryOn} />
         )}
         {currentPage === "loyalty" && <LoyaltyPage fidelidade={fid.info} historicoFidelidade={fid.historico} fidelidadeLoading={fid.loading} />}
         {currentPage === "profile" && (
@@ -306,54 +213,18 @@ function AppInner() {
         {currentPage === "cadastro" && <ClienteCadastro onVoltar={() => setCurrentPage("profile")} />}
       </main>
 
-      {/* Bottom Navigation */}
-      {!isProductPage && (
-        <BottomNav activePage={currentPage} onNavigate={handleNavigate} dark={dark} />
-      )}
+      {!isProductPage && <BottomNav activePage={currentPage} onNavigate={handleNavigate} dark={dark} />}
 
-      {/* Scroll to Top */}
       <ScrollToTop />
 
-      {/* Purchase Drawer */}
-      <PurchaseDrawer
-        product={drawerProduct}
-        isOpen={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        onConfirm={handleConfirmAddToCart}
-      />
+      <PurchaseDrawer product={drawerProduct} isOpen={drawerOpen} onClose={() => setDrawerOpen(false)} onConfirm={handleConfirmAddToCart} />
 
-      {/* Cart Drawer */}
-      <CartDrawer
-        items={cartItems}
-        isOpen={cartDrawerOpen}
-        onClose={() => setCartDrawerOpen(false)}
-        onUpdateQuantity={handleUpdateCartQuantity}
-        onRemove={handleRemoveCartItem}
-        onCheckout={() => {
-          setCartDrawerOpen(false);
-          setCheckoutOpen(true);
-        }}
-      />
+      <CartDrawer items={cartItems} isOpen={cartDrawerOpen} onClose={() => setCartDrawerOpen(false)} onUpdateQuantity={handleUpdateCartQuantity} onRemove={handleRemoveCartItem} onCheckout={() => { setCartDrawerOpen(false); setCheckoutOpen(true); }} />
 
-      {/* Checkout (PIX / cartão dentro do app) */}
-      <CheckoutDrawer
-        items={cartItems}
-        isOpen={checkoutOpen}
-        onClose={() => setCheckoutOpen(false)}
-        fidelidade={fid.info}
-      />
+      <CheckoutDrawer items={cartItems} isOpen={checkoutOpen} onClose={() => setCheckoutOpen(false)} fidelidade={fid.info} />
 
-      {/* Virtual Try-On */}
-      {tryOnProduct && (
-        <VirtualTryOn
-          isOpen={tryOnOpen}
-          onClose={handleCloseTryOn}
-          product={tryOnProduct}
-          onAddToCart={handleAddToCart}
-        />
-      )}
+      {tryOnProduct && <VirtualTryOn isOpen={tryOnOpen} onClose={handleCloseTryOn} product={tryOnProduct} onAddToCart={handleAddToCart} />}
 
-      {/* Painel de Notificações */}
       {notif.aberto && (
         <div className="fixed top-16 right-4 left-4 z-[80] max-w-lg mx-auto animate-slide-down">
           <div className="bg-white rounded-2xl shadow-xl border border-gray-100 max-h-[70vh] overflow-y-auto">
@@ -361,60 +232,37 @@ function AppInner() {
               <p className="text-sm font-bold text-luxury-black">Notificações</p>
               <button onClick={() => notif.setAberto(false)} className="text-gray-400 text-xs">Fechar</button>
             </div>
-            {notif.notificacoes.length === 0 ? (
-              <p className="text-xs text-gray-400 text-center py-8">Nenhuma notificação ainda.</p>
-            ) : (
-              notif.notificacoes.map((n) => (
-                <button
-                  key={n.id}
-                  onClick={() => notif.marcarLida(n.id)}
-                  className="w-full text-left px-4 py-3 border-b border-gray-50 flex gap-3 active:bg-ice"
-                >
-                  <div className="flex-1">
-                    <p className="text-xs font-bold text-luxury-black">{n.titulo}</p>
-                    <p className="text-[11px] text-gray-500 mt-0.5">{n.corpo}</p>
-                    <p className="text-[9px] text-gray-300 mt-1 uppercase">{n.tipo}</p>
-                  </div>
-                  {!n.lida && <span className="w-2 h-2 rounded-full bg-gold mt-1 flex-shrink-0" />}
-                </button>
-              ))
-            )}
+            {notif.notificacoes.length === 0 ? <p className="text-xs text-gray-400 text-center py-8">Nenhuma notificação ainda.</p> : notif.notificacoes.map((n) => (
+              <button key={n.id} onClick={() => notif.marcarLida(n.id)} className="w-full text-left px-4 py-3 border-b border-gray-50 flex gap-3 active:bg-ice">
+                <div className="flex-1">
+                  <p className="text-xs font-bold text-luxury-black">{n.titulo}</p>
+                  <p className="text-[11px] text-gray-500 mt-0.5">{n.corpo}</p>
+                  <p className="text-[9px] text-gray-300 mt-1 uppercase">{n.tipo}</p>
+                </div>
+                {!n.lida && <span className="w-2 h-2 rounded-full bg-gold mt-1 flex-shrink-0" />}
+              </button>
+            ))}
           </div>
         </div>
       )}
 
-      {/* Cart Notification */}
       {showCartNotification && (
         <div className="fixed top-16 left-4 right-4 z-[80] max-w-lg mx-auto animate-slide-down">
           <div className="bg-luxury-black text-white rounded-2xl p-4 flex items-center gap-3 shadow-xl">
             <div className="w-10 h-10 bg-green-500/20 rounded-xl flex items-center justify-center flex-shrink-0">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polyline points="20 6 9 17 4 12" />
-              </svg>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22c55e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
             </div>
             <div className="flex-1">
               <p className="text-xs font-bold">Adicionado ao carrinho!</p>
               <p className="text-[10px] text-gray-400">
                 {cartCount} {cartCount === 1 ? "item" : "itens"} •{" "}
-                {cartItems
-                  .reduce((sum, item) => sum + item.product.price * item.quantity, 0)
-                  .toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
+                {cartItems.reduce((sum, item) => sum + item.product.price * item.quantity, 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}
               </p>
             </div>
-            <button
-              onClick={() => {
-                setShowCartNotification(false);
-                setCartDrawerOpen(true);
-              }}
-              className="text-gold text-[10px] font-bold hover:text-gold-light"
-            >
-              Ver
-            </button>
+            <button onClick={() => { setShowCartNotification(false); setCartDrawerOpen(true); }} className="text-gold text-[10px] font-bold hover:text-gold-light">Ver</button>
           </div>
         </div>
       )}
-      </div>
+    </div>
   );
 }
-
-
