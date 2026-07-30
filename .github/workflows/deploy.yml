@@ -75,26 +75,11 @@ jobs:
           cp _routes.json "$DEPLOY_DIR/"
           echo "DEPLOY_DIR=$DEPLOY_DIR" >> $GITHUB_ENV
       - name: Deploy to Cloudflare Pages
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -x
-          echo "=== node version ==="
-          node --version
-          echo "=== npm version ==="
-          npm --version
-          echo "=== wrangler location ==="
-          which wrangler 2>&1 || echo "no wrangler in PATH"
-          echo "=== wrangler version ==="
-          npx wrangler --version 2>&1 || echo "version check failed"
-          echo "=== direct wrangler ==="
-          ./node_modules/.bin/wrangler --version 2>&1 || echo "direct failed"
-          echo "=== npm exec ==="
-          npm exec -- wrangler --version 2>&1 || echo "npm exec failed"
-          echo "=== run deploy ==="
-          npx wrangler pages deploy "$DEPLOY_DIR" --project-name=appdgriffedois --branch=main
-          echo "=== exit: $? ==="
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy "$DEPLOY_DIR" --project-name=appdgriffedois --branch=main
 
   deploy-backend:
     needs: [test, sync-supabase]
