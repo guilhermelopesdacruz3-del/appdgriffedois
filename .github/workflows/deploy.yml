@@ -79,10 +79,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          node --version
-          npm --version
-          echo "=== deploy ==="
-          npx -p wrangler@4.115.0 -- pages deploy "$DEPLOY_DIR" --project-name=appdgriffedois --branch=main
+          npx -p wrangler@4.115.0 -- wrangler pages deploy "$DEPLOY_DIR" --project-name=appdgriffedois --branch=main
 
   deploy-backend:
     needs: [test, sync-supabase]
