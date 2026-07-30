@@ -71,6 +71,7 @@ jobs:
           mkdir -p "$DEPLOY_DIR"
           cp -r dist/. "$DEPLOY_DIR/"
           cp -r functions/. "$DEPLOY_DIR/functions/"
+          cp _routes.json "$DEPLOY_DIR/"
           echo "DEPLOY_DIR=$DEPLOY_DIR" >> $GITHUB_ENV
       - name: Deploy to Cloudflare Pages
         env:
