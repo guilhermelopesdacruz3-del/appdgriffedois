@@ -10,7 +10,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # 1) Testa (type-check + build) antes de liberar qualquer deploy.
   test:
     runs-on: ubuntu-latest
     steps:
@@ -23,8 +22,6 @@ jobs:
       - run: npx tsc --noEmit
       - run: npm run build
 
-  # 1b) Aplica o schema de segredos no Supabase (tabelas + RLS + seed).
-  # Usa a Supabase Access Token (PAT) guardada como secret. Idempotente (IF NOT EXISTS).
   sync-supabase:
     needs: test
     runs-on: ubuntu-latest
@@ -41,20 +38,19 @@ jobs:
           fi
           SQL=$(cat supabase/schema-segredos.sql)
           RESP=$(curl -fsSL -X POST "$SUPABASE_URL/rest/v1/sql" \
-            -H "Authorization: Bearer ***" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             -H "Content-Type: application/json" \
             -H "Accept: application/json" \
             -d "$(jq -n --arg q "$SQL" '{query:$q}')")
           echo "Resposta Supabase (segredos): $RESP"
           SQL2=$(cat supabase/schema-fidelidade.sql)
           RESP2=$(curl -fsSL -X POST "$SUPABASE_URL/rest/v1/sql" \
-            -H "Authorization: Bearer ***" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             -H "Content-Type: application/json" \
             -H "Accept: application/json" \
             -d "$(jq -n --arg q "$SQL2" '{query:$q}')")
           echo "Resposta Supabase (fidelidade): $RESP2"
 
-  # 2) Deploy do FRONT no Cloudflare Pages.
   deploy-front:
     needs: test
     runs-on: ubuntu-latest
@@ -85,10 +81,6 @@ jobs:
           directory: ${{ env.DEPLOY_DIR }}
           gitHubToken: ${{ secrets.GITHUB_TOKEN }}
 
-  # 3) Deploy do PROXY no Render.
-  # O Render já faz auto-deploy direto do GitHub (a cada push na main), então
-  # este passo é redundante/opcional. Se o RENDER_DEPLOY_HOOK não estiver
-  # configurado, apenas avisamos e seguimos (não quebra o pipeline).
   deploy-backend:
     needs: [test, sync-supabase]
     runs-on: ubuntu-latest
@@ -101,7 +93,7 @@ jobs:
             exit 0
           fi
           curl -fsSL -X POST "$RENDER_DEPLOY_HOOK" \
-            -H "Authorization: Bearer ***" \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
             -H "Accept: application/json"
         env:
           RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
