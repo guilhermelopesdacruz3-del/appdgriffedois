@@ -113,7 +113,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
 
       const autorizacao = `Bearer ${getAdminToken()}`;
       const res = await fetch("/api/admin/logs?" + new URLSearchParams(q).toString(), {
-        headers: { Authorization: autorizacao },
+        headers: { Authorization: autorizacao }
       });
       const json = (await res.json().catch(() => ({}))) as any;
       if (!res.ok) throw new Error(json?.erro || `Falha ao carregar logs (${res.status})`);
