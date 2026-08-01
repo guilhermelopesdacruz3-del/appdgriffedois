@@ -46,16 +46,16 @@ body {
 }
 .dark .bg-ice,
 .dark .bg-ice-light {
-  background-color: #121212 !important;
+  background-color: var(--color-ice, #121212) !important;
 }
 .dark .bg-ice-dark {
-  background-color: #1f1f1f !important;
+  background-color: var(--color-ice-dark, #1f1f1f) !important;
 }
 .dark .bg-white {
-  background-color: #151515 !important;
+  background-color: var(--color-ice-light, #151515) !important;
 }
 .dark .text-luxury-black {
-  color: #f5f5f5 !important;
+  color: var(--color-luxury-black, #f5f5f5) !important;
 }
 .dark .text-gray-400,
 .dark .text-gray-500,
@@ -74,3 +74,32 @@ body {
 }
 
 /* Animations... rest unchanged */
+
+/* Tema por cidade: Osório -> "pirâmides" (deserto/dourado) */
+html[data-cidade="osorio"] {
+  --color-ice: #F4EFE4;
+  --color-ice-light: #FAF6EC;
+  --color-ice-dark: #E7DCC4;
+  --color-gold: #C9962D;
+  --color-gold-light: #E0B75A;
+  --color-gold-dark: #A87A1B;
+  --color-silver: #C9B99A;
+  --color-silver-light: #E3D9C0;
+  --color-luxury-black: #1E1609;
+  --color-luxury-dark: #2A2010;
+  --color-luxury-gray: #3A2E18;
+}
+
+html[data-cidade="osorio"].dark {
+  --color-ice: #151208;
+  --color-ice-light: #1A160B;
+  --color-ice-dark: #241E10;
+  --color-gold: #D9A63C;
+  --color-gold-light: #EEC667;
+  --color-gold-dark: #B8860B;
+  --color-silver: #A8997A;
+  --color-silver-light: #C4B694;
+  --color-luxury-black: #F2E8D0;
+  --color-luxury-dark: #E5D9BC;
+  --color-luxury-gray: #CBBFA3;
+}

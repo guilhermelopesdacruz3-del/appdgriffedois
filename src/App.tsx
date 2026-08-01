@@ -21,6 +21,7 @@ import { useFidelidade } from "./hooks/useFidelidade";
 import { useNotificacoes } from "./hooks/useNotificacoes";
 import { ProductGridSkeleton } from "./components/features/ProductSkeleton";
 import { useFavorites, useRecentlyViewed } from "./hooks/useUserLists";
+import { useCidadeTema } from "./hooks/useCidadeTema";
 
 interface CartItem {
   product: Product;
@@ -36,6 +37,7 @@ function AppInner() {
   const { cliente } = useCliente();
   const notif = useNotificacoes(cliente?.email);
   const fid = useFidelidade(cliente?.email);
+  useCidadeTema();
 
   const [currentPage, setCurrentPage] = useState("home");
   const [previousPage, setPreviousPage] = useState("home");
