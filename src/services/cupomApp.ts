@@ -3,7 +3,8 @@ const BASE_URL =
   "";
 
 import { getAdminToken, clearAdminToken } from "./admin";
-import { getClienteToken, clearClienteToken } from "../utils/cookies";
+import { clearClienteToken } from "../utils/cookies";
+import { obterTokenValido } from "./cliente";
 
 async function request<T>(path: string, opts: { method?: string; body?: unknown; auth?: boolean } = {}): Promise<T> {
   const token = opts.auth !== false ? getAdminToken() : null;
@@ -77,7 +78,7 @@ export async function enviarCupom(id: string, dados: EnviarCupomPayload): Promis
 }
 
 export async function meusCupons(): Promise<CupomUsuario[]> {
-  const token = getClienteToken() || "";
+  const token = (await obterTokenValido()) || "";
   const headers: Record<string, string> = { Accept: "application/json" };
   if (token) headers["Authorization"] = `Bearer ${token}`;
   const res = await fetch(`${BASE_URL}/api/cupons/meus`, { method: "GET", headers });

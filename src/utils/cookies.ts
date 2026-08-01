@@ -65,14 +65,26 @@ export function hasAdminCookieSupport(): boolean {
 }
 
 const TOKEN_KEY = "dgriffe:cliente_token";
+const REFRESH_KEY = "dgriffe:cliente_refresh_token";
 export function getClienteToken(): string | null {
   try { return window.localStorage.getItem(TOKEN_KEY); } catch { return null; }
+}
+export function getClienteRefreshToken(): string | null {
+  try { return window.localStorage.getItem(REFRESH_KEY); } catch { return null; }
 }
 export function setClienteToken(token: string): void {
   try { window.localStorage.setItem(TOKEN_KEY, token); } catch { /* ignore */ }
 }
+export function salvarClienteSessao(sess: { access_token?: string; refresh_token?: string } | null | undefined): void {
+  if (!sess) return;
+  try {
+    if (sess.access_token) window.localStorage.setItem(TOKEN_KEY, sess.access_token);
+    if (sess.refresh_token) window.localStorage.setItem(REFRESH_KEY, sess.refresh_token);
+  } catch { /* ignore */ }
+}
 export function clearClienteToken(): void {
   try { window.localStorage.removeItem(TOKEN_KEY); } catch { /* ignore */ }
+  try { window.localStorage.removeItem(REFRESH_KEY); } catch { /* ignore */ }
 }
 export function hasClienteToken(): boolean {
   return !!getClienteToken();

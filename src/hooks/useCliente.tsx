@@ -151,6 +151,7 @@ export function ClienteProvider({ children }: { children: ReactNode }) {
       window.localStorage.removeItem(LS_EMAIL);
       window.localStorage.removeItem(LS_ID);
       window.localStorage.removeItem("dgriffe:cliente_token");
+      window.localStorage.removeItem("dgriffe:cliente_refresh_token");
     } catch { /* ignora */ }
   }, []);
 

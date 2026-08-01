@@ -1380,6 +1380,25 @@ app.post("/api/cliente/verificar", async (req, res) => {
   }
 });
 
+// POST /api/cliente/renovar -> renova a sessão com o refresh_token
+// (o access_token do Supabase expira em ~1h; o app guarda o refresh_token
+// e renova aqui para o cliente não perder o login/cupons no meio da sessão).
+app.post("/api/cliente/renovar", async (req, res) => {
+  const { refresh_token } = req.body || {};
+  const rt = String(refresh_token || "").trim();
+  if (!rt) return res.status(400).json({ erro: "refresh_token ausente." });
+  const sb = supabaseClient();
+  if (!sb) return res.status(503).json({ erro: "Banco de dados indisponível (modo demo)." });
+  try {
+    const { data, error } = await sb.auth.refreshSession({ refresh_token: rt });
+    if (error) return res.status(401).json({ erro: "Sessão expirada. Faça login novamente." });
+    return res.json({ ok: true, session: data.session, user: data.user });
+  } catch (err) {
+    console.error("[cliente] renovar sessão:", err);
+    return res.status(500).json({ erro: "Falha ao renovar sessão." });
+  }
+});
+
 // EXCLUSÃO DE CONTA (LGPD / Política de Dados do Google Play) — self-service.
 // Fluxo em 2 passos com OTP por e-mail (mesmo padrão do cadastro/verificar):
 //   1) POST /api/cliente/excluir-solicitar  -> envia OTP

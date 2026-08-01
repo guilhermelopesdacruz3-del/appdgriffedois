@@ -11,6 +11,8 @@ import { formatPrice } from "../utils";
 
 import { getReceitas, criarReceita, apagarReceita } from "../services/receitas";
 import type { Receita } from "../types";
+import { cadastrarCliente, verificarOtp } from "../services/cliente";
+import { salvarClienteSessao } from "../utils/cookies";
 
 import { getFavoritos, apagarFavorito } from "../services/favoritos";
 import type { Favorito } from "../types";
@@ -324,7 +326,7 @@ function PreferenciasPage({ voltar }: { voltar: () => void }) {
 }
 
 export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNavigate?: (page: string) => void; fidelidade?: any }) {
-  const { cliente, loading: loadingCliente, error: erroCliente, entrarComEmail, sair, atualizarCliente } = useCliente();
+  const { cliente, entrarComEmail, sair, atualizarCliente } = useCliente();
   const [email, setEmail] = useState("");
   const { carregarPerfil, carregarPreferencias } = useCliente();
   useEffect(() => {
@@ -481,8 +483,63 @@ export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNav
     },
   ];
 
-  // Ninguém logado ainda: pede o e-mail cadastrado na loja e busca o cliente
-  // via API da Loja Integrada (src/hooks/useCliente.ts).
+  // Ninguém logado ainda: pede o e-mail + código OTP (gera/renova a sessão
+  // Supabase, necessária para cupons, pontos, perfil e endereços) e depois
+  // busca o cliente via API da Loja Integrada (src/hooks/useCliente.ts).
+  const [etapaLogin, setEtapaLogin] = useState<"email" | "codigo">("email");
+  const [codigoLogin, setCodigoLogin] = useState("");
+  const [enviandoCodigo, setEnviandoCodigo] = useState(false);
+  const [erroLogin, setErroLogin] = useState<string | null>(null);
+  const [msgLogin, setMsgLogin] = useState<string | null>(null);
+
+  const enviarCodigo = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email.trim()) return;
+    setErroLogin(null);
+    setMsgLogin(null);
+    setEnviandoCodigo(true);
+    try {
+      const r = await cadastrarCliente({ email: email.trim() });
+      setMsgLogin(r.mensagem || "Enviamos um código para seu e-mail.");
+      setEtapaLogin("codigo");
+      setCodigoLogin("");
+    } catch (err) {
+      setErroLogin((err as Error).message);
+    } finally {
+      setEnviandoCodigo(false);
+    }
+  };
+
+  const confirmarLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (codigoLogin.length !== 6) return;
+    setErroLogin(null);
+    setMsgLogin(null);
+    setEnviandoCodigo(true);
+    try {
+      const r = await verificarOtp(email.trim(), codigoLogin);
+      if (!r.ok) {
+        setErroLogin("Não foi possível confirmar o código.");
+        return;
+      }
+      // Sessão Supabase (access + refresh) salva → cupons/pontos/perfil funcionam.
+      try {
+        const sess = r.session as any;
+        if (sess?.access_token) {
+          salvarClienteSessao({ access_token: sess.access_token, refresh_token: sess.refresh_token });
+        }
+      } catch { /* ignora */ }
+      // Busca o cliente na Loja Integrada e entra na conta.
+      await entrarComEmail(email.trim());
+      setEtapaLogin("email");
+      setCodigoLogin("");
+    } catch (err) {
+      setErroLogin((err as Error).message);
+    } finally {
+      setEnviandoCodigo(false);
+    }
+  };
+
   if (!cliente) {
     return (
       <div className="px-5 pt-10 pb-4">
@@ -495,36 +552,66 @@ export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNav
           </div>
           <h2 className="text-base font-bold text-luxury-black">Entrar na minha conta</h2>
           <p className="text-xs text-gray-500 mt-1">
-            Informe o e-mail que você usou para comprar na loja
+            {etapaLogin === "email"
+              ? "Informe o e-mail que você usou para comprar na loja"
+              : `Enviamos um código de 6 dígitos para ${email}.`}
           </p>
 
-          <form
-            className="mt-5 space-y-3"
-            onSubmit={(e) => {
-              e.preventDefault();
-              if (email.trim()) entrarComEmail(email);
-            }}
-          >
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="seu@email.com"
-              className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
-            />
-            <button
-              type="submit"
-              disabled={loadingCliente}
-              className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl disabled:opacity-50 active:scale-[0.98] transition-all"
+          {etapaLogin === "email" ? (
+            <form
+              className="mt-5 space-y-3"
+              onSubmit={enviarCodigo}
             >
-              {loadingCliente ? "Buscando..." : "Continuar"}
-            </button>
-          </form>
-
-          {erroCliente && (
-            <p className="text-[11px] text-red-500 mt-3">{erroCliente}</p>
+              <input
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seu@email.com"
+                className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+              />
+              <button
+                type="submit"
+                disabled={enviandoCodigo || !email.trim()}
+                className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl disabled:opacity-50 active:scale-[0.98] transition-all"
+              >
+                {enviandoCodigo ? "Enviando..." : "Enviar código"}
+              </button>
+            </form>
+          ) : (
+            <form
+              className="mt-5 space-y-3"
+              onSubmit={confirmarLogin}
+            >
+              <input
+                type="text"
+                inputMode="numeric"
+                maxLength={6}
+                required
+                value={codigoLogin}
+                onChange={(e) => setCodigoLogin(e.target.value.replace(/\D/g, ""))}
+                placeholder="Código de 6 dígitos"
+                className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm text-center tracking-[0.5em] focus:outline-none focus:border-gold"
+              />
+              <button
+                type="submit"
+                disabled={enviandoCodigo || codigoLogin.length !== 6}
+                className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl disabled:opacity-50 active:scale-[0.98] transition-all"
+              >
+                {enviandoCodigo ? "Confirmando..." : "Confirmar"}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setEtapaLogin("email"); setErroLogin(null); setMsgLogin(null); }}
+                className="w-full text-[10px] text-gray-400 underline mt-1"
+              >
+                Usar outro e-mail
+              </button>
+            </form>
           )}
+
+          {erroLogin && <p className="text-[11px] text-red-500 mt-3">{erroLogin}</p>}
+          {msgLogin && !erroLogin && <p className="text-[11px] text-green-600 mt-3">{msgLogin}</p>}
 
           <button
             type="button"

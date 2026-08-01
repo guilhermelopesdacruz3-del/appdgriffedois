@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { cadastrarCliente, verificarOtp } from "../services/cliente";
+import { salvarClienteSessao } from "../utils/cookies";
 import { buscarClientePorEmail } from "../services/lojaIntegrada";
 import TermosPrivacidade from "./TermosPrivacidade";
 
@@ -55,14 +56,13 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
         // getSupabase() lança — ignoramos, pois o login pela Loja Integrada
         // (busca por e-mail + localStorage) já identifica o cliente na "Minha Conta".
         if (r.session) {
-          // Salva o access_token para chamadas autenticadas da API
-          // (cupons/meus, perfil, enderecos, etc.) que exigem Authorization.
-          // NÃO depende do cliente Supabase do front (que pode não estar
-          // configurado no deploy) — o token vem da resposta do backend.
+          // Salva o access_token (e refresh_token para renovação) para chamadas
+          // autenticadas da API (cupons/meus, perfil, enderecos, etc.) que
+          // exigem Authorization. O token vem da resposta do backend.
           try {
             const sess = r.session as any;
             if (sess?.access_token) {
-              window.localStorage.setItem("dgriffe:cliente_token", sess.access_token);
+              salvarClienteSessao({ access_token: sess.access_token, refresh_token: sess.refresh_token });
             }
           } catch { /* ignora */ }
         }

@@ -50,8 +50,51 @@ function token(): string | null {
   }
 }
 
-async function authed<T>(path: string, init: RequestInit = {}): Promise<T> {
+function expJwt(t: string): number {
+  try {
+    const p = t.split(".")[1];
+    const d = JSON.parse(atob(p.replace(/-/g, "+").replace(/_/g, "/")));
+    return typeof d.exp === "number" ? d.exp * 1000 : 0;
+  } catch {
+    return 0;
+  }
+}
+
+// Retorna um access_token válido, renovando com o refresh_token se o atual
+// estiver expirado ou prestes a expirar (< 60s). Retorna null se não houver
+// sessão ou a renovação falhar.
+export async function obterTokenValido(): Promise<string | null> {
   const t = token();
+  if (!t) return null;
+  if (expJwt(t) > Date.now() + 60_000) return t;
+  const rt = (() => {
+    try { return window.localStorage.getItem("dgriffe:cliente_refresh_token") || null; } catch { return null; }
+  })();
+  if (!rt) return null;
+  try {
+    const res = await fetch(`/api/cliente/renovar`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refresh_token: rt }),
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || !json.session?.access_token) return null;
+    salvarSessaoLocal(json.session);
+    return json.session.access_token;
+  } catch {
+    return null;
+  }
+}
+
+function salvarSessaoLocal(sess: { access_token?: string; refresh_token?: string }): void {
+  try {
+    if (sess.access_token) window.localStorage.setItem("dgriffe:cliente_token", sess.access_token);
+    if (sess.refresh_token) window.localStorage.setItem("dgriffe:cliente_refresh_token", sess.refresh_token);
+  } catch { /* ignore */ }
+}
+
+async function authed<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const t = await obterTokenValido();
   const res = await fetch(`/api/cliente${path}`, {
     ...init,
     headers: {
