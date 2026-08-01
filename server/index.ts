@@ -1292,11 +1292,15 @@ app.post("/api/cliente/cadastro", async (req, res) => {
   try {
     // 1) Envia OTP por e-mail. shouldCreateUser:true cria o usuário se ainda
     //    não existir; se já existir, apenas reenvia o código.
+    //    emailRedirectTo: o link do e-mail aponta para o app (evita cair em
+    //    localhost:3000, o default do projeto Supabase).
+    const siteUrl = process.env.FRONTEND_ORIGIN?.split(",")[0]?.trim() || "https://appdgriffedois.pages.dev";
     const { error: otpErr } = await sb.auth.signInWithOtp({
       email: e,
       options: {
         shouldCreateUser: true,
         data: { nome: nome || "", telefone: telefone || "", cpf: cpf || "" },
+        emailRedirectTo: siteUrl,
       },
     });
     if (otpErr) {
@@ -1399,6 +1403,39 @@ app.post("/api/cliente/renovar", async (req, res) => {
   }
 });
 
+// POST /api/cliente/confirmar-link -> troca o token_hash do link do e-mail
+// (Supabase magic link) por uma sessão. Usado quando o cliente clica no link
+// do e-mail em vez de digitar o código de 6 dígitos.
+app.post("/api/cliente/confirmar-link", async (req, res) => {
+  const { token_hash, type } = req.body || {};
+  const th = String(token_hash || "").trim();
+  const tp = String(type || "magiclink").trim();
+  if (!th) return res.status(400).json({ erro: "token_hash ausente." });
+  const sb = supabaseClient();
+  if (!sb) return res.status(503).json({ erro: "Banco de dados indisponível (modo demo)." });
+  try {
+    const { data, error } = await sb.auth.verifyOtp({ token_hash: th, type: tp as any });
+    if (error) return res.status(401).json({ erro: error.message });
+    // Garante o perfil do usuário confirmado via link.
+    try {
+      const uid = data.user?.id;
+      if (uid) {
+        await sb.from("profiles").upsert({
+          id: uid,
+          email: data.user?.email || "",
+          updated_at: new Date().toISOString(),
+        }, { onConflict: "id" });
+      }
+    } catch (pErr) {
+      console.warn("[confirmar-link] falha ao garantir perfil (ignorado):", (pErr as Error)?.message);
+    }
+    return res.json({ ok: true, session: data.session, user: data.user });
+  } catch (err) {
+    console.error("[cliente] confirmar link:", err);
+    return res.status(500).json({ erro: "Falha ao confirmar link." });
+  }
+});
+
 // EXCLUSÃO DE CONTA (LGPD / Política de Dados do Google Play) — self-service.
 // Fluxo em 2 passos com OTP por e-mail (mesmo padrão do cadastro/verificar):
 //   1) POST /api/cliente/excluir-solicitar  -> envia OTP
@@ -1418,9 +1455,10 @@ app.post("/api/cliente/excluir-solicitar", async (req, res) => {
   // se cadastraram só pela Loja Integrada (sem conta no Supabase Auth) — o
   // usuario sera criado e imediatamente deletado no confirmar. Sem isso, o
   // Supabase barra com "Signups not allowed" e a exclusao nunca acontece (P1).
+  const siteUrl = process.env.FRONTEND_ORIGIN?.split(",")[0]?.trim() || "https://appdgriffedois.pages.dev";
   const { error } = await sb.auth.signInWithOtp({
     email: e,
-    options: { shouldCreateUser: true, data: { __exclusao: true } },
+    options: { shouldCreateUser: true, data: { __exclusao: true }, emailRedirectTo: siteUrl },
   });
   if (error) {
     // Se o usuário não existe, não vaza a informação — mas também não envia OTP.

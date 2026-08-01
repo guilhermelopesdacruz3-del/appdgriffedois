@@ -85,6 +85,38 @@ function AppInner() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
+  // Cliente clicou no link de confirmação do e-mail (Supabase magic link):
+  // troca o token_hash por uma sessão e limpa a URL.
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tokenHash = params.get("token_hash");
+      const type = params.get("type");
+      if (tokenHash) {
+        (async () => {
+          try {
+            const r = await fetch(`/api/cliente/confirmar-link`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ token_hash: tokenHash, type: type || "magiclink" }),
+            });
+            const j = await r.json().catch(() => ({}));
+            if (r.ok && j.session?.access_token) {
+              const sess = j.session;
+              try {
+                window.localStorage.setItem("dgriffe:cliente_token", sess.access_token);
+                if (sess.refresh_token) window.localStorage.setItem("dgriffe:cliente_refresh_token", sess.refresh_token);
+              } catch { /* ignora */ }
+              window.dispatchEvent(new Event("cliente-atualizado"));
+              setCurrentPage("profile");
+            }
+          } catch { /* ignora — sem token, o app segue normal */ }
+        })();
+        window.history.replaceState({}, "", window.location.pathname);
+      }
+    } catch { /* ignora */ }
+  }, []);
+
   const { isFavorite, toggleFavorite } = useFavorites();
   const { recentIds, registerView } = useRecentlyViewed();
 
