@@ -85,10 +85,29 @@ function AppInner() {
     return () => window.removeEventListener("popstate", onPop);
   }, []);
 
-  // Cliente clicou no link de confirmação do e-mail (Supabase magic link):
-  // troca o token_hash por uma sessão e limpa a URL.
+  // Cliente clicou no link de confirmação do e-mail (Supabase):
+  //  - forma A: o Supabase redireciona com #access_token=...&refresh_token=...
+  //    (fragmento) — salvamos a sessão direto;
+  //  - forma B: ?token_hash=...&type=... (query string) — trocamos por sessão
+  //    via /api/cliente/confirmar-link.
   useEffect(() => {
     try {
+      const hash = window.location.hash;
+      if (hash && hash.includes("access_token=")) {
+        const params = new URLSearchParams(hash.replace(/^#/, ""));
+        const accessToken = params.get("access_token");
+        const refreshToken = params.get("refresh_token");
+        if (accessToken) {
+          try {
+            window.localStorage.setItem("dgriffe:cliente_token", accessToken);
+            if (refreshToken) window.localStorage.setItem("dgriffe:cliente_refresh_token", refreshToken);
+          } catch { /* ignora */ }
+          window.dispatchEvent(new Event("cliente-atualizado"));
+          setCurrentPage("profile");
+        }
+        window.history.replaceState({}, "", window.location.pathname);
+        return;
+      }
       const params = new URLSearchParams(window.location.search);
       const tokenHash = params.get("token_hash");
       const type = params.get("type");
