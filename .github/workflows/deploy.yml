@@ -37,18 +37,19 @@ jobs:
             echo "SUPABASE_ACCESS_TOKEN não definido — pulando sync do banco."
             exit 0
           fi
+          # Extrai o project ref da URL (ex: https://xxxx.supabase.co -> xxxx)
+          PROJECT_REF=$(echo "$SUPABASE_URL" | sed -E 's|https?://([^.]+)\..*|\1|')
+          echo "Project ref: $PROJECT_REF"
           SQL=$(cat supabase/schema-segredos.sql)
-          RESP=$(curl -fsSL -X POST "$SUPABASE_URL/rest/v1/sql" \
+          RESP=$(curl -fsSL -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             -H "Content-Type: application/json" \
-            -H "Accept: application/json" \
             -d "$(jq -n --arg q "$SQL" '{query:$q}')")
           echo "Resposta Supabase (segredos): $RESP"
           SQL2=$(cat supabase/schema-fidelidade.sql)
-          RESP2=$(curl -fsSL -X POST "$SUPABASE_URL/rest/v1/sql" \
+          RESP2=$(curl -fsSL -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             -H "Content-Type: application/json" \
-            -H "Accept: application/json" \
             -d "$(jq -n --arg q "$SQL2" '{query:$q}')")
           echo "Resposta Supabase (fidelidade): $RESP2"
 
