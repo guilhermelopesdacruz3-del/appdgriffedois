@@ -1,19 +1,31 @@
+import { useCidade } from "../../hooks/useCidadeTema";
+
 interface BottomNavProps {
   activePage: string;
   onNavigate: (page: string) => void;
   dark?: boolean;
 }
 
+const casaIcon = (active: boolean) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.5"} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+    {!active && <polyline points="9 22 9 12 15 12 15 22" />}
+  </svg>
+);
+
+const piramideIcon = (active: boolean) => (
+  <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.5"} strokeLinecap="round" strokeLinejoin="round">
+    <path d="M12 2l9 18a1 1 0 01-.9 1.5H3.9A1 1 0 013 20z" />
+    <path d="M12 9.5l5 10H7z" />
+    {!active && <path d="M12 2v7" />}
+  </svg>
+);
+
 const navItems = [
   {
     id: "home",
     label: "Início",
-    icon: (active: boolean) => (
-      <svg width="22" height="22" viewBox="0 0 24 24" fill={active ? "currentColor" : "none"} stroke="currentColor" strokeWidth={active ? "0" : "1.5"} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
-        {!active && <polyline points="9 22 9 12 15 12 15 22" />}
-      </svg>
-    ),
+    icon: (active: boolean, osorio: boolean) => (osorio ? piramideIcon(active) : casaIcon(active)),
   },
   {
     id: "catalog",
@@ -50,6 +62,7 @@ const navItems = [
 
 export default function BottomNav({ activePage, onNavigate, dark = false }: BottomNavProps) {
   const isDark = dark;
+  const osorio = useCidade() === "osorio";
   const containerClass = isDark
     ? "border-white/10 bg-[#050505]/90"
     : "border-ice-dark/50 bg-ice/90";
@@ -70,7 +83,7 @@ export default function BottomNav({ activePage, onNavigate, dark = false }: Bott
               className={`flex flex-col items-center justify-center gap-0.5 flex-1 py-1 rounded-xl transition-all duration-200 ${textClass}`}
             >
               <div className={`relative ${isActive ? "scale-110" : ""} transition-transform duration-200`}>
-                {item.icon(isActive)}
+                {item.icon(isActive, osorio)}
                 {isActive && item.id === "loyalty" && (
                   <span className="absolute -top-1 -right-1 w-2 h-2 bg-gold rounded-full" />
                 )}

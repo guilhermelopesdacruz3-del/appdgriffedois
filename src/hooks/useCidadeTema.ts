@@ -1,6 +1,6 @@
 // Detecção de cidade por geolocalização para aplicar o tema local.
 // Capão da Canoa -> tema padrão; Osório -> tema "pirâmides" (deserto/dourado).
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 const CIDADES: Record<string, { lat: number; lng: number; raioKm: number }> = {
   "capao-da-canoa": { lat: -29.7464, lng: -50.0136, raioKm: 15 },
@@ -28,6 +28,29 @@ function cidadeMaisProxima(lat: number, lng: number): string {
     }
   }
   return melhor;
+}
+
+export function getCidadeAtual(): "osorio" | "capao-da-canoa" {
+  try {
+    return document.documentElement.getAttribute("data-cidade") === "osorio"
+      ? "osorio"
+      : "capao-da-canoa";
+  } catch {
+    return "capao-da-canoa";
+  }
+}
+
+// Hook reativo: retorna a cidade do tema e atualiza quando ela mudar.
+export function useCidade(): "osorio" | "capao-da-canoa" {
+  const [cidade, setCidade] = useState<"osorio" | "capao-da-canoa">(getCidadeAtual);
+
+  useEffect(() => {
+    const observer = new MutationObserver(() => setCidade(getCidadeAtual()));
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ["data-cidade"] });
+    return () => observer.disconnect();
+  }, []);
+
+  return cidade;
 }
 
 export function useCidadeTema() {
