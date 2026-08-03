@@ -77,29 +77,49 @@ body {
 
 /* Tema por cidade: Osório -> "pirâmides" (deserto/dourado) */
 html[data-cidade="osorio"] {
-  --color-ice: #F5EAD3;
-  --color-ice-light: #FCF5E4;
-  --color-ice-dark: #E6D3A8;
-  --color-gold: #E09E1F;
-  --color-gold-light: #F2C14E;
-  --color-gold-dark: #B97B0D;
-  --color-silver: #C9B582;
-  --color-silver-light: #E5D7AE;
-  --color-luxury-black: #241705;
-  --color-luxury-dark: #33240C;
-  --color-luxury-gray: #4A3A1C;
+  --bg-page: #EDDFB9;
+  --color-ice: #F1E3BD;
+  --color-ice-light: #FAF2DB;
+  --color-ice-dark: #DCC396;
+  --color-gold: #E88A00;
+  --color-gold-light: #FFAE3D;
+  --color-gold-dark: #B96A00;
+  --color-silver: #C4A76E;
+  --color-silver-light: #E0C99A;
+  --color-luxury-black: #2B1D06;
+  --color-luxury-dark: #3C2C10;
+  --color-luxury-gray: #5C4A26;
+}
+
+html[data-cidade="osorio"] body {
+  background-color: var(--bg-page, #F1E3BD);
+  background-image: linear-gradient(180deg, #F7EDCC 0%, var(--bg-page, #F1E3BD) 45%, #E8D7A8 100%);
 }
 
 html[data-cidade="osorio"].dark {
-  --color-ice: #1A1405;
-  --color-ice-light: #211A08;
-  --color-ice-dark: #2E2410;
-  --color-gold: #F0B32E;
-  --color-gold-light: #FFD060;
+  --color-ice: #161005;
+  --color-ice-light: #1F1809;
+  --color-ice-dark: #2B2110;
+  --color-gold: #FFAE2E;
+  --color-gold-light: #FFCA5C;
   --color-gold-dark: #C98F18;
   --color-silver: #B3A273;
   --color-silver-light: #D6C693;
   --color-luxury-black: #F6E8C4;
   --color-luxury-dark: #EBDCAC;
   --color-luxury-gray: #D4C394;
+}
+
+html[data-cidade="osorio"].dark body {
+  background-image: linear-gradient(180deg, #1D1608 0%, #161005 100%);
+}
+
+html[data-cidade="osorio"] .glass {
+  background-color: rgba(250, 242, 219, 0.88);
+  border-color: rgba(224, 138, 0, 0.25);
+}
+
+html[data-cidade="osorio"].dark .glass {
+  background-color: rgba(31, 24, 9, 0.88);
+  border-color: rgba(255, 174, 46, 0.25);
 }

@@ -219,7 +219,7 @@ function AppInner() {
       const root = document.documentElement;
       if (dark) { root.classList.add("dark"); } else { root.classList.remove("dark"); }
       root.setAttribute("data-theme", dark ? "dark" : "light");
-      root.style.setProperty("--bg-page", dark ? "#050505" : "#F0F0F5");
+      root.style.setProperty("--bg-page", dark ? "#050505" : "");
     } catch {}
   }, [dark]);
 

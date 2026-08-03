@@ -93,7 +93,7 @@ export default function ProductPage({ product, onBack, onTryOn }: ProductPagePro
         {/* Favorite button */}
         <button onClick={() => setIsFavorite(!isFavorite)} className="absolute top-4 right-4 w-10 h-10 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow-sm hover:bg-white transition-colors z-10">
           {isFavorite ? (
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="#D4A853" stroke="#D4A853" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06 1.06a5.5 5.5 0 000-7.78z" /></svg>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="var(--color-gold)" stroke="var(--color-gold)" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06 1.06a5.5 5.5 0 000-7.78z" /></svg>
           ) : (
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#1A1A1A" strokeWidth="2"><path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06 1.06a5.5 5.5 0 000-7.78z" /></svg>
           )}
@@ -126,7 +126,7 @@ export default function ProductPage({ product, onBack, onTryOn }: ProductPagePro
 
         {/* Rating */}
         <div className="flex items-center gap-1 mb-3">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="#D4A853" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--color-gold)" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
           <span className="text-xs font-semibold text-luxury-black">{product.rating}</span>
           <span className="text-[10px] text-gray-400">({product.reviews} reviews)</span>
         </div>
