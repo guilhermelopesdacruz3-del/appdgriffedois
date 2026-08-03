@@ -15,7 +15,7 @@ export function BarChart({
   height?: number;
   color?: string;
 }) {
-  if (data.length === 0) return <p className="text-[11px] text-gray-400">Sem dados.</p>;
+  if (data.length === 0) return <p className="text-[11px] text-white/40">Sem dados.</p>;
   const max = Math.max(...data.map((d) => d.value), 1);
   const width = 100; // viewBox percentual
   const gap = 5;
@@ -25,7 +25,7 @@ export function BarChart({
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="w-full" preserveAspectRatio="none" style={{ height }}>
       {/* linha de base */}
-      <line x1={0} y1={height - 12} x2={width} y2={height - 12} stroke="#E5E7EB" strokeWidth={0.4} />
+      <line x1={0} y1={height - 12} x2={width} y2={height - 12} stroke="#FFFFFF" strokeOpacity={0.15} strokeWidth={0.4} />
       {data.map((d, i) => {
         const h = Math.max((d.value / max) * (height - 26), 2);
         const x = i * (barW + gap);
@@ -34,11 +34,11 @@ export function BarChart({
           <g key={i}>
             <rect x={x} y={y} width={barW} height={h} rx={1.5} fill={color} opacity={0.92} />
             {/* valor no topo da barra */}
-            <text x={x + barW / 2} y={y - 2} fontSize={3.4} textAnchor="middle" fill="#6B7280" fontWeight={600}>
+            <text x={x + barW / 2} y={y - 2} fontSize={3.4} textAnchor="middle" fill="#E8C878" fontWeight={600}>
               {fmt(d.value)}
             </text>
             {/* label legível (abrevia só se muito longo) */}
-            <text x={x + barW / 2} y={height - 4} fontSize={3.6} textAnchor="middle" fill="#9CA3AF">
+            <text x={x + barW / 2} y={height - 4} fontSize={3.6} textAnchor="middle" fill="#A1A1AA">
               {d.label.length > 7 ? d.label.slice(0, 5) + "…" : d.label}
             </text>
           </g>
@@ -56,14 +56,14 @@ interface Slice {
 
 export function PieChart({ data, size = 132 }: { data: Slice[]; size?: number }) {
   const total = data.reduce((s, d) => s + d.value, 0);
-  if (total === 0) return <p className="text-[11px] text-gray-400">Sem dados.</p>;
+  if (total === 0) return <p className="text-[11px] text-white/40">Sem dados.</p>;
   const r = size / 2;
   const c = 2 * Math.PI * r;
   let offset = 0;
   return (
     <div className="flex items-center gap-3">
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="flex-shrink-0">
-        <circle cx={r} cy={r} r={r} fill="#F3F4F6" />
+        <circle cx={r} cy={r} r={r} fill="#FFFFFF" fillOpacity={0.05} />
         {data.map((d, i) => {
           const frac = d.value / total;
           const dash = frac * c;
@@ -91,9 +91,9 @@ export function PieChart({ data, size = 132 }: { data: Slice[]; size?: number })
           return (
             <div key={i} className="flex items-center gap-2 text-[11px]">
               <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }} />
-              <span className="text-gray-600 flex-1 truncate">{d.label}</span>
-              <span className="font-semibold text-luxury-black">{d.value}</span>
-              <span className="text-gray-400 w-7 text-right">{pct}%</span>
+              <span className="text-white/70 flex-1 truncate">{d.label}</span>
+              <span className="font-semibold text-white">{d.value}</span>
+              <span className="text-white/40 w-7 text-right">{pct}%</span>
             </div>
           );
         })}
@@ -117,12 +117,12 @@ export function KpiCard({
   trend?: "up" | "down";
   delta?: string;
 }) {
-  const trendColor = trend === "up" ? "#16A34A" : trend === "down" ? "#EF4444" : undefined;
+  const trendColor = trend === "up" ? "#34D399" : trend === "down" ? "#F87171" : undefined;
   return (
-    <div className="bg-white rounded-2xl p-3 shadow-sm border border-gray-50">
-      <p className="text-[9px] text-gray-400 uppercase tracking-wider">{label}</p>
-      <div className="flex items-end gap-1 mt-0.5">
-        <p className="text-lg font-bold leading-tight" style={{ color: accent || "#0A0A0A" }}>
+    <div className="bg-gradient-to-b from-white/[0.09] to-white/[0.03] border border-white/10 rounded-2xl p-4 shadow-lg shadow-black/20 hover:border-gold/30 transition-colors">
+      <p className="text-[9px] text-gold/70 uppercase tracking-wider font-bold">{label}</p>
+      <div className="flex items-end gap-1 mt-1">
+        <p className="text-xl font-bold leading-tight" style={{ color: accent || "#FFFFFF" }}>
           {value}
         </p>
         {trend && (
@@ -134,7 +134,7 @@ export function KpiCard({
           </span>
         )}
       </div>
-      {sub && <p className="text-[9px] text-gray-400 mt-0.5">{sub}</p>}
+      {sub && <p className="text-[9px] text-white/40 mt-0.5">{sub}</p>}
     </div>
   );
 }

@@ -7,6 +7,13 @@ import {
   type RegrasFidelidade,
 } from "../../services/fidelidadeAdmin";
 
+const inputCls =
+  "h-10 px-3 rounded-xl border border-white/15 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/20 transition-all";
+const cardCls =
+  "bg-gradient-to-b from-white/[0.07] to-white/[0.02] border border-white/10 rounded-2xl";
+const btnPrimary =
+  "bg-gradient-to-r from-gold to-gold-dark text-black font-bold rounded-xl active:scale-[0.98] transition-all hover:brightness-110 disabled:opacity-50";
+
 export default function FidelidadeAdmin() {
   const [clientes, setClientes] = useState<{ email: string; nome: string }[]>([]);
   const [email, setEmail] = useState("");
@@ -67,13 +74,13 @@ export default function FidelidadeAdmin() {
   return (
     <div className="space-y-4">
       {/* Ajuste de pontos */}
-      <form onSubmit={ajustar} className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3 backdrop-blur">
-        <p className="text-xs font-bold text-white">Ajustar pontos de um cliente</p>
+      <form onSubmit={ajustar} className={`${cardCls} p-4 space-y-3`}>
+        <p className="text-xs font-bold text-white flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-gold inline-block" />Ajustar pontos de um cliente</p>
         <input
           value={email}
           onChange={(e) => setEmail(e.target.value)}
           placeholder="E-mail do cliente"
-          className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold"
+          className={`${inputCls} w-full`}
           required
         />
         <div className="flex gap-2">
@@ -82,13 +89,13 @@ export default function FidelidadeAdmin() {
             onChange={(e) => setPontos(e.target.value)}
             placeholder="Quantidade"
             type="number"
-            className="flex-1 h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold"
+            className={`${inputCls} flex-1`}
             required
           />
           <select
             value={operacao}
             onChange={(e) => setOperacao(e.target.value as any)}
-            className="h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs focus:outline-none focus:border-gold"
+            className={inputCls}
           >
             <option value="creditar">Creditar</option>
             <option value="resgatar">Resgatar</option>
@@ -99,59 +106,62 @@ export default function FidelidadeAdmin() {
           value={motivo}
           onChange={(e) => setMotivo(e.target.value)}
           placeholder="Motivo (opcional)"
-          className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold"
+          className={`${inputCls} w-full`}
         />
-        <button type="submit" className="w-full h-12 bg-white text-black text-xs font-bold rounded-2xl active:scale-[0.98] transition-all disabled:opacity-50">
+        <button type="submit" className={`${btnPrimary} w-full h-12 text-xs`}>
           Aplicar
         </button>
       </form>
 
-      {erro && <p className="text-[11px] text-red-400">{erro}</p>}
-      {msg && <p className="text-[11px] text-emerald-400">{msg}</p>}
+      {erro && <p className="text-[11px] text-red-400 px-1">{erro}</p>}
+      {msg && <p className="text-[11px] text-emerald-400 px-1">{msg}</p>}
 
       {/* Regras */}
-      <form onSubmit={salvarRegras} className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-3 backdrop-blur">
-        <p className="text-xs font-bold text-white">Regras do programa</p>
+      <form onSubmit={salvarRegras} className={`${cardCls} p-4 space-y-3`}>
+        <p className="text-xs font-bold text-white flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-gold inline-block" />Regras do programa</p>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="block text-[9px] text-white/50 mb-0.5 px-1">Pontos por R$</label>
+            <label className="block text-[9px] text-gold/60 mb-0.5 px-1 uppercase tracking-wider font-bold">Pontos por R$</label>
             <input
               value={regras.pontosPorReal}
               onChange={(e) => setRegras((r) => ({ ...r, pontosPorReal: Number(e.target.value) }))}
               type="number"
               step="0.1"
-              className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold"
+              className={`${inputCls} w-full`}
             />
           </div>
           <div>
-            <label className="block text-[9px] text-white/50 mb-0.5 px-1">Pontos = R$ (desconto)</label>
+            <label className="block text-[9px] text-gold/60 mb-0.5 px-1 uppercase tracking-wider font-bold">Pontos = R$ (desconto)</label>
             <input
               value={regras.pontosPorDesconto}
               onChange={(e) => setRegras((r) => ({ ...r, pontosPorDesconto: Number(e.target.value) }))}
               type="number"
-              className="w-full h-10 px-3 rounded-xl border border-white/10 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold"
+              className={`${inputCls} w-full`}
             />
           </div>
         </div>
         <p className="text-[10px] text-white/50">
           Ex.: 1 ponto por R$1 e 100 pontos = R$10 de desconto.
         </p>
-        <button type="submit" className="w-full h-10 bg-white text-black text-[11px] font-bold rounded-xl active:scale-[0.98] transition-all disabled:opacity-50">
+        <button type="submit" className={`${btnPrimary} w-full h-10 text-[11px]`}>
           Salvar regras
         </button>
       </form>
 
       {/* Clientes */}
-      <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-2 backdrop-blur">
-        <p className="text-xs font-bold text-white">Clientes ({clientes.length})</p>
+      <div className={`${cardCls} p-4 space-y-2`}>
+        <p className="text-xs font-bold text-white flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-gold inline-block" />Clientes ({clientes.length})</p>
         <p className="text-[10px] text-white/50">Clique para preencher o e-mail no ajuste acima.</p>
         <div className="max-h-64 overflow-y-auto space-y-1">
           {clientes.map((cl) => (
             <button
               key={cl.email}
               onClick={() => setEmail(cl.email)}
-              className="w-full flex items-center gap-2 py-1.5 px-2 rounded-xl hover:bg-white/10 text-left"
+              className="w-full flex items-center gap-2 py-1.5 px-2 rounded-xl hover:bg-gold/[0.06] text-left transition-colors"
             >
+              <span className="w-6 h-6 rounded-full bg-gradient-to-br from-gold/30 to-gold/10 border border-gold/20 flex items-center justify-center text-[10px] font-bold text-gold flex-shrink-0">
+                {(cl.nome || "?").charAt(0).toUpperCase()}
+              </span>
               <div className="min-w-0 flex-1">
                 <p className="text-[11px] font-semibold text-white truncate">{cl.nome}</p>
                 <p className="text-[9px] text-white/40 truncate">{cl.email}</p>
