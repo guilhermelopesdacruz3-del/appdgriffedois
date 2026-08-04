@@ -22,18 +22,24 @@ create table if not exists public.profiles (
   created_at    timestamptz not null default now()
 );
 
--- 3) pedidos: substitui o .admin-state.json e o mock em memória.
+-- 3) pedidos: espelha os pedidos do Mercado Pago (webhook/checkout do app).
 create table if not exists public.pedidos (
-  id            uuid primary key default gen_random_uuid(),
-  numero        text,
-  cliente_id    uuid references public.profiles(id) on delete set null,
-  status        text,
-  total         numeric(12,2) default 0,
-  verificado    boolean not null default false,
-  verificado_em timestamptz,
-  payload       jsonb,
-  created_at    timestamptz not null default now()
+  mp_payment_id      text primary key,
+  email              text,
+  valor              numeric(12,2) default 0,
+  status             text,
+  external_reference text,
+  pontos_creditados  boolean not null default false,
+  li_pedido          text,
+  created_at         timestamptz not null default now(),
+  updated_at         timestamptz not null default now()
 );
+
+-- Reparos idempotentes: a tabela pode ter sido criada por uma versão antiga.
+alter table public.pedidos add column if not exists li_pedido text;
+alter table public.pedidos add column if not exists external_reference text;
+alter table public.pedidos add column if not exists pontos_creditados boolean not null default false;
+alter table public.pedidos add column if not exists updated_at timestamptz not null default now();
 
 -- 4) admin_users: quem tem acesso ao painel admin.
 create table if not exists public.admin_users (
@@ -77,8 +83,8 @@ drop policy if exists "pedidos_self_or_admin" on public.pedidos;
 create policy "pedidos_self_or_admin"
   on public.pedidos for all
   to authenticated
-  using ((select auth.uid()) = cliente_id or public.is_admin())
-  with check ((select auth.uid()) = cliente_id or public.is_admin());
+  using (email = (select email from public.profiles where id = (select auth.uid())))
+  with check (email = (select email from public.profiles where id = (select auth.uid())));
 
 drop policy if exists "admin_users_read" on public.admin_users;
 create policy "admin_users_read"
