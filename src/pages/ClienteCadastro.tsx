@@ -42,9 +42,15 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
         if (r.session) {
           try {
             const sess = r.session as any;
-            salvarClienteSessao({ access_token: sess.access_token, refresh_token: sess.refresh_token });
+            if (sess?.access_token) {
+              salvarClienteSessao({ access_token: sess.access_token, refresh_token: sess.refresh_token });
+            }
           } catch { /* ignora */ }
         }
+        // Persiste o cliente (para sobreviver ao reload).
+        const emailL = email.trim().toLowerCase();
+        window.localStorage.setItem("dgriffe:cliente_email", emailL);
+        window.localStorage.setItem("dgriffe:cliente", JSON.stringify({ email: emailL, nome: (nome || emailL.split("@")[0] || ""), id: null }));
         window.dispatchEvent(new Event("cliente-atualizado"));
         setMensagem(r.mensagem || "Conta criada! Redirecionando...");
         setTimeout(() => onVoltar(), 1200);
@@ -89,9 +95,27 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
         if (r.session) {
           try {
             const sess = r.session as any;
-            salvarClienteSessao({ access_token: sess.access_token, refresh_token: sess.refresh_token });
+            if (sess?.access_token) {
+              salvarClienteSessao({ access_token: sess.access_token, refresh_token: sess.refresh_token });
+            }
           } catch { /* ignora */ }
         }
+        // Persiste o cliente (para sobreviver ao reload) — mesmo padrão do confirmação OTP.
+        const emailL = email.trim().toLowerCase();
+        let cli: any = null;
+        try {
+          cli = await buscarClientePorEmail(emailL);
+        } catch {
+          /* ignora falha de busca — prossegue com dados locais */
+        }
+        if (!cli) {
+          cli = { email: emailL, nome: (nome || emailL.split("@")[0] || ""), id: null };
+        }
+        window.localStorage.setItem("dgriffe:cliente_email", emailL);
+        if (cli.id != null) {
+          window.localStorage.setItem("dgriffe:cliente_id", String(cli.id));
+        }
+        window.localStorage.setItem("dgriffe:cliente", JSON.stringify(cli));
         window.dispatchEvent(new Event("cliente-atualizado"));
         setMensagem(r.mensagem || "Login OK!");
         setTimeout(() => onVoltar(), 1200);
