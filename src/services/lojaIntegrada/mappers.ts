@@ -69,8 +69,8 @@ const HEX_POR_NOME_COR: Record<string, string> = {
   verde: "#2E7D32",
 };
 
-function extrairCoresDasTags(tagsBrutas: string | undefined): { colors: string[]; colorNames: string[] } {
-  const tags = (tagsBrutas || "").split(",").map((t) => t.trim());
+function extrairCoresDasTags(tagsBrutas: string | string[] | undefined): { colors: string[]; colorNames: string[] } {
+  const tags = Array.isArray(tagsBrutas) ? tagsBrutas : (tagsBrutas || "").split(",").map((t) => t.trim());
   const coresTags = tags.filter((t) => t.toLowerCase().startsWith("cor:"));
 
   const colorNames = coresTags.map((t) => t.slice(4).trim());
@@ -131,10 +131,12 @@ export function mapProdutoParaProduct(
   const price = precoPromocional > 0 && precoPromocional < precoCheio ? precoPromocional : precoCheio;
   const originalPrice = precoPromocional > 0 && precoPromocional < precoCheio ? precoCheio : undefined;
 
-  const tags = (produto.tags || "")
-    .split(",")
-    .map((t) => t.trim().toLowerCase())
-    .filter(Boolean);
+  const tags = Array.isArray(produto.tags)
+    ? produto.tags.map((t) => t.trim().toLowerCase()).filter(Boolean)
+    : (produto.tags || "")
+        .split(",")
+        .map((t) => t.trim().toLowerCase())
+        .filter(Boolean);
 
   // A Loja Integrada pode retornar as categorias do produto em `categorias`
   // (lista de resource_uris) ou em `categoria` (resource_uri única). Resolvemos

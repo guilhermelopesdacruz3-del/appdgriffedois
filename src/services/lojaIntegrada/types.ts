@@ -64,7 +64,7 @@ export interface LIProduto {
   profundidade: string | number;
   marca: string | null;
   pai: string | null;
-  tags: string;
+  tags: string[] | string;
   url: string;
   url_video_youtube: string | null;
   imagem_principal: LIImagemProduto | null;

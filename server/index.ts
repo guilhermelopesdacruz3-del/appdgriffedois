@@ -1202,13 +1202,34 @@ app.post("/api/mp-webhook", async (req, res) => {
 // Proxy público de dados da Loja Integrada
 // ---------------------------------------------------------------------------
 
-// A API v3 da Loja Integrada NÃO retorna imagens na listagem de produtos
-// (só no GET individual). O front precisa das fotos para montar os cards,
-// então o proxy "enriquece" a listagem: busca cada produto individualmente
-// (em paralelo, com limite de concorrência) e mescla imagem_principal/imagens.
-const imagemCache = new Map(); // id -> { imagem_principal, imagens, expira }
+// A API v3 da Loja Integrada NÃO retorna imagens, preço e estoque na listagem
+// de produtos (só no GET individual). O front precisa desses dados para montar
+// os cards, então o proxy "enriquece" a listagem: busca cada produto
+// individualmente (em paralelo, com limite de concorrência) e mescla os campos
+// ausentes (imagem_principal, imagens, preco_*, estoque_*, destaque, etc.).
+const imagemCache = new Map(); // id -> { campos extras, expira }
 const IMAGEM_CACHE_TTL_MS = 10 * 60 * 1000;
 const IMAGEM_CONCURRENCIA = 6;
+
+// Campos que a listagem não devolve mas o GET individual devolve — são os que
+// o card do produto usa (foto, preço, parcelamento, estoque, destaque).
+const CAMPOS_DO_INDIVIDUAL = [
+  "imagem_principal",
+  "imagens",
+  "preco_cheio",
+  "preco_promocional",
+  "preco_custo",
+  "preco_sob_consulta",
+  "destaque",
+  "estoque_quantidade",
+  "estoque_gerenciado",
+  "estoque_situacao_em_estoque",
+  "estoque_situacao_sem_estoque",
+  "marca",
+  "data_criacao",
+  "data_modificacao",
+  "usado",
+];
 
 async function enriquecerProdutoComImagem(id) {
   const agora = Date.now();
@@ -1218,11 +1239,10 @@ async function enriquecerProdutoComImagem(id) {
     const { status, payload } = await chamarLI("GET", "produto", id, {});
     if (status !== 200) return {};
     const obj = Array.isArray(payload.objects) ? payload.objects[0] : payload;
-    const dados = {
-      imagem_principal: obj?.imagem_principal ?? null,
-      imagens: obj?.imagens ?? [],
-      expira: agora + IMAGEM_CACHE_TTL_MS,
-    };
+    const dados = { expira: agora + IMAGEM_CACHE_TTL_MS };
+    for (const campo of CAMPOS_DO_INDIVIDUAL) {
+      dados[campo] = obj?.[campo] ?? null;
+    }
     imagemCache.set(id, dados);
     return dados;
   } catch {
@@ -1231,16 +1251,19 @@ async function enriquecerProdutoComImagem(id) {
 }
 
 async function enriquecerListaProdutos(objects) {
-  const semImagem = objects.filter((p) => !p?.imagem_principal && !(p?.imagens && p.imagens.length > 0));
-  if (semImagem.length === 0) return;
-  let fila = [...semImagem];
+  const semDetalhes = objects.filter(
+    (p) => !p?.imagem_principal && !(p?.imagens && p.imagens.length > 0) && p?.preco_cheio === undefined
+  );
+  if (semDetalhes.length === 0) return;
+  let fila = [...semDetalhes];
   async function worker() {
     while (fila.length > 0) {
       const produto = fila.shift();
       const extra = await enriquecerProdutoComImagem(produto.id);
-      if (extra.imagem_principal || (extra.imagens && extra.imagens.length > 0)) {
-        produto.imagem_principal = extra.imagem_principal;
-        produto.imagens = extra.imagens;
+      for (const campo of CAMPOS_DO_INDIVIDUAL) {
+        if (produto[campo] === undefined && extra[campo] !== undefined && extra[campo] !== null) {
+          produto[campo] = extra[campo];
+        }
       }
     }
   }
