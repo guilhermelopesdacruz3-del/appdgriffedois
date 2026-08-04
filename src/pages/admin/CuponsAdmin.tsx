@@ -13,8 +13,6 @@ const cardCls =
   "bg-gradient-to-b from-white/[0.07] to-white/[0.02] border border-white/10 rounded-2xl";
 const btnPrimary =
   "bg-gradient-to-r from-gold to-gold-dark text-black font-bold rounded-xl active:scale-[0.98] transition-all hover:brightness-110 disabled:opacity-50";
-const btnSecondary =
-  "bg-white/10 text-white font-bold rounded-xl border border-white/15 hover:bg-white/15 active:scale-95 transition-all";
 
 export default function CuponsAdmin() {
   const [cupons, setCupons] = useState<Cupom[]>([]);

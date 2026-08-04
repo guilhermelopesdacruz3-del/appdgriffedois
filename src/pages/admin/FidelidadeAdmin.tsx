@@ -54,6 +54,7 @@ export default function FidelidadeAdmin() {
       setMsg(`Saldo de ${r.email} agora é ${r.saldo} pts (${r.operacao}).`);
       setPontos("");
       setMotivo("");
+      window.dispatchEvent(new Event("fidelidade-atualizada"));
     } catch (e: any) {
       setErro(e.message);
     }

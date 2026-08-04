@@ -212,7 +212,7 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
 
             {passo === "cartao" && (
               <CartaoForm
-                total={total}
+                total={totalComDesconto}
                 onVoltar={() => setPasso("escolher")}
                 onPagar={async (cardToken: string) => {
                   setPasso("processando");
@@ -223,6 +223,8 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
                       meio: "cartao",
                       email: email || undefined,
                       card_token: cardToken,
+                      pontosResgate: pontosResgate > 0 ? pontosResgate : undefined,
+                      cupom: cupomAplicado || undefined,
                     });
                     setPontosC(Number(resultado.pontos_creditados || 0));
                     setPasso("sucesso");

@@ -65,7 +65,11 @@ export default function CheckoutOtica({ produto, isOpen, onClose }: Props) {
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, meio: "pix" }),
+        body: JSON.stringify({
+          email,
+          meio: "pix",
+          items: [{ price: totalFinal, qty: 1, sku: String(produto.code), li_uri: produto.li_uri, nome: produto.name }],
+        }),
       });
 
       const data = (await res.json().catch(() => ({}))) as any;
@@ -79,7 +83,7 @@ export default function CheckoutOtica({ produto, isOpen, onClose }: Props) {
       setErro(e?.message || "Falha ao finalizar.");
       setPasso("erro");
     }
-  }, [cliente?.email]);
+  }, [cliente?.email, totalFinal]);
 
   const proximo = () => {
     switch (passo) {
