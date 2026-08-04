@@ -1201,6 +1201,52 @@ app.post("/api/mp-webhook", async (req, res) => {
 // ---------------------------------------------------------------------------
 // Proxy público de dados da Loja Integrada
 // ---------------------------------------------------------------------------
+
+// A API v3 da Loja Integrada NÃO retorna imagens na listagem de produtos
+// (só no GET individual). O front precisa das fotos para montar os cards,
+// então o proxy "enriquece" a listagem: busca cada produto individualmente
+// (em paralelo, com limite de concorrência) e mescla imagem_principal/imagens.
+const imagemCache = new Map(); // id -> { imagem_principal, imagens, expira }
+const IMAGEM_CACHE_TTL_MS = 10 * 60 * 1000;
+const IMAGEM_CONCURRENCIA = 6;
+
+async function enriquecerProdutoComImagem(id) {
+  const agora = Date.now();
+  const cached = imagemCache.get(id);
+  if (cached && cached.expira > agora) return cached;
+  try {
+    const { status, payload } = await chamarLI("GET", "produto", id, {});
+    if (status !== 200) return {};
+    const obj = Array.isArray(payload.objects) ? payload.objects[0] : payload;
+    const dados = {
+      imagem_principal: obj?.imagem_principal ?? null,
+      imagens: obj?.imagens ?? [],
+      expira: agora + IMAGEM_CACHE_TTL_MS,
+    };
+    imagemCache.set(id, dados);
+    return dados;
+  } catch {
+    return {};
+  }
+}
+
+async function enriquecerListaProdutos(objects) {
+  const semImagem = objects.filter((p) => !p?.imagem_principal && !(p?.imagens && p.imagens.length > 0));
+  if (semImagem.length === 0) return;
+  let fila = [...semImagem];
+  async function worker() {
+    while (fila.length > 0) {
+      const produto = fila.shift();
+      const extra = await enriquecerProdutoComImagem(produto.id);
+      if (extra.imagem_principal || (extra.imagens && extra.imagens.length > 0)) {
+        produto.imagem_principal = extra.imagem_principal;
+        produto.imagens = extra.imagens;
+      }
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(IMAGEM_CONCURRENCIA, semImagem.length) }, worker));
+}
+
 app.all("/api/loja-integrada/:resource/:id?", async (req, res) => {
   const { resource, id } = req.params;
 
@@ -1248,6 +1294,9 @@ app.all("/api/loja-integrada/:resource/:id?", async (req, res) => {
   try {
     const query = Object.fromEntries(Object.entries(req.query).map(([k, v]) => [k, String(v)]));
     const { status, payload } = await chamarLI(req.method, resource, id, query);
+    if (req.method === "GET" && resource === "produto" && !id && status === 200 && Array.isArray(payload?.objects)) {
+      await enriquecerListaProdutos(payload.objects);
+    }
     res.status(status).send(payload);
   } catch (err) {
     console.error("[loja-integrada-proxy] erro ao chamar a Loja Integrada:", err);
