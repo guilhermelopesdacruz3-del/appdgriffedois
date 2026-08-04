@@ -23,9 +23,10 @@ import { ApiConfigPanel } from "../components/admin/ApiConfigPanel";
 import CuponsAdmin from "./admin/CuponsAdmin";
 import FidelidadeAdmin from "./admin/FidelidadeAdmin";
 import NotificacoesAdmin from "./admin/NotificacoesAdmin";
+import ReceitasAdmin from "./admin/ReceitasAdmin";
 import AdminDashboard from "./AdminDashboard";
 
-type Aba = "pedidos" | "dashboard" | "cupons" | "fidelidade" | "notificacoes" | "relatorios" | "logs";
+type Aba = "pedidos" | "dashboard" | "cupons" | "fidelidade" | "notificacoes" | "relatorios" | "logs" | "receitas";
 
 export default function AdminPage({ onExit }: { onExit: () => void }) {
   const [token, setToken] = useState<string | null>(() => getAdminToken());
@@ -311,11 +312,13 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
 
         <div className="sticky top-[61px] z-10 bg-luxury-black/80 backdrop-blur-lg px-4 pt-3 pb-2">
           <div className="flex gap-1 p-1 rounded-2xl bg-white/[0.04] border border-white/10 overflow-x-auto">
-            {(["pedidos", "dashboard", "cupons", "fidelidade", "notificacoes", "relatorios", "logs"] as Aba[]).map((a) => (
-              <button key={a} onClick={() => setAba(a)} className={`flex-1 min-w-[80px] h-9 rounded-xl text-[11px] font-bold transition-all whitespace-nowrap ${aba === a ? "bg-gradient-to-r from-gold to-gold-dark text-black shadow-lg shadow-gold/20" : "text-gray-300 hover:text-white hover:bg-white/5"}`}>
-                {a === "pedidos" ? "Pedidos" : a === "dashboard" ? "Dashboard" : a === "cupons" ? "Cupons" : a === "fidelidade" ? "Fidelidade" : a === "notificacoes" ? "Notificações" : a === "relatorios" ? "Relatórios" : "Logs"}
-              </button>
-            ))}
+{([
+  "pedidos", "dashboard", "cupons", "fidelidade", "notificacoes", "relatorios", "logs", "receitas"
+] as Aba[]).map((a) => (
+  <button key={a} onClick={() => setAba(a)} className={`flex-1 min-w-[80px] h-9 rounded-xl text-[11px] font-bold transition-all whitespace-nowrap ${aba === a ? "bg-gradient-to-r from-gold to-gold-dark text-black shadow-lg shadow-gold/20" : "text-gray-300 hover:text-white hover:bg-white/5"}`}>
+    {a === "pedidos" ? "Pedidos" : a === "dashboard" ? "Dashboard" : a === "cupons" ? "Cupons" : a === "fidelidade" ? "Fidelidade" : a === "notificacoes" ? "Notificações" : a === "relatorios" ? "Relatórios" : a === "logs" ? "Logs" : "Receitas"}
+  </button>
+))}
           </div>
         </div>
 
@@ -506,10 +509,12 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-        </div>
-      </div>
+             </div>
+           )}
+
+           {aba === "receitas" && <ReceitasAdmin />}
+         </div>
+       </div>
 
       {selecionado !== null && (
         <div className="fixed inset-0 z-40 bg-black/70 backdrop-blur-sm flex items-end justify-center" onClick={() => setSelecionado(null)}>

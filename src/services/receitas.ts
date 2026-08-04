@@ -1,5 +1,18 @@
 import type { Receita } from "../types";
 
+const camposOpticos = [
+  "nome", "medico", "data_receita",
+  "esf_od_longe", "cil_od_longe", "eixo_od_longe",
+  "esf_oe_longe", "cil_oe_longe", "eixo_oe_longe",
+  "esf_od_perto", "cil_od_perto", "eixo_od_perto",
+  "esf_oe_perto", "cil_oe_perto", "eixo_oe_perto",
+  "dip",
+] as const;
+
+export type DadosReceitaOptica = {
+  [K in (typeof camposOpticos)[number]]?: string | number | null;
+};
+
 export async function getReceitas(email: string): Promise<Receita[]> {
   const base = (import.meta.env.VITE_LOJA_INTEGRADA_PROXY_URL as string | undefined)?.replace(/\/$/, "") || "";
   const res = await fetch(
@@ -11,11 +24,10 @@ export async function getReceitas(email: string): Promise<Receita[]> {
   return json.receitas || [];
 }
 
-export async function criarReceita(email: string, dados: {
-  tipo?: string;
-  descricao: string;
-  arquivo_url?: string | null;
-}): Promise<Receita> {
+export async function criarReceita(
+  email: string,
+  dados: { tipo?: string; descricao: string; arquivo_url?: string | null } & DadosReceitaOptica
+): Promise<Receita> {
   const base = (import.meta.env.VITE_LOJA_INTEGRADA_PROXY_URL as string | undefined)?.replace(/\/$/, "") || "";
   const res = await fetch(`${base}/api/cliente/receitas`, {
     method: "POST",
@@ -30,7 +42,7 @@ export async function criarReceita(email: string, dados: {
 export async function atualizarReceita(
   id: string,
   email: string,
-  dados: { tipo?: string; descricao?: string; arquivo_url?: string | null }
+  dados: { tipo?: string; descricao?: string; arquivo_url?: string | null } & Partial<DadosReceitaOptica>
 ): Promise<Receita> {
   const base = (import.meta.env.VITE_LOJA_INTEGRADA_PROXY_URL as string | undefined)?.replace(/\/$/, "") || "";
   const res = await fetch(`${base}/api/cliente/receitas/${encodeURIComponent(id)}`, {

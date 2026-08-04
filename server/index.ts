@@ -693,6 +693,24 @@ app.get("/api/admin/clientes", requireAdmin, async (_req, res) => {
 });
 
 // ---------------------------------------------------------------------------
+// RECEITAS — admin pode listar todas as receitas ópticas dos clientes.
+app.get("/api/admin/receitas", requireAdmin, async (req, res) => {
+  try {
+    const sb = supabaseClient();
+    if (!sb) return res.status(503).json({ erro: "Banco indisponível." });
+    const { data, error } = await sb
+      .from("receitas")
+      .select("id, email, nome, medico, data_receita, tipo, descricao, esf_od_longe, cil_od_longe, eixo_od_longe, esf_oe_longe, cil_oe_longe, eixo_oe_longe, esf_od_perto, cil_od_perto, eixo_od_perto, esf_oe_perto, cil_oe_perto, eixo_oe_perto, dip, created_at")
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return res.json({ ok: true, receitas: data || [] });
+  } catch (err) {
+    console.error("[admin] erro ao listar receitas:", err);
+    return res.status(502).json({ erro: "Falha ao listar receitas." });
+  }
+});
+
+// ---------------------------------------------------------------------------
 // CONFIG DE APIs (chaves da Loja Integrada / Mercado Pago) — usado pelo painel admin.
 // Fonte de verdade: Supabase (tabela store_config) quando SUPABASE_* estão setadas;
 // caso contrário, fallback para arquivo local .store-config.json. NUNCA devolve

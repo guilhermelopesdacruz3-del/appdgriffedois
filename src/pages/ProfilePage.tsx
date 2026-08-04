@@ -9,7 +9,7 @@ import EditarPerfil from "../components/cliente/EditarPerfil";
 import MeusCupons from "./MeusCupons";
 import { formatPrice } from "../utils";
 
-import { getReceitas, criarReceita, apagarReceita } from "../services/receitas";
+import { getReceitas, criarReceita, atualizarReceita, apagarReceita } from "../services/receitas";
 import type { Receita } from "../types";
 import { cadastrarCliente, verificarOtp } from "../services/cliente";
 import { salvarClienteSessao } from "../utils/cookies";
@@ -21,110 +21,242 @@ function ReceitasSalvas({ email }: { email: string }) {
   const [itens, setItens] = useState<Receita[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
-  const [texto, setTexto] = useState("");
-  const [tipo, setTipo] = useState<Receita["tipo"]>("grau");
+  const [editando, setEditando] = useState<string | null>(null);
+  const [form, setForm] = useState<{
+    tipo: Receita["tipo"];
+    descricao: string;
+    nome: string;
+    medico: string;
+    data_receita: string;
+    esf_od_longe: string;
+    cil_od_longe: string;
+    eixo_od_longe: string;
+    esf_oe_longe: string;
+    cil_oe_longe: string;
+    eixo_oe_longe: string;
+    esf_od_perto: string;
+    cil_od_perto: string;
+    eixo_od_perto: string;
+    esf_oe_perto: string;
+    cil_oe_perto: string;
+    eixo_oe_perto: string;
+    dip: string;
+  }>({
+    tipo: "grau", descricao: "", nome: "", medico: "", data_receita: "",
+    esf_od_longe: "", cil_od_longe: "", eixo_od_longe: "",
+    esf_oe_longe: "", cil_oe_longe: "", eixo_oe_longe: "",
+    esf_od_perto: "", cil_od_perto: "", eixo_od_perto: "",
+    esf_oe_perto: "", cil_oe_perto: "", eixo_oe_perto: "",
+    dip: "",
+  });
 
   const carregar = async () => {
-    setLoading(true);
-    setErro(null);
-    try {
-      const lista = await getReceitas(email);
-      setItens(lista);
-    } catch (e) {
-      setErro((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
+    setLoading(true); setErro(null);
+    try { setItens(await getReceitas(email)); } catch (e) { setErro((e as Error).message); } finally { setLoading(false); }
   };
 
-  useEffect(() => {
-    if (!email) return;
-    carregar();
-  }, [email]);
+  useEffect(() => { if (!email) return; carregar(); }, [email]);
 
   const salvar = async () => {
-    if (!texto.trim()) return;
+    if (!form.descricao.trim()) return;
     try {
-      const criada = await criarReceita(email, { tipo, descricao: texto.trim() });
+      const criada = await criarReceita(email, {
+        tipo: form.tipo, descricao: form.descricao.trim(),
+        nome: form.nome || null, medico: form.medico || null, data_receita: form.data_receita || null,
+        esf_od_longe: form.esf_od_longe ? Number(form.esf_od_longe) : null,
+        cil_od_longe: form.cil_od_longe ? Number(form.cil_od_longe) : null,
+        eixo_od_longe: form.eixo_od_longe ? Number(form.eixo_od_longe) : null,
+        esf_oe_longe: form.esf_oe_longe ? Number(form.esf_oe_longe) : null,
+        cil_oe_longe: form.cil_oe_longe ? Number(form.cil_oe_longe) : null,
+        eixo_oe_longe: form.eixo_oe_longe ? Number(form.eixo_oe_longe) : null,
+        esf_od_perto: form.esf_od_perto ? Number(form.esf_od_perto) : null,
+        cil_od_perto: form.cil_od_perto ? Number(form.cil_od_perto) : null,
+        eixo_od_perto: form.eixo_od_perto ? Number(form.eixo_od_perto) : null,
+        esf_oe_perto: form.esf_oe_perto ? Number(form.esf_oe_perto) : null,
+        cil_oe_perto: form.cil_oe_perto ? Number(form.cil_oe_perto) : null,
+        eixo_oe_perto: form.eixo_oe_perto ? Number(form.eixo_oe_perto) : null,
+        dip: form.dip ? Number(form.dip) : null,
+      });
       setItens((prev) => [criada, ...prev]);
-      setTexto("");
-    } catch (e) {
-      setErro((e as Error).message);
-    }
+      setForm({ tipo: "grau", descricao: "", nome: "", medico: "", data_receita: "", esf_od_longe: "", cil_od_longe: "", eixo_od_longe: "", esf_oe_longe: "", cil_oe_longe: "", eixo_oe_longe: "", esf_od_perto: "", cil_od_perto: "", eixo_od_perto: "", esf_oe_perto: "", cil_oe_perto: "", eixo_oe_perto: "", dip: "" });
+    } catch (e) { setErro((e as Error).message); }
+  };
+
+  const iniciarEdicao = (r: Receita) => {
+    setEditando(r.id);
+    setForm({
+      tipo: r.tipo, descricao: r.descricao || "", nome: r.nome || "", medico: r.medico || "", data_receita: r.data_receita || "",
+      esf_od_longe: r.esf_od_longe != null ? String(r.esf_od_longe) : "", cil_od_longe: r.cil_od_longe != null ? String(r.cil_od_longe) : "", eixo_od_longe: r.eixo_od_longe != null ? String(r.eixo_od_longe) : "",
+      esf_oe_longe: r.esf_oe_longe != null ? String(r.esf_oe_longe) : "", cil_oe_longe: r.cil_oe_longe != null ? String(r.cil_oe_longe) : "", eixo_oe_longe: r.eixo_oe_longe != null ? String(r.eixo_oe_longe) : "",
+      esf_od_perto: r.esf_od_perto != null ? String(r.esf_od_perto) : "", cil_od_perto: r.cil_od_perto != null ? String(r.cil_od_perto) : "", eixo_od_perto: r.eixo_od_perto != null ? String(r.eixo_od_perto) : "",
+      esf_oe_perto: r.esf_oe_perto != null ? String(r.esf_oe_perto) : "", cil_oe_perto: r.cil_oe_perto != null ? String(r.cil_oe_perto) : "", eixo_oe_perto: r.eixo_oe_perto != null ? String(r.eixo_oe_perto) : "",
+      dip: r.dip != null ? String(r.dip) : "",
+    });
+  };
+
+  const cancelarEdicao = () => { setEditando(null); setForm({ tipo: "grau", descricao: "", nome: "", medico: "", data_receita: "", esf_od_longe: "", cil_od_longe: "", eixo_od_longe: "", esf_oe_longe: "", cil_oe_longe: "", eixo_oe_longe: "", esf_od_perto: "", cil_od_perto: "", eixo_od_perto: "", esf_oe_perto: "", cil_oe_perto: "", eixo_oe_perto: "", dip: "" }); };
+
+  const salvarEdicao = async () => {
+    if (!editando || !form.descricao.trim()) return;
+    try {
+      await atualizarReceita(editando, email, {
+        tipo: form.tipo, descricao: form.descricao.trim(),
+        nome: form.nome || null, medico: form.medico || null, data_receita: form.data_receita || null,
+        esf_od_longe: form.esf_od_longe ? Number(form.esf_od_longe) : null,
+        cil_od_longe: form.cil_od_longe ? Number(form.cil_od_longe) : null,
+        eixo_od_longe: form.eixo_od_longe ? Number(form.eixo_od_longe) : null,
+        esf_oe_longe: form.esf_oe_longe ? Number(form.esf_oe_longe) : null,
+        cil_oe_longe: form.cil_oe_longe ? Number(form.cil_oe_longe) : null,
+        eixo_oe_longe: form.eixo_oe_longe ? Number(form.eixo_oe_longe) : null,
+        esf_od_perto: form.esf_od_perto ? Number(form.esf_od_perto) : null,
+        cil_od_perto: form.cil_od_perto ? Number(form.cil_od_perto) : null,
+        eixo_od_perto: form.eixo_od_perto ? Number(form.eixo_od_perto) : null,
+        esf_oe_perto: form.esf_oe_perto ? Number(form.esf_oe_perto) : null,
+        cil_oe_perto: form.cil_oe_perto ? Number(form.cil_oe_perto) : null,
+        eixo_oe_perto: form.eixo_oe_perto ? Number(form.eixo_oe_perto) : null,
+        dip: form.dip ? Number(form.dip) : null,
+      });
+      setEditando(null);
+      carregar();
+    } catch (e) { setErro((e as Error).message); }
   };
 
   const apagar = async (id: string) => {
-    try {
-      await apagarReceita(id, email);
-      setItens((prev) => prev.filter((x) => x.id !== id));
-    } catch (e) {
-      setErro((e as Error).message);
-    }
+    try { await apagarReceita(id, email); setItens((prev) => prev.filter((x) => x.id !== id)); } catch (e) { setErro((e as Error).message); }
+  };
+
+  const numInput = (val: string, onChange: (v: string) => void) => (
+    <input type="number" step="0.25" value={val} onChange={(e) => onChange(e.target.value)} placeholder="—" className="w-14 h-8 px-1 rounded-lg border border-gray-200 text-[10px] text-center focus:outline-none focus:border-gold" />
+  );
+
+  const Campo = (label: string, val: string, onChange: (v: string) => void) => (
+    <div className="flex flex-col gap-0.5">
+      <label className="text-[9px] text-gray-400 text-center">{label}</label>
+      <input value={val} onChange={(e) => onChange(e.target.value)} placeholder="—" className="h-8 px-1 rounded-lg border border-gray-200 text-[10px] text-center focus:outline-none focus:border-gold" />
+    </div>
+  );
+
+  const TabelaReceita = (r: Receita) => {
+    const n = (v: number | null | undefined) => v != null ? v.toFixed(2) : "—";
+    return (
+      <div className="overflow-x-auto">
+        <table className="w-full text-[10px] border-collapse">
+          <thead>
+            <tr className="bg-ice text-gray-500">
+              <th className="p-1 border border-ice-dark" colSpan={4}>OD (Direito)</th>
+              <th className="p-1 border border-ice-dark" colSpan={4}>OE (Esquerdo)</th>
+            </tr>
+            <tr className="bg-ice text-gray-400">
+              <th className="p-1 border border-ice-dark">Esf.</th>
+              <th className="p-1 border border-ice-dark">Cil.</th>
+              <th className="p-1 border border-ice-dark">Eixo</th>
+              <th className="p-1 border border-ice-dark">DIP</th>
+              <th className="p-1 border border-ice-dark">Esf.</th>
+              <th className="p-1 border border-ice-dark">Cil.</th>
+              <th className="p-1 border border-ice-dark">Eixo</th>
+              <th className="p-1 border border-ice-dark">DIP</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td className="p-1 border border-ice-dark text-center">{n(r.esf_od_longe)}</td>
+              <td className="p-1 border border-ice-dark text-center">{n(r.cil_od_longe)}</td>
+              <td className="p-1 border border-ice-dark text-center">{n(r.eixo_od_longe)}</td>
+              <td className="p-1 border border-ice-dark text-center" rowSpan={2}>{n(r.dip)} mm</td>
+              <td className="p-1 border border-ice-dark text-center">{n(r.esf_oe_longe)}</td>
+              <td className="p-1 border border-ice-dark text-center">{n(r.cil_oe_longe)}</td>
+              <td className="p-1 border border-ice-dark text-center">{n(r.eixo_oe_longe)}</td>
+              <td className="p-1 border border-ice-dark" />
+            </tr>
+            <tr>
+              <td className="p-1 border border-ice-dark text-center">{n(r.esf_od_perto)}</td>
+              <td className="p-1 border border-ice-dark text-center">{n(r.cil_od_perto)}</td>
+              <td className="p-1 border border-ice-dark text-center">{n(r.eixo_od_perto)}</td>
+              <td className="p-1 border border-ice-dark text-center">{n(r.esf_oe_perto)}</td>
+              <td className="p-1 border border-ice-dark text-center">{n(r.cil_oe_perto)}</td>
+              <td className="p-1 border border-ice-dark text-center">{n(r.eixo_oe_perto)}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    );
   };
 
   return (
     <div className="space-y-3">
       {erro && <p className="text-[11px] text-red-500">{erro}</p>}
 
-      <div className="bg-white rounded-2xl p-4 shadow-sm space-y-2">
-        <div className="flex gap-2">
-          <select
-            value={tipo}
-            onChange={(e) => setTipo(e.target.value as Receita["tipo"])}
-            className="h-10 px-3 rounded-xl border border-gray-200 text-xs"
-          >
+      <div className="bg-white rounded-2xl p-4 shadow-sm space-y-3">
+        <p className="text-xs font-bold text-luxury-black">Nova receita</p>
+        <div className="grid grid-cols-2 gap-2">
+          <select value={form.tipo} onChange={(e) => setForm((p) => ({ ...p, tipo: e.target.value as Receita["tipo"] }))} className="h-10 px-3 rounded-xl border border-gray-200 text-xs">
             <option value="grau">Grau</option>
             <option value="lente">Lente</option>
           </select>
-          <input
-            value={texto}
-            onChange={(e) => setTexto(e.target.value)}
-            placeholder="Cole ou digite a receita"
-            className="flex-1 h-10 px-3 rounded-xl border border-gray-200 text-xs"
-          />
+          <input value={form.nome} onChange={(e) => setForm((p) => ({ ...p, nome: e.target.value }))} placeholder="Nome do paciente" className="h-10 px-3 rounded-xl border border-gray-200 text-xs" />
         </div>
-        <button
-          onClick={salvar}
-          disabled={!texto.trim()}
-          className="w-full h-10 bg-luxury-black text-white text-xs font-bold rounded-xl disabled:opacity-50"
-        >
-          Salvar receita
-        </button>
+        <div className="grid grid-cols-2 gap-2">
+          <input value={form.medico} onChange={(e) => setForm((p) => ({ ...p, medico: e.target.value }))} placeholder="Médico" className="h-10 px-3 rounded-xl border border-gray-200 text-xs" />
+          <input type="date" value={form.data_receita} onChange={(e) => setForm((p) => ({ ...p, data_receita: e.target.value }))} className="h-10 px-3 rounded-xl border border-gray-200 text-xs" />
+        </div>
+
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Para Longe</p>
+        <div className="grid grid-cols-4 gap-2">
+          <div className="text-center"><p className="text-[9px] text-gray-400 mb-1">OD</p><div className="grid grid-cols-4 gap-1">{numInput(form.esf_od_longe, (v) => setForm((p) => ({ ...p, esf_od_longe: v })))}</div></div>
+          <div className="text-center"><p className="text-[9px] text-gray-400 mb-1">OE</p><div className="grid grid-cols-4 gap-1">{numInput(form.esf_oe_longe, (v) => setForm((p) => ({ ...p, esf_oe_longe: v })))}</div></div>
+        </div>
+
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Para Perto</p>
+        <div className="grid grid-cols-4 gap-2">
+          <div className="text-center"><p className="text-[9px] text-gray-400 mb-1">OD</p><div className="grid grid-cols-4 gap-1">{numInput(form.esf_od_perto, (v) => setForm((p) => ({ ...p, esf_od_perto: v })))}</div></div>
+          <div className="text-center"><p className="text-[9px] text-gray-400 mb-1">OE</p><div className="grid grid-cols-4 gap-1">{numInput(form.esf_oe_perto, (v) => setForm((p) => ({ ...p, esf_oe_perto: v })))}</div></div>
+        </div>
+
+        <div className="flex gap-2 items-center">
+          {Campo("DIP (mm)", form.dip, (v) => setForm((p) => ({ ...p, dip: v })))}
+        </div>
+
+        <textarea value={form.descricao} onChange={(e) => setForm((p) => ({ ...p, descricao: e.target.value }))} placeholder="Observações" className="w-full h-20 px-3 py-2 rounded-xl border border-gray-200 text-xs resize-none focus:outline-none focus:border-gold" />
+        <button onClick={salvar} disabled={!form.descricao.trim()} className="w-full h-10 bg-luxury-black text-white text-xs font-bold rounded-xl disabled:opacity-50">Salvar receita</button>
       </div>
 
-      {loading && (
-        <div className="bg-white rounded-2xl p-4 shadow-sm text-center text-xs text-gray-400">
-          Carregando receitas...
-        </div>
-      )}
-
-      {!loading && itens.length === 0 && (
-        <div className="bg-white rounded-2xl p-4 shadow-sm text-center text-xs text-gray-400">
-          Nenhuma receita salva.
-        </div>
-      )}
+      {loading && <div className="bg-white rounded-2xl p-4 shadow-sm text-center text-xs text-gray-400">Carregando receitas...</div>}
+      {!loading && itens.length === 0 && <div className="bg-white rounded-2xl p-4 shadow-sm text-center text-xs text-gray-400">Nenhuma receita salva.</div>}
 
       <div className="space-y-2">
         {itens.map((r) => (
           <div key={r.id} className="bg-white rounded-2xl p-4 shadow-sm space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] uppercase tracking-wider text-gray-400">
-                {r.tipo}
-              </span>
-              <button
-                onClick={() => apagar(r.id)}
-                className="text-[10px] font-bold text-red-500"
-              >
-                Apagar
-              </button>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase tracking-wider text-gray-400">{r.tipo}</span>
+                {r.nome && <span className="text-[10px] font-semibold text-luxury-black">{r.nome}</span>}
+                {r.medico && <span className="text-[10px] text-gray-400">— {r.medico}</span>}
+              </div>
+              <div className="flex gap-2">
+                <button onClick={() => iniciarEdicao(r)} className="text-[10px] font-bold text-gold">Editar</button>
+                <button onClick={() => apagar(r.id)} className="text-[10px] font-bold text-red-500">Apagar</button>
+              </div>
             </div>
-            <p className="text-xs text-luxury-black whitespace-pre-wrap">{r.descricao}</p>
-            <p className="text-[10px] text-gray-400">
-              {new Date(r.created_at).toLocaleString("pt-BR")}
-            </p>
+            {TabelaReceita(r)}
+            {r.descricao && <p className="text-[10px] text-gray-400 whitespace-pre-wrap">{r.descricao}</p>}
+            {r.data_receita && <p className="text-[10px] text-gray-400">{new Date(r.data_receita).toLocaleDateString("pt-BR")}</p>}
+            <p className="text-[10px] text-gray-400">{new Date(r.created_at).toLocaleString("pt-BR")}</p>
           </div>
         ))}
       </div>
+
+      {editando && (
+        <div className="fixed inset-0 z-[80] bg-black/60 flex items-center justify-center" onClick={cancelarEdicao}>
+          <div className="bg-white rounded-2xl p-5 max-w-md w-full mx-4 space-y-3" onClick={(e) => e.stopPropagation()}>
+            <p className="text-sm font-bold text-luxury-black">Editar receita</p>
+            <textarea value={form.descricao} onChange={(e) => setForm((p) => ({ ...p, descricao: e.target.value }))} className="w-full h-20 px-3 py-2 rounded-xl border border-gray-200 text-xs resize-none focus:outline-none focus:border-gold" />
+            <div className="flex gap-2">
+              <button onClick={cancelarEdicao} className="flex-1 h-10 border border-gray-200 text-xs font-bold rounded-xl">Cancelar</button>
+              <button onClick={salvarEdicao} className="flex-1 h-10 bg-luxury-black text-white text-xs font-bold rounded-xl">Salvar</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

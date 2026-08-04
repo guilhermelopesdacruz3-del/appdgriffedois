@@ -252,3 +252,34 @@ export function pedidoParaCSV(pedidos: AdminPedido[]): string {
   );
   return [header.join(","), ...linhas].join("\n");
 }
+
+export interface ReceitaAdmin {
+  id: string;
+  email: string;
+  nome: string | null;
+  medico: string | null;
+  data_receita: string | null;
+  tipo: string;
+  descricao: string;
+  esf_od_longe: number | null;
+  cil_od_longe: number | null;
+  eixo_od_longe: number | null;
+  esf_oe_longe: number | null;
+  cil_oe_longe: number | null;
+  eixo_oe_longe: number | null;
+  esf_od_perto: number | null;
+  cil_od_perto: number | null;
+  eixo_od_perto: number | null;
+  esf_oe_perto: number | null;
+  cil_oe_perto: number | null;
+  eixo_oe_perto: number | null;
+  dip: number | null;
+  created_at: string;
+}
+
+export async function listarReceitasAdmin(): Promise<{ total: number; receitas: ReceitaAdmin[] }> {
+  return adminRequest<{ ok: boolean; receitas: ReceitaAdmin[] }>("/receitas").then((r) => ({
+    total: r.receitas?.length || 0,
+    receitas: r.receitas || [],
+  }));
+}

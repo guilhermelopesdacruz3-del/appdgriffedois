@@ -46,7 +46,7 @@ receitasApp.get("/", async (req, res) => {
 
 // POST /api/cliente/receitas
 receitasApp.post("/", async (req, res) => {
-  const { email, tipo, descricao, arquivo_url } = req.body || {};
+  const { email, tipo, descricao, arquivo_url, nome, medico, data_receita, esf_od_longe, cil_od_longe, eixo_od_longe, esf_oe_longe, cil_oe_longe, eixo_oe_longe, esf_od_perto, cil_od_perto, eixo_od_perto, esf_oe_perto, cil_oe_perto, eixo_oe_perto, dip } = req.body || {};
   const e = String(email || "").trim().toLowerCase();
   if (!e) return res.status(400).json({ erro: "E-mail obrigatório." });
   const desc = String(descricao || "").trim();
@@ -60,7 +60,7 @@ receitasApp.post("/", async (req, res) => {
 
   const { data, error } = await sb
     .from("receitas")
-    .insert({ user_id: userId, email: e, tipo: tipo || "grau", descricao: desc, arquivo_url: arquivo_url || null })
+    .insert({ user_id: userId, email: e, tipo: tipo || "grau", descricao: desc, arquivo_url: arquivo_url || null, nome, medico, data_receita, esf_od_longe, cil_od_longe, eixo_od_longe, esf_oe_longe, cil_oe_longe, eixo_oe_longe, esf_od_perto, cil_od_perto, eixo_od_perto, esf_oe_perto, cil_oe_perto, eixo_oe_perto, dip })
     .select("*")
     .single();
 
@@ -74,7 +74,7 @@ receitasApp.post("/", async (req, res) => {
 
 // PUT /api/cliente/receitas/:id
 receitasApp.put("/:id", async (req, res) => {
-  const { email, tipo, descricao, arquivo_url } = req.body || {};
+  const { email, tipo, descricao, arquivo_url, nome, medico, data_receita, esf_od_longe, cil_od_longe, eixo_od_longe, esf_oe_longe, cil_oe_longe, eixo_oe_longe, esf_od_perto, cil_od_perto, eixo_od_perto, esf_oe_perto, cil_oe_perto, eixo_oe_perto, dip } = req.body || {};
   const e = String(email || "").trim().toLowerCase();
   if (!e) return res.status(400).json({ erro: "E-mail obrigatório." });
 
@@ -88,6 +88,22 @@ receitasApp.put("/:id", async (req, res) => {
   if (tipo !== undefined) updates.tipo = tipo;
   if (descricao !== undefined) updates.descricao = descricao;
   if (arquivo_url !== undefined) updates.arquivo_url = arquivo_url;
+  if (nome !== undefined) updates.nome = nome;
+  if (medico !== undefined) updates.medico = medico;
+  if (data_receita !== undefined) updates.data_receita = data_receita || null;
+  if (esf_od_longe !== undefined) updates.esf_od_longe = esf_od_longe;
+  if (cil_od_longe !== undefined) updates.cil_od_longe = cil_od_longe;
+  if (eixo_od_longe !== undefined) updates.eixo_od_longe = eixo_od_longe;
+  if (esf_oe_longe !== undefined) updates.esf_oe_longe = esf_oe_longe;
+  if (cil_oe_longe !== undefined) updates.cil_oe_longe = cil_oe_longe;
+  if (eixo_oe_longe !== undefined) updates.eixo_oe_longe = eixo_oe_longe;
+  if (esf_od_perto !== undefined) updates.esf_od_perto = esf_od_perto;
+  if (cil_od_perto !== undefined) updates.cil_od_perto = cil_od_perto;
+  if (eixo_od_perto !== undefined) updates.eixo_od_perto = eixo_od_perto;
+  if (esf_oe_perto !== undefined) updates.esf_oe_perto = esf_oe_perto;
+  if (cil_oe_perto !== undefined) updates.cil_oe_perto = cil_oe_perto;
+  if (eixo_oe_perto !== undefined) updates.eixo_oe_perto = eixo_oe_perto;
+  if (dip !== undefined) updates.dip = dip;
 
   const { data, error } = await sb
     .from("receitas")
