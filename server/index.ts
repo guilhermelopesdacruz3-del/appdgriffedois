@@ -368,7 +368,7 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get("/health", (_req, res) => res.json({ ok: true }));
+app.get("/health", (_req, res) => res.json({ ok: true, sync: syncState.progresso }));
 
 // Vídeos mais recentes do canal D'Griffe (YouTube RSS, sem API key).
 // Usado pela seção "D'Griffe no YouTube" do app — sempre os últimos vídeos.
@@ -1206,16 +1206,107 @@ app.post("/api/mp-webhook", async (req, res) => {
 // ---------------------------------------------------------------------------
 
 // A API v3 da Loja Integrada NÃO retorna imagens, preço e estoque na listagem
-// de produtos (só no GET individual). O front precisa desses dados para montar
-// os cards, então o proxy "enriquece" a listagem: busca cada produto
-// individualmente (em paralelo, com limite de concorrência) e mescla os campos
-// ausentes (imagem_principal, imagens, preco_*, estoque_*, destaque, etc.).
+// de produtos (só no GET individual). Para o catálogo inteiro (19 mil produtos)
+// não é viável buscar 1 por 1 a cada página — então o servidor sincroniza em
+// background as três fontes em massa (/produto_imagem, /produto_preco,
+// /produto_estoque) e guarda em memória. O enriquecimento da listagem consulta
+// esses mapas (instantâneo) e, se ainda não sincronizado, cai no GET individual.
+const CDN_PREFIX = "https://cdn.awsli.com.br";
+const imagemSync = new Map(); // produtoId -> { principal: string, todas: string[] }
+const precoSync = new Map(); // produtoId -> { cheio, promocional, sob_consulta }
+const estoqueSync = new Map(); // produtoId -> { quantidade, disponivel, gerenciado }
+let syncState = { rodando: false, ultimoOk: 0, progresso: "" };
+
+function extrairIdDaUri(uri) {
+  const m = String(uri || "").match(/(\d+)\/?$/);
+  return m ? Number(m[1]) : null;
+}
+
+async function paginarRecurso(recurso, processaItem) {
+  let offset = 0;
+  const limit = 100;
+  for (;;) {
+    const { status, payload } = await chamarLI("GET", recurso, undefined, { limit, offset });
+    if (status !== 200) {
+      console.error(`[sync-${recurso}] status ${status} no offset ${offset}`);
+      return;
+    }
+    const objetos = payload.objects || [];
+    for (const item of objetos) processaItem(item);
+    if (objetos.length < limit) return;
+    offset += limit;
+  }
+}
+
+async function sincronizarDadosLoja() {
+  if (syncState.rodando) return;
+  syncState.rodando = true;
+  syncState.progresso = "iniciando";
+  const t0 = Date.now();
+  try {
+    // Imagens: caminho -> https://cdn.awsli.com.br/800x800/{caminho}
+    await paginarRecurso("produto_imagem", (img) => {
+      const produtoId = extrairIdDaUri(img.produto);
+      if (!produtoId) return;
+      const url = img.caminho ? `${CDN_PREFIX}/800x800/${img.caminho}` : null;
+      let registro = imagemSync.get(produtoId);
+      if (!registro) {
+        registro = { principal: null, todas: [] };
+        imagemSync.set(produtoId, registro);
+      }
+      if (url) registro.todas.push(url);
+      if (img.principal && !registro.principal) registro.principal = url;
+    });
+
+    // Preços
+    await paginarRecurso("produto_preco", (preco) => {
+      const produtoId = extrairIdDaUri(preco.produto);
+      if (!produtoId) return;
+      precoSync.set(produtoId, {
+        cheio: preco.cheio ?? null,
+        promocional: preco.promocional ?? null,
+        sob_consulta: preco.sob_consulta ?? false,
+      });
+    });
+
+    // Estoque
+    await paginarRecurso("produto_estoque", (est) => {
+      const produtoId = extrairIdDaUri(est.produto);
+      if (!produtoId) return;
+      estoqueSync.set(produtoId, {
+        quantidade: est.quantidade ?? 0,
+        disponivel: est.quantidade_disponivel ?? est.quantidade ?? 0,
+        gerenciado: est.gerenciado ?? false,
+        em_estoque: est.situacao_em_estoque ?? null,
+        sem_estoque: est.situacao_sem_estoque ?? null,
+      });
+    });
+
+    syncState.ultimoOk = Date.now();
+    syncState.progresso = `ok: ${imagemSync.size} imagens, ${precoSync.size} precos, ${estoqueSync.size} estoques em ${((Date.now() - t0) / 1000).toFixed(0)}s`;
+    console.log(`[loja-integrada-proxy] sync em massa: ${syncState.progresso}`);
+  } catch (e) {
+    console.error("[loja-integrada-proxy] sync em massa falhou:", e?.message);
+    syncState.progresso = `erro: ${e?.message}`;
+  } finally {
+    syncState.rodando = false;
+  }
+}
+
+// Sincroniza no boot (se houver chaves) e a cada 15 minutos.
+setTimeout(() => {
+  if (!DEMO && !MOCK && process.env.LOJA_INTEGRADA_APP_KEY) sincronizarDadosLoja();
+}, 2000);
+setInterval(() => {
+  if (!DEMO && !MOCK && process.env.LOJA_INTEGRADA_APP_KEY) sincronizarDadosLoja();
+}, 15 * 60 * 1000);
+
+// Fallback individual (usado enquanto o sync em massa ainda não cobriu o produto).
 const imagemCache = new Map(); // id -> { campos extras, expira }
 const IMAGEM_CACHE_TTL_MS = 10 * 60 * 1000;
 const IMAGEM_CONCURRENCIA = 6;
 
-// Campos que a listagem não devolve mas o GET individual devolve — são os que
-// o card do produto usa (foto, preço, parcelamento, estoque, destaque).
+// Campos que o GET individual devolve e a listagem não — usados no fallback.
 const CAMPOS_DO_INDIVIDUAL = [
   "imagem_principal",
   "imagens",
@@ -1253,12 +1344,46 @@ async function enriquecerProdutoComImagem(id) {
   }
 }
 
+/** Aplica dados sincronizados (imagem/preço/estoque em massa) a um produto da listagem. */
+function aplicarDadosSincronizados(produto) {
+  const id = produto?.id;
+  if (!id) return;
+  const img = imagemSync.get(id);
+  if (img && !produto.imagem_principal && img.principal) {
+    produto.imagem_principal = {
+      caminho: img.principal.replace(`${CDN_PREFIX}/800x800/`, ""),
+      grande: img.principal,
+      media: img.principal,
+      icone: img.principal,
+      pequena: img.principal,
+    };
+  }
+  const preco = precoSync.get(id);
+  if (preco && produto.preco_cheio === undefined) {
+    produto.preco_cheio = preco.cheio ?? 0;
+    produto.preco_promocional = preco.promocional ?? null;
+    produto.preco_sob_consulta = preco.sob_consulta ?? false;
+  }
+  const est = estoqueSync.get(id);
+  if (est && produto.estoque_quantidade === undefined) {
+    produto.estoque_quantidade = est.disponivel;
+    produto.estoque_gerenciado = est.gerenciado;
+    produto.estoque_situacao_em_estoque = est.em_estoque;
+    produto.estoque_situacao_sem_estoque = est.sem_estoque;
+  }
+}
+
 async function enriquecerListaProdutos(objects) {
   const semDetalhes = objects.filter(
     (p) => !p?.imagem_principal && !(p?.imagens && p.imagens.length > 0) && p?.preco_cheio === undefined
   );
   if (semDetalhes.length === 0) return;
-  let fila = [...semDetalhes];
+  for (const produto of objects) aplicarDadosSincronizados(produto);
+  const aindaFaltam = objects.filter(
+    (p) => (!p?.imagem_principal && !(p?.imagens && p.imagens.length > 0)) || p?.preco_cheio === undefined
+  );
+  if (aindaFaltam.length === 0) return;
+  let fila = [...aindaFaltam];
   async function worker() {
     while (fila.length > 0) {
       const produto = fila.shift();
@@ -1270,7 +1395,7 @@ async function enriquecerListaProdutos(objects) {
       }
     }
   }
-  await Promise.all(Array.from({ length: Math.min(IMAGEM_CONCURRENCIA, semDetalhes.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(IMAGEM_CONCURRENCIA, aindaFaltam.length) }, worker));
 }
 
 app.all("/api/loja-integrada/:resource/:id?", async (req, res) => {
