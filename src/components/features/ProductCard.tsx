@@ -148,16 +148,22 @@ export default function ProductCard({ product, onSelect, onAddToCart, onTryOn, i
           <p className="text-[9px] text-gold font-semibold uppercase tracking-wider leading-tight">{product.brand}</p>
           <h3 className="text-[12px] font-semibold text-luxury-black leading-tight line-clamp-1 mt-0.5">{product.name}</h3>
           <div className="mt-1">
-            <span className="text-[13px] font-bold text-luxury-black">{formatPrice(product.price)}</span>
-            {product.originalPrice && (
+            {product.sobConsulta || product.price <= 0 ? (
+              <span className="text-[11px] font-bold text-luxury-black">Sob consulta</span>
+            ) : (
+              <span className="text-[13px] font-bold text-luxury-black">{formatPrice(product.price)}</span>
+            )}
+            {product.originalPrice && product.price > 0 && (
               <span className="text-[10px] text-gray-400 line-through ml-1">{formatPrice(product.originalPrice)}</span>
             )}
           </div>
-          <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="text-[9px] text-green-600 font-medium">{formatPrice(product.pixPrice)} Pix</span>
-            <span className="text-[8px] text-gray-300">•</span>
-            <span className="text-[8px] text-gray-400">{formatInstallment(product.installmentCount, product.installmentValue)}</span>
-          </div>
+          {product.sobConsulta || product.price <= 0 ? null : (
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-[9px] text-green-600 font-medium">{formatPrice(product.pixPrice)} Pix</span>
+              <span className="text-[8px] text-gray-300">•</span>
+              <span className="text-[8px] text-gray-400">{formatInstallment(product.installmentCount, product.installmentValue)}</span>
+            </div>
+          )}
           <button
             onClick={(e) => { e.stopPropagation(); onAddToCart(product); }}
             className="mt-2 w-full h-8 bg-luxury-black text-white text-[11px] font-semibold rounded-lg hover:bg-luxury-dark active:scale-[0.98] transition-all flex items-center justify-center gap-1"

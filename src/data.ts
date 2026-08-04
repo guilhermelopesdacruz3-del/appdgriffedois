@@ -19,6 +19,10 @@ export interface Product {
   installmentCount: number;
   installmentValue: number;
   li_uri?: string;
+  /** Estoque disponível (da Loja Integrada). undefined = sem informação. */
+  stock?: number;
+  /** true quando o produto não tem preço cadastrado (venda sob consulta). */
+  sobConsulta?: boolean;
 }
 
 /**

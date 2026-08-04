@@ -133,19 +133,33 @@ export default function ProductPage({ product, onBack, onTryOn }: ProductPagePro
 
         {/* Price */}
         <div className="bg-ice rounded-2xl p-4 mb-4">
-          <div className="flex items-center gap-3 mb-1">
-            <span className="text-2xl font-bold text-luxury-black">{formatPrice(product.price)}</span>
-            {product.originalPrice && <span className="text-sm text-gray-400 line-through">{formatPrice(product.originalPrice)}</span>}
-          </div>
-          <div className="flex items-center gap-2 mb-2">
-            <div className="flex items-center gap-1 bg-green-50 rounded-lg px-2 py-1">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg>
-              <span className="text-[11px] text-green-700 font-bold">{formatPrice(product.pixPrice)} via Pix</span>
+          {product.sobConsulta ? (
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xl font-bold text-luxury-black">Sob consulta</span>
+              <span className="text-[10px] text-gray-400">Consulte-nos pelo WhatsApp</span>
             </div>
-          </div>
-          <p className="text-[10px] text-gray-400">
-            {formatInstallment(product.installmentCount, product.installmentValue)} sem juros
-          </p>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 mb-1">
+                <span className="text-2xl font-bold text-luxury-black">{formatPrice(product.price)}</span>
+                {product.originalPrice && <span className="text-sm text-gray-400 line-through">{formatPrice(product.originalPrice)}</span>}
+              </div>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-1 bg-green-50 rounded-lg px-2 py-1">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg>
+                  <span className="text-[11px] text-green-700 font-bold">{formatPrice(product.pixPrice)} via Pix</span>
+                </div>
+              </div>
+              <p className="text-[10px] text-gray-400">
+                {formatInstallment(product.installmentCount, product.installmentValue)} sem juros
+              </p>
+            </>
+          )}
+          {product.stock !== undefined && (
+            <p className={`text-[10px] font-semibold mt-2 ${product.stock > 0 ? "text-green-600" : "text-red-500"}`}>
+              {product.stock > 0 ? `${product.stock} em estoque` : "Produto esgotado — avise-me quando voltar"}
+            </p>
+          )}
         </div>
 
         {/* Description */}
@@ -252,11 +266,17 @@ export default function ProductPage({ product, onBack, onTryOn }: ProductPagePro
         <div className="glass rounded-2xl p-3 shadow-lg">
           <div className="flex items-center gap-3">
             <div className="flex-1 min-w-0">
-              <div className="flex items-baseline gap-2">
-                <span className="text-lg font-bold text-luxury-black">{formatPrice(product.price)}</span>
-                <span className="text-[10px] text-green-600 font-semibold">{formatPrice(product.pixPrice)} Pix</span>
-              </div>
-              <p className="text-[9px] text-gray-400">{formatInstallment(product.installmentCount, product.installmentValue)} s/ juros</p>
+              {product.sobConsulta ? (
+                <span className="text-lg font-bold text-luxury-black">Sob consulta</span>
+              ) : (
+                <>
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-lg font-bold text-luxury-black">{formatPrice(product.price)}</span>
+                    <span className="text-[10px] text-green-600 font-semibold">{formatPrice(product.pixPrice)} Pix</span>
+                  </div>
+                  <p className="text-[9px] text-gray-400">{formatInstallment(product.installmentCount, product.installmentValue)} s/ juros</p>
+                </>
+              )}
             </div>
           </div>
         </div>
