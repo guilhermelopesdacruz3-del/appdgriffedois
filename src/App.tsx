@@ -152,7 +152,7 @@ function AppInner() {
     return <AdminPage onExit={() => { window.location.hash = ""; }} />;
   }
 
-  const { produtos: products, loading: loadingProducts, error: productsError, reload: reloadProducts } = useProdutos({ limit: 100 });
+  const { produtos: products, total, loading: loadingProducts, error: productsError, reload: reloadProducts, loadMore: loadMoreProducts, loadingMore, hasMore } = useProdutos({ limit: 100 });
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleSelectProduct = useCallback((product: Product) => {
@@ -252,7 +252,7 @@ function AppInner() {
           <HomePage products={products} onSelectProduct={handleSelectProduct} onAddToCart={handleAddToCart} onNavigate={handleNavigate} onTryOn={handleTryOn} recentIds={recentIds} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} />
         )}
         {currentPage === "catalog" && !(loadingProducts && products.length === 0) && (
-          <CatalogPage products={products} onSelectProduct={handleSelectProduct} onAddToCart={handleAddToCart} onTryOn={handleTryOn} searchQuery={searchQuery} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} />
+          <CatalogPage products={products} onSelectProduct={handleSelectProduct} onAddToCart={handleAddToCart} onTryOn={handleTryOn} searchQuery={searchQuery} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} hasMore={hasMore} onLoadMore={loadMoreProducts} loadingMore={loadingMore} total={total} />
         )}
         {currentPage === "product" && selectedProduct && (
           <ProductPage product={selectedProduct} onBack={handleBackFromProduct} onTryOn={handleTryOn} />

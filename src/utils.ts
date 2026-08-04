@@ -10,6 +10,8 @@ export const productImages: Record<string, string> = {
 };
 
 export function getProductImage(imageKey: string): string {
+  if (!imageKey) return "/images/product-gold-aviator.jpg";
+  if (/^https?:\/\//.test(imageKey)) return imageKey;
   return productImages[imageKey] || "/images/product-gold-aviator.jpg";
 }
 

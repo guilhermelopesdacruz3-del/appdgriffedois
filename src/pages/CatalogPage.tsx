@@ -10,6 +10,10 @@ interface CatalogPageProps {
   searchQuery?: string;
   isFavorite?: (id: number) => boolean;
   onToggleFavorite?: (id: number) => void;
+  hasMore?: boolean;
+  onLoadMore?: () => void;
+  loadingMore?: boolean;
+  total?: number;
 }
 
 const filterOptions = [
@@ -39,6 +43,10 @@ export default function CatalogPage({
   searchQuery = "",
   isFavorite,
   onToggleFavorite,
+  hasMore = false,
+  onLoadMore,
+  loadingMore = false,
+  total = 0,
 }: CatalogPageProps) {
   const [activeFilter, setActiveFilter] = useState("all");
   const [activeSort, setActiveSort] = useState("featured");
@@ -127,6 +135,19 @@ export default function CatalogPage({
           />
         ))}
       </div>
+
+      {/* Load more (paginação server-side; oculto quando há filtro/busca ativos) */}
+      {!termo && activeFilter === "all" && hasMore && onLoadMore && (
+        <div className="flex justify-center pt-5 pb-2">
+          <button
+            onClick={onLoadMore}
+            disabled={loadingMore}
+            className="px-6 py-2.5 rounded-xl border border-luxury-black/15 text-xs font-bold text-luxury-black hover:bg-luxury-black hover:text-white active:scale-95 transition-all disabled:opacity-50"
+          >
+            {loadingMore ? "Carregando..." : `Carregar mais (${products.length} de ${total})`}
+          </button>
+        </div>
+      )}
 
       {sortedProducts.length === 0 && (
         <div className="flex flex-col items-center justify-center py-16">
