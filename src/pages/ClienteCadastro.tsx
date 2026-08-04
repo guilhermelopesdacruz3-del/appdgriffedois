@@ -1,10 +1,10 @@
 import { useState } from "react";
-import { cadastrarCliente, verificarOtp } from "../services/cliente";
+import { cadastrarCliente, verificarOtp, loginComMagicLink } from "../services/cliente";
 import { salvarClienteSessao } from "../utils/cookies";
 import { buscarClientePorEmail } from "../services/lojaIntegrada";
 import TermosPrivacidade from "./TermosPrivacidade";
 
-type Etapa = "dados" | "codigo";
+type Etapa = "dados" | "codigo" | "login";
 
 export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) {
   const [etapa, setEtapa] = useState<Etapa>("dados");
@@ -36,6 +36,26 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
       if (r.ok) {
         setMensagem(r.mensagem || "Código enviado para seu e-mail.");
         setEtapa("codigo");
+      }
+    } catch (err) {
+      setErro((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const enviarMagicLink = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErro(null);
+    setMensagem(null);
+    if (!email.trim()) return setErro("Digite seu e-mail.");
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email.trim())) return setErro("E-mail inválido.");
+    setLoading(true);
+    try {
+      const r = await loginComMagicLink(email.trim().toLowerCase());
+      if (r.ok) {
+        setMensagem(r.mensagem || "Link mágico enviado. Clique no e-mail para entrar.");
+        setEtapa("login");
       }
     } catch (err) {
       setErro((err as Error).message);
@@ -110,13 +130,30 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
           </svg>
         </div>
         <h2 className="text-base font-bold text-luxury-black text-center">
-          {etapa === "dados" ? "Criar minha conta" : "Confirmar e-mail"}
+          {etapa === "dados" ? "Criar minha conta" : etapa === "codigo" ? "Confirmar e-mail" : "Entrar"}
         </h2>
         <p className="text-xs text-gray-500 mt-1 text-center">
           {etapa === "dados"
             ? "Cadastre-se para acompanhar pedidos e acumular pontos."
-            : `Enviamos um código de 6 dígitos para ${email}.`}
+            : etapa === "codigo"
+            ? `Enviamos um código de 6 dígitos para ${email}.`
+            : "Digite seu e-mail e receba um link mágico para entrar."}
         </p>
+
+        <div className="flex bg-gray-50 rounded-xl p-1 text-[11px] font-bold mb-4">
+          <button
+            onClick={() => { setEtapa("dados"); setEmail(""); setNome(""); setTelefone(""); setCpf(""); setErro(null); setMensagem(null); setAceite(false); }}
+            className={`flex-1 py-2 rounded-lg transition-all ${etapa === "dados" ? "bg-luxury-black text-white" : "text-gray-500"}`}
+          >
+            Cadastrar
+          </button>
+          <button
+            onClick={() => { setEtapa("login"); setEmail(""); setNome(""); setTelefone(""); setCpf(""); setErro(null); setMensagem(null); }}
+            className={`flex-1 py-2 rounded-xl transition-all ${etapa === "login" ? "bg-luxury-black text-white" : "text-gray-500"}`}
+          >
+            Entrar
+          </button>
+        </div>
 
         {etapa === "dados" ? (
           <form className="mt-5 space-y-3" onSubmit={enviarCadastro}>
@@ -176,6 +213,27 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
               {loading ? "Enviando..." : "Enviar código"}
             </button>
           </form>
+        ) : etapa === "login" ? (
+          <form className="mt-5 space-y-3" onSubmit={enviarMagicLink}>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="seu@email.com"
+              className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+            />
+            <button
+              type="submit"
+              disabled={loading || !email.trim()}
+              className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl disabled:opacity-50 active:scale-[0.98] transition-all"
+            >
+              {loading ? "Enviando..." : "Enviar link mágico"}
+            </button>
+            <p className="text-[10px] text-gray-400 text-center">
+              Sem código! Clique no link que chega no seu e-mail.
+            </p>
+          </form>
         ) : (
           <form className="mt-5 space-y-3" onSubmit={confirmarCodigo}>
             <input
@@ -206,7 +264,7 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
         )}
 
         {erro && <p className="text-[11px] text-red-500 mt-3 text-center">{erro}</p>}
-        {mensagem && etapa === "dados" && (
+        {mensagem && etapa !== "dados" && (
           <p className="text-[11px] text-green-600 mt-3 text-center">{mensagem}</p>
         )}
 
@@ -215,9 +273,10 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
           onClick={onVoltar}
           className="w-full text-[10px] text-gray-400 underline mt-4"
         >
-          Já tenho conta
+          {etapa === "dados" ? "Já tenho conta" : "Voltar"}
         </button>
       </div>
     </div>
   );
 }
+

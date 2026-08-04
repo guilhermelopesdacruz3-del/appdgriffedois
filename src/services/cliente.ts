@@ -38,6 +38,17 @@ export async function verificarOtp(
   return json;
 }
 
+export async function loginComMagicLink(email: string): Promise<{ ok: boolean; mensagem?: string }> {
+  const r = await fetch(`/api/cliente/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const json = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(json.erro || `Falha ao enviar link (${r.status})`);
+  return json;
+}
+
 // ---------------------------------------------------------------------------
 // Perfil / Endereços / Preferências (C2, C3, C7)
 // Todas as rotas exigem o access_token da sessão (Authorization Bearer).

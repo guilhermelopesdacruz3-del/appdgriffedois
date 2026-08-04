@@ -1454,6 +1454,58 @@ app.post("/api/cliente/confirmar-link", async (req, res) => {
   }
 });
 
+// POST /api/cliente/login -> verifica se email existe, envia link mágico (sem código)
+// Login simplificado: o cliente digita só o e-mail já cadastrado → recebe link mágico
+// (não precisa digitar código). Clica no link → /auth/callback confirma a sessão.
+app.post("/api/cliente/login", async (req, res) => {
+  const ip = ipDo(req);
+  const bloq = checarBloqueio(ip);
+  if (bloq.bloqueado) return res.status(429).json({ erro: `Muitas tentativas. Tente em ${bloq.resta}s.` });
+
+  const { email } = req.body || {};
+  const e = (email || "").trim().toLowerCase();
+  if (!e || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) {
+    return res.status(400).json({ erro: "E-mail inválido." });
+  }
+  const sb = supabaseClient();
+  if (!sb) return res.status(503).json({ erro: "Banco de dados indisponível." });
+
+  try {
+    // Verifica se o usuário já existe (sign-in, não sign-up).
+    let existente: string | null = null;
+    try {
+      const list = await sb.auth.admin.listUsers();
+      existente = list.data?.users?.find((u) => u.email === e)?.id || null;
+    } catch { /* ignora */ }
+
+    if (!existente) {
+      return res.status(404).json({ erro: "E-mail não cadastrado. Faça seu cadastro primeiro." });
+    }
+
+    registrarTentativaSucesso(ip);
+    const siteUrl = process.env.FRONTEND_ORIGIN?.split(",")[0]?.trim() || "https://appdgriffedois.pages.dev";
+
+    // Envia link mágico (shouldCreateUser: false → apenas existing users).
+    const { error: otpErr } = await sb.auth.signInWithOtp({
+      email: e,
+      options: {
+        shouldCreateUser: false,
+        emailRedirectTo: `${siteUrl}/auth/callback`,
+      },
+    });
+    if (otpErr) {
+      if (/rate limit/i.test(otpErr.message)) {
+        return res.status(429).json({ erro: "Muitas tentativas. Aguarde alguns minutos." });
+      }
+      return res.status(400).json({ erro: otpErr.message });
+    }
+    return res.json({ ok: true, mensagem: "Link mágico enviado. Clique no e-mail para entrar." });
+  } catch (err) {
+    console.error("[login] erro:", err);
+    return res.status(500).json({ erro: "Falha ao enviar link de login." });
+  }
+});
+
 // EXCLUSÃO DE CONTA (LGPD / Política de Dados do Google Play) — self-service.
 // Fluxo em 2 passos com OTP por e-mail (mesmo padrão do cadastro/verificar):
 //   1) POST /api/cliente/excluir-solicitar  -> envia OTP
