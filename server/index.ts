@@ -1332,7 +1332,19 @@ async function enriquecerProdutoComImagem(id) {
   try {
     const { status, payload } = await chamarLI("GET", "produto", id, {});
     if (status !== 200) return {};
-    const obj = Array.isArray(payload.objects) ? payload.objects[0] : payload;
+    let obj = Array.isArray(payload.objects) ? payload.objects[0] : payload;
+    // Produtos pai (tipo "atributo") não têm preço/imagem próprios — os dados
+    // estão no primeiro filho (variação). Herda os dados do primeiro filho.
+    if (obj && !obj.preco_cheio && Array.isArray(obj.filhos) && obj.filhos.length > 0) {
+      const primeiroFilhoId = extrairIdDaUri(obj.filhos[0]);
+      if (primeiroFilhoId) {
+        const filho = await chamarLI("GET", "produto", primeiroFilhoId, {});
+        const filhoObj = Array.isArray(filho.payload?.objects) ? filho.payload.objects[0] : filho.payload;
+        if (filhoObj) {
+          obj = { ...obj, ...filhoObj, id: obj.id };
+        }
+      }
+    }
     const dados = { expira: agora + IMAGEM_CACHE_TTL_MS };
     for (const campo of CAMPOS_DO_INDIVIDUAL) {
       dados[campo] = obj?.[campo] ?? null;
@@ -1348,6 +1360,36 @@ async function enriquecerProdutoComImagem(id) {
 function aplicarDadosSincronizados(produto) {
   const id = produto?.id;
   if (!id) return;
+  // Produtos pai (tipo "atributo") não têm dados próprios — herdam do primeiro
+  // filho (variação), que carrega preço/imagem/estoque.
+  if (produto.tipo === "atributo" && Array.isArray(produto.filhos) && produto.filhos.length > 0) {
+    const filhoId = extrairIdDaUri(produto.filhos[0]);
+    if (filhoId && precoSync.has(filhoId)) {
+      const fp = precoSync.get(filhoId);
+      if (produto.preco_cheio === undefined) {
+        produto.preco_cheio = fp.cheio ?? 0;
+        produto.preco_promocional = fp.promocional ?? null;
+        produto.preco_sob_consulta = fp.sob_consulta ?? false;
+      }
+      const fim = imagemSync.get(filhoId);
+      if (fim && !produto.imagem_principal && fim.principal) {
+        produto.imagem_principal = {
+          caminho: fim.principal.replace(`${CDN_PREFIX}/800x800/`, ""),
+          grande: fim.principal,
+          media: fim.principal,
+          icone: fim.principal,
+          pequena: fim.principal,
+        };
+      }
+      const fest = estoqueSync.get(filhoId);
+      if (fest && produto.estoque_quantidade === undefined) {
+        produto.estoque_quantidade = fest.disponivel;
+        produto.estoque_gerenciado = fest.gerenciado;
+        produto.estoque_situacao_em_estoque = fest.em_estoque;
+        produto.estoque_situacao_sem_estoque = fest.sem_estoque;
+      }
+    }
+  }
   const img = imagemSync.get(id);
   if (img && !produto.imagem_principal && img.principal) {
     produto.imagem_principal = {
@@ -1446,6 +1488,14 @@ app.all("/api/loja-integrada/:resource/:id?", async (req, res) => {
     const query = Object.fromEntries(Object.entries(req.query).map(([k, v]) => [k, String(v)]));
     const { status, payload } = await chamarLI(req.method, resource, id, query);
     if (req.method === "GET" && resource === "produto" && !id && status === 200 && Array.isArray(payload?.objects)) {
+      // A LI lista variações (atributo_opcao) junto com produtos reais — o
+      // catálogo do app mostra apenas produtos (normal/atributo). Filtramos
+      // aqui para não inflar a listagem com centenas de variações sem foto.
+      const antes = payload.objects.length;
+      payload.objects = payload.objects.filter((p) => p?.tipo !== "atributo_opcao");
+      if (payload.meta && payload.meta.total_count) {
+        payload.meta.total_count -= antes - payload.objects.length;
+      }
       await enriquecerListaProdutos(payload.objects);
     }
     res.status(status).send(payload);
