@@ -1483,44 +1483,30 @@ app.post("/api/cliente/login-password", async (req, res) => {
     } catch { /* ignora */ }
 
     if (listUser) {
-      // Verifica se o usuário já tem senha (cadastros via OTP/magic link não têm).
-      let hasPassword = false;
-      try {
-        const { data: userData, error: userErr } = await sb.auth.admin.getUserById(listUser);
-        if (!userErr && userData?.user) {
-          const u = userData.user as any;
-          hasPassword = Boolean(u.encrypted_password);
-        }
-      } catch { /* ignora */ }
-
-      if (hasPassword) {
-        // Usuário com senha — tenta login direto.
-        const { data, error: loginErr } = await sb.auth.signInWithPassword({ email: e, password: s });
-        if (loginErr) {
+      // Tenta login com senha direto. Se falhar (usuário sem senha, cadastro via OTP),
+      // define a senha e faz login novamente.
+      const { data, error: loginErr } = await sb.auth.signInWithPassword({ email: e, password: s });
+      if (loginErr) {
+        try {
+          const { error: updErr } = await sb.auth.admin.updateUserById(listUser, { password: s });
+          if (updErr) throw updErr;
+          const { data: data2, error: loginErr2 } = await sb.auth.signInWithPassword({ email: e, password: s });
+          if (loginErr2) throw loginErr2;
+          registrarTentativaSucesso(ip);
+          try { await sb.from("profiles").upsert({ id: data2.user!.id, email: e, nome: (nome || null), updated_at: new Date().toISOString() }, { onConflict: "id" }); } catch (pErr) {
+            console.warn("[login-password] falha ao salvar perfil (ignorado):", (pErr as Error)?.message);
+          }
+          return res.json({ ok: true, session: data2.session, user: data2.user, mensagem: "Senha definida e login OK." });
+        } catch (fallbackErr) {
+          console.error("[login-password] fallback senha falhou:", (fallbackErr as Error)?.message);
           return res.status(401).json({ erro: "Senha incorreta." });
         }
-        registrarTentativaSucesso(ip);
-        try { await sb.from("profiles").upsert({ id: data.user!.id, email: e, nome: (nome || null), updated_at: new Date().toISOString() }, { onConflict: "id" }); } catch (pErr) {
-          console.warn("[login-password] falha ao salvar perfil (ignorado):", (pErr as Error)?.message);
-        }
-        return res.json({ ok: true, session: data.session, user: data.user, mensagem: "Login OK" });
       }
-
-      // Usuário sem senha (cadastro via OTP/magic link) — define senha e loga.
-      try {
-        const { error: updErr } = await sb.auth.admin.updateUserById(listUser, { password: s });
-        if (updErr) throw updErr;
-        const { data, error: loginErr } = await sb.auth.signInWithPassword({ email: e, password: s });
-        if (loginErr) throw loginErr;
-        registrarTentativaSucesso(ip);
-        try { await sb.from("profiles").upsert({ id: data.user!.id, email: e, nome: (nome || null), updated_at: new Date().toISOString() }, { onConflict: "id" }); } catch (pErr) {
-          console.warn("[login-password] falha ao salvar perfil (ignorado):", (pErr as Error)?.message);
-        }
-        return res.json({ ok: true, session: data.session, user: data.user, mensagem: "Senha definida e login OK." });
-      } catch (fallbackErr) {
-        console.error("[login-password] fallback senha falhou:", (fallbackErr as Error)?.message);
-        return res.status(401).json({ erro: "Não foi possível definir senha." });
+      registrarTentativaSucesso(ip);
+      try { await sb.from("profiles").upsert({ id: data.user!.id, email: e, nome: (nome || null), updated_at: new Date().toISOString() }, { onConflict: "id" }); } catch (pErr) {
+        console.warn("[login-password] falha ao salvar perfil (ignorado):", (pErr as Error)?.message);
       }
+      return res.json({ ok: true, session: data.session, user: data.user, mensagem: "Login OK" });
     }
 
     // Cria o usuário com senha (bypassa confirmação de e-mail).
