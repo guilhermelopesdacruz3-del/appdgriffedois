@@ -535,7 +535,7 @@ app.get("/api/admin/situacoes", requireAdmin, async (_req, res) => {
   if (MOCK) return res.json(mockSituacoes);
   if (DEMO) return res.json(demoAdminSituacoes());
   try {
-    const { status, payload } = await chamarLI("GET", "situacaopedido", undefined, { limit: 200 });
+    const { status, payload } = await chamarLI("GET", "situacaopedido", undefined, { limit: 100 });
     if (status !== 200) return res.status(status).json(payload);
     return res.json((payload.objects || []));
   } catch (err) {
@@ -592,8 +592,8 @@ function agregarPedidos(objects) {
 async function buscarTodosPedidos() {
   const todos = [];
   let offset = 0;
-  const limit = 200;
-  const MAX_PAGINAS = 4;
+  const limit = 100;
+  const MAX_PAGINAS = 8;
   // Em demo, retorna os pedidos demo direto.
   if (DEMO || MOCK) {
     const base = DEMO ? demoAdminPedidos().objects : mockListPedidos().objects;

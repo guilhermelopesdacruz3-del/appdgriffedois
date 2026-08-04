@@ -152,7 +152,7 @@ function AppInner() {
     return <AdminPage onExit={() => { window.location.hash = ""; }} />;
   }
 
-  const { produtos: products, loading: loadingProducts, error: productsError, reload: reloadProducts } = useProdutos({ limit: 120 });
+  const { produtos: products, loading: loadingProducts, error: productsError, reload: reloadProducts } = useProdutos({ limit: 100 });
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleSelectProduct = useCallback((product: Product) => {

@@ -20,14 +20,14 @@ let marcasCache: Record<string, string> | null = null;
 
 async function getCategoriasLookup(): Promise<Record<string, string>> {
   if (categoriasCache) return categoriasCache;
-  const resposta = await listResource<LICategoria>("categoria", { limit: 200 });
+  const resposta = await listResource<LICategoria>("categoria", { limit: 100 });
   categoriasCache = mapCategoriasParaLookup(resposta.objects);
   return categoriasCache;
 }
 
 async function getMarcasLookup(): Promise<Record<string, string>> {
   if (marcasCache) return marcasCache;
-  const resposta = await listResource<LIMarca>("marca", { limit: 200 });
+  const resposta = await listResource<LIMarca>("marca", { limit: 100 });
   marcasCache = mapMarcasParaLookup(resposta.objects);
   return marcasCache;
 }
