@@ -127,6 +127,35 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
     }
   };
 
+  const loginDemo = async () => {
+    setErro(null);
+    setMensagem(null);
+    setLoading(true);
+    try {
+      const r = await loginComSenha("demo@dgriffe.com", "demo123");
+      if (r.ok) {
+        if (r.session) {
+          try {
+            const sess = r.session as any;
+            if (sess?.access_token) {
+              salvarClienteSessao({ access_token: sess.access_token, refresh_token: sess.refresh_token });
+            }
+          } catch { /* ignora */ }
+        }
+        const emailL = "demo@dgriffe.com";
+        window.localStorage.setItem("dgriffe:cliente_email", emailL);
+        window.localStorage.setItem("dgriffe:cliente", JSON.stringify({ email: emailL, nome: "Cliente Demo", id: null }));
+        window.dispatchEvent(new Event("cliente-atualizado"));
+        setMensagem("Logado como demo!");
+        setTimeout(() => onVoltar(), 1200);
+      }
+    } catch (err) {
+      setErro((err as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const confirmarCodigo = async (e: React.FormEvent) => {
     e.preventDefault();
     setErro(null);
@@ -333,17 +362,30 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
                placeholder="Senha (mín. 6 caracteres)"
                className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
              />
-             <button
-               type="submit"
-               disabled={loading || !email.trim() || senha.length < 6}
-               className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl disabled:opacity-50 active:scale-[0.98] transition-all"
-             >
-               {loading ? "Entrando..." : etapa === "senha" ? "Entrar" : "Enviar"}
-             </button>
-             <p className="text-[10px] text-gray-400 text-center">
-               Cadastre-se com e-mail + senha na aba "Cadastrar". Se ainda não tem conta, o primeiro login cria sua conta automaticamente.
-             </p>
-           </form>
+              <button
+                type="submit"
+                disabled={loading || !email.trim() || senha.length < 6}
+                className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl disabled:opacity-50 active:scale-[0.98] transition-all"
+              >
+                {loading ? "Entrando..." : "Entrar"}
+              </button>
+              <div className="flex items-center gap-2 my-1">
+                <div className="flex-1 h-px bg-gray-200"></div>
+                <span className="text-[10px] text-gray-400">ou</span>
+                <div className="flex-1 h-px bg-gray-200"></div>
+              </div>
+              <button
+                type="button"
+                onClick={loginDemo}
+                disabled={loading}
+                className="w-full h-11 bg-gold text-luxury-black text-xs font-bold rounded-2xl disabled:opacity-50 active:scale-[0.98] transition-all border border-gold"
+              >
+                {loading ? "Entrando..." : "Entrar como demo"}
+              </button>
+              <p className="text-[10px] text-gray-400 text-center">
+                Conta demo: demo@dgriffe.com / demo123 — ou crie sua conta na aba "Cadastrar" com e-mail + senha.
+              </p>
+            </form>
          ) : (
            <form className="mt-5 space-y-3" onSubmit={confirmarCodigo}>
             <input
