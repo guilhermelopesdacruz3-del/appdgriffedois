@@ -1482,9 +1482,31 @@ app.post("/api/cliente/register-password", async (req, res) => {
     } catch { /* ignora */ }
 
     if (listUser) {
-      // Usuário já existe — faz login com senha direto.
-      const { data, error } = await sb.auth.signInWithPassword({ email: e, password: s });
-      if (error) return res.status(401).json({ erro: "Senha incorreta. Use um e-mail + senha já cadastrados ou cadastre-se." });
+      // Usuário já existe — tenta login com senha direto.
+      const { data, error: loginErr } = await sb.auth.signInWithPassword({ email: e, password: s });
+      if (loginErr) {
+        const msg = loginErr.message || "";
+        // Caso usado tenha cadastro via OTP (sem senha) — define a senha e loga.
+        if (/no password/i.test(msg) || /invalid login credentials/i.test(msg) || /password/i.test(msg)) {
+          try {
+            const { data: upd, error: updErr } = await sb.auth.admin.updateUserById(data?.user?.id || listUser, {
+              password: s,
+            });
+            if (updErr) throw updErr;
+            const { data: data2, error: loginErr2 } = await sb.auth.signInWithPassword({ email: e, password: s });
+            if (loginErr2) throw loginErr2;
+            registrarTentativaSucesso(ip);
+            try { await sb.from("profiles").upsert({ id: data2.user!.id, email: e, nome: (nome || null), updated_at: new Date().toISOString() }, { onConflict: "id" }); } catch (pErr) {
+              console.warn("[register-password] falha ao salvar perfil (ignorado):", (pErr as Error)?.message);
+            }
+            return res.json({ ok: true, session: data2.session, user: data2.user, mensagem: "Senha definida e login OK." });
+          } catch (fallbackErr) {
+            console.error("[register-password] fallback senha falhou:", (fallbackErr as Error)?.message);
+            return res.status(401).json({ erro: "Senha incorreta ou não foi possível definir senha." });
+          }
+        }
+        return res.status(401).json({ erro: "Senha incorreta." });
+      }
       registrarTentativaSucesso(ip);
       // Garante perfil.
       try {
