@@ -68,7 +68,7 @@ export async function registrarComSenha(
   senha: string,
   nome?: string
 ): Promise<{ ok: boolean; mensagem?: string; session?: unknown; user?: unknown }> {
-  const r = await fetch(`/api/cliente/register-password`, {
+  const r = await fetch(`/api/cliente/login-password`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ email, senha, nome }),

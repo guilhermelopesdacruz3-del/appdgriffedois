@@ -1454,9 +1454,10 @@ app.post("/api/cliente/confirmar-link", async (req, res) => {
   }
 });
 
-// POST /api/cliente/register-password -> cria usuário com senha
-// Ideal para testes: o admin cria uma conta com senha e o cliente loga direto.
-app.post("/api/cliente/register-password", async (req, res) => {
+// POST /api/cliente/login-password -> cria usuário com senha ou faz login
+// Ideal para testes: o cliente digita email + senha e entra direto.
+// Se o usuário não existir, cria com senha. Se existir, loga ou define senha.
+app.post("/api/cliente/login-password", async (req, res) => {
   const ip = ipDo(req);
   const bloq = checarBloqueio(ip);
   if (bloq.bloqueado) return res.status(429).json({ erro: `Muitas tentativas. Tente em ${bloq.resta}s.` });
