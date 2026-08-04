@@ -310,6 +310,8 @@ async function chamarLI(method, resource, id, query, body) {
 
 const RECURSOS_PERMITIDOS = new Set([
   "produto",
+  "produto_preco",
+  "produto_estoque",
   "categoria",
   "marca",
   "cliente",
