@@ -1267,7 +1267,7 @@ async function enriquecerListaProdutos(objects) {
       }
     }
   }
-  await Promise.all(Array.from({ length: Math.min(IMAGEM_CONCURRENCIA, semImagem.length) }, worker));
+  await Promise.all(Array.from({ length: Math.min(IMAGEM_CONCURRENCIA, semDetalhes.length) }, worker));
 }
 
 app.all("/api/loja-integrada/:resource/:id?", async (req, res) => {
