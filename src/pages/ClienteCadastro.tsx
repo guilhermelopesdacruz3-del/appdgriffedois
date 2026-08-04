@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { cadastrarCliente, verificarOtp, loginComMagicLink, loginComSenha } from "../services/cliente";
+import { verificarOtp, loginComMagicLink, loginComSenha, registrarComSenha } from "../services/cliente";
 import { salvarClienteSessao } from "../utils/cookies";
 import { buscarClientePorEmail } from "../services/lojaIntegrada";
 import TermosPrivacidade from "./TermosPrivacidade";
@@ -24,19 +24,30 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
     return <TermosPrivacidade onVoltar={() => setMostrarTermos(false)} />;
   }
 
-  const enviarCadastro = async (e: React.FormEvent) => {
+  const enviarCadastroComSenha = async (e: React.FormEvent) => {
     e.preventDefault();
     setErro(null);
+    setMensagem(null);
     if (!aceite) {
       setErro("É necessário aceitar os Termos e a Política de Privacidade para continuar.");
       return;
     }
+    if (!senha || senha.length < 6) {
+      return setErro("Senha deve ter ao menos 6 caracteres.");
+    }
     setLoading(true);
     try {
-      const r = await cadastrarCliente({ email, nome, telefone, cpf, aceiteLgpd: true });
+      const r = await registrarComSenha(email.trim().toLowerCase(), senha, nome);
       if (r.ok) {
-        setMensagem(r.mensagem || "Código enviado para seu e-mail.");
-        setEtapa("codigo");
+        if (r.session) {
+          try {
+            const sess = r.session as any;
+            salvarClienteSessao({ access_token: sess.access_token, refresh_token: sess.refresh_token });
+          } catch { /* ignora */ }
+        }
+        window.dispatchEvent(new Event("cliente-atualizado"));
+        setMensagem(r.mensagem || "Conta criada! Redirecionando...");
+        setTimeout(() => onVoltar(), 1200);
       }
     } catch (err) {
       setErro((err as Error).message);
@@ -191,37 +202,46 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
            </button>
          </div>
 
-        {etapa === "dados" ? (
-          <form className="mt-5 space-y-3" onSubmit={enviarCadastro}>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="seu@email.com"
-              className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
-            />
-            <input
-              type="text"
-              value={nome}
-              onChange={(e) => setNome(e.target.value)}
-              placeholder="Nome completo"
-              className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
-            />
-            <input
-              type="tel"
-              value={telefone}
-              onChange={(e) => setTelefone(e.target.value)}
-              placeholder="Telefone (opcional)"
-              className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
-            />
-            <input
-              type="text"
-              value={cpf}
-              onChange={(e) => setCpf(e.target.value)}
-              placeholder="CPF (opcional)"
-              className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
-            />
+         {etapa === "dados" ? (
+           <form className="mt-5 space-y-3" onSubmit={enviarCadastroComSenha}>
+             <input
+               type="email"
+               required
+               value={email}
+               onChange={(e) => setEmail(e.target.value)}
+               placeholder="seu@email.com"
+               className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+             />
+             <input
+               type="text"
+               value={nome}
+               onChange={(e) => setNome(e.target.value)}
+               placeholder="Nome completo"
+               className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+             />
+             <input
+               type="tel"
+               value={telefone}
+               onChange={(e) => setTelefone(e.target.value)}
+               placeholder="Telefone (opcional)"
+               className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+             />
+             <input
+               type="text"
+               value={cpf}
+               onChange={(e) => setCpf(e.target.value)}
+               placeholder="CPF (opcional)"
+               className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+             />
+             <input
+               type="password"
+               required
+               minLength={6}
+               value={senha}
+               onChange={(e) => setSenha(e.target.value)}
+               placeholder="Senha (mín. 6 caracteres)"
+               className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+             />
             <label className="flex items-start gap-2 mt-1 text-[10px] text-gray-500 leading-tight">
               <input
                 type="checkbox"
@@ -243,10 +263,10 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
             </label>
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || senha.length < 6}
               className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl disabled:opacity-50 active:scale-[0.98] transition-all"
             >
-              {loading ? "Enviando..." : "Enviar código"}
+              {loading ? "Cadastrando..." : "Criar conta"}
             </button>
           </form>
         ) : etapa === "login" ? (
