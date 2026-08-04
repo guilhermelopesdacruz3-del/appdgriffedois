@@ -312,6 +312,7 @@ const RECURSOS_PERMITIDOS = new Set([
   "produto",
   "produto_preco",
   "produto_estoque",
+  "produto_imagem",
   "categoria",
   "marca",
   "cliente",
