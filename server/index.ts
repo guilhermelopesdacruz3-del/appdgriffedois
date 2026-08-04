@@ -46,7 +46,7 @@ const {
   LOJA_INTEGRADA_APP_KEY,
   LOJA_INTEGRADA_API_KEY,
   LOJA_INTEGRADA_API_BASE_URL = "https://api.awsli.com.br/api/v1",
-  FRONTEND_ORIGIN = "https://appdgriffedois-3xwz-hrxf1ru63.vercel.app",
+  FRONTEND_ORIGIN = "https://appdgriffedois.pages.dev",
   PORT = 8787,
   ADMIN_PASSWORD,
   ADMIN_SECRET = "altere-este-segredo-admin-num-environment",
@@ -1312,7 +1312,7 @@ app.post("/api/cliente/cadastro", async (req, res) => {
     //    não existir; se já existir, apenas reenvia o código.
     //    emailRedirectTo: o link do e-mail aponta para o app (evita cair em
     //    localhost:3000, o default do projeto Supabase).
-    const siteUrl = process.env.FRONTEND_ORIGIN?.split(",")[0]?.trim() || "https://appdgriffedois.pages.dev";
+    const siteUrl = FRONTEND_ORIGIN.split(",")[0].trim();
     const { error: otpErr } = await sb.auth.signInWithOtp({
       email: e,
       options: {
@@ -1454,6 +1454,83 @@ app.post("/api/cliente/confirmar-link", async (req, res) => {
   }
 });
 
+// POST /api/cliente/register-password -> cria usuário com senha
+// Ideal para testes: o admin cria uma conta com senha e o cliente loga direto.
+app.post("/api/cliente/register-password", async (req, res) => {
+  const ip = ipDo(req);
+  const bloq = checarBloqueio(ip);
+  if (bloq.bloqueado) return res.status(429).json({ erro: `Muitas tentativas. Tente em ${bloq.resta}s.` });
+
+  const { email, senha, nome } = req.body || {};
+  const e = (email || "").trim().toLowerCase();
+  const s = String(senha || "").trim();
+  if (!e || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) {
+    return res.status(400).json({ erro: "E-mail inválido." });
+  }
+  if (!s || s.length < 6) {
+    return res.status(400).json({ erro: "Senha deve ter ao menos 6 caracteres." });
+  }
+  const sb = supabaseClient();
+  if (!sb) return res.status(503).json({ erro: "Banco de dados indisponível." });
+
+  try {
+    // Verifica se já existe — se sim, só loga.
+    let listUser: string | null = null;
+    try {
+      const list = await sb.auth.admin.listUsers();
+      listUser = list.data?.users?.find((u) => u.email === e)?.id || null;
+    } catch { /* ignora */ }
+
+    if (listUser) {
+      // Usuário já existe — faz login com senha direto.
+      const { data, error } = await sb.auth.signInWithPassword({ email: e, password: s });
+      if (error) return res.status(401).json({ erro: "Senha incorreta. Use um e-mail + senha já cadastrados ou cadastre-se." });
+      registrarTentativaSucesso(ip);
+      // Garante perfil.
+      try {
+        await sb.from("profiles").upsert({ id: data.user!.id, email: e, nome: (nome || null), updated_at: new Date().toISOString() }, { onConflict: "id" });
+      } catch (pErr) {
+        console.warn("[register-password] falha ao salvar perfil (ignorado):", (pErr as Error)?.message);
+      }
+      return res.json({ ok: true, session: data.session, user: data.user, mensagem: listUser ? "Login OK" : undefined });
+    }
+
+    // Cria o usuário com senha (bypassa confirmação de e-mail).
+    const { data, error } = await sb.auth.admin.createUser({
+      email: e,
+      password: s,
+      email_confirm: true,
+      user_metadata: { nome: nome || "", telefone: "" },
+    });
+    if (error) {
+      console.error("[register-password] createUser erro:", error.message);
+      // Não vaza detalhes do Supabase; tenta fallback de login caso já exista.
+      if (/already/i.test(error.message)) {
+        return res.status(409).json({ erro: "Já existe uma conta com este e-mail. Faça login." });
+      }
+      return res.status(400).json({ erro: "Não foi possível criar a conta." });
+    }
+    registrarTentativaSucesso(ip);
+    // Garante perfil na tabela profiles.
+    try {
+      await sb.from("profiles").upsert({ id: data.user!.id, email: e, nome: (nome || null), updated_at: new Date().toISOString() }, { onConflict: "id" });
+    } catch (pErr) {
+      console.warn("[register-password] falha ao salvar perfil (ignorado):", (pErr as Error)?.message);
+    }
+    // Faz login para obter a sessão.
+    const { data: loginData, error: loginErr } = await sb.auth.signInWithPassword({ email: e, password: s });
+    if (loginErr) {
+      // Se o login falhar (raro), retorna ok mas sem sessão — o cliente tenta de novo.
+      console.warn("[register-password] signInWithPassword falhou:", loginErr.message);
+      return res.json({ ok: true, user: data.user, mensagem: "Conta criada. Faça login." });
+    }
+    return res.json({ ok: true, session: loginData.session, user: loginData.user, mensagem: "Conta criada com sucesso." });
+  } catch (err) {
+    console.error("[register-password] erro:", err);
+    return res.status(500).json({ erro: "Falha ao criar conta." });
+  }
+});
+
 // POST /api/cliente/login -> verifica se email existe, envia link mágico (sem código)
 // Login simplificado: o cliente digita só o e-mail já cadastrado → recebe link mágico
 // (não precisa digitar código). Clica no link → /auth/callback confirma a sessão.
@@ -1483,7 +1560,7 @@ app.post("/api/cliente/login", async (req, res) => {
     }
 
     registrarTentativaSucesso(ip);
-    const siteUrl = process.env.FRONTEND_ORIGIN?.split(",")[0]?.trim() || "https://appdgriffedois.pages.dev";
+    const siteUrl = FRONTEND_ORIGIN.split(",")[0].trim();
 
     // Envia link mágico (shouldCreateUser: false → apenas existing users).
     const { error: otpErr } = await sb.auth.signInWithOtp({
@@ -1525,7 +1602,7 @@ app.post("/api/cliente/excluir-solicitar", async (req, res) => {
   // se cadastraram só pela Loja Integrada (sem conta no Supabase Auth) — o
   // usuario sera criado e imediatamente deletado no confirmar. Sem isso, o
   // Supabase barra com "Signups not allowed" e a exclusao nunca acontece (P1).
-  const siteUrl = process.env.FRONTEND_ORIGIN?.split(",")[0]?.trim() || "https://appdgriffedois.pages.dev";
+  const siteUrl = FRONTEND_ORIGIN.split(",")[0].trim();
   const { error } = await sb.auth.signInWithOtp({
     email: e,
     options: { shouldCreateUser: true, data: { __exclusao: true }, emailRedirectTo: siteUrl },

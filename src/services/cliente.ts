@@ -49,6 +49,35 @@ export async function loginComMagicLink(email: string): Promise<{ ok: boolean; m
   return json;
 }
 
+export async function loginComSenha(
+  email: string,
+  senha: string
+): Promise<{ ok: boolean; mensagem?: string; session?: unknown; user?: unknown }> {
+  const r = await fetch(`/api/cliente/login-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, senha }),
+  });
+  const json = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(json.erro || `Falha no login (${r.status})`);
+  return json;
+}
+
+export async function registrarComSenha(
+  email: string,
+  senha: string,
+  nome?: string
+): Promise<{ ok: boolean; mensagem?: string; session?: unknown; user?: unknown }> {
+  const r = await fetch(`/api/cliente/register-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, senha, nome }),
+  });
+  const json = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(json.erro || `Falha no cadastro (${r.status})`);
+  return json;
+}
+
 // ---------------------------------------------------------------------------
 // Perfil / Endereços / Preferências (C2, C3, C7)
 // Todas as rotas exigem o access_token da sessão (Authorization Bearer).
