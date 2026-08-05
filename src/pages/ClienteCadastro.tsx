@@ -37,7 +37,7 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
     }
     setLoading(true);
     try {
-      const r = await registrarComSenha(email.trim().toLowerCase(), senha, nome);
+      const r = await registrarComSenha(email.trim().toLowerCase(), senha, nome, telefone.trim(), cpf.trim());
       if (r.ok) {
         if (r.session) {
           try {

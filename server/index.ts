@@ -1861,7 +1861,7 @@ app.post("/api/cliente/login-password", async (req, res) => {
   const bloq = checarBloqueio(ip);
   if (bloq.bloqueado) return res.status(429).json({ erro: `Muitas tentativas. Tente em ${bloq.resta}s.` });
 
-  const { email, senha, nome } = req.body || {};
+  const { email, senha, nome, telefone, cpf } = req.body || {};
   const e = (email || "").trim().toLowerCase();
   const s = String(senha || "").trim();
   if (!e || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) {
@@ -1895,6 +1895,13 @@ app.post("/api/cliente/login-password", async (req, res) => {
           try { await sb.from("profiles").upsert({ id: data2.user!.id, email: e, nome: (nome || null), updated_at: new Date().toISOString() }, { onConflict: "id" }); } catch (pErr) {
             console.warn("[login-password] falha ao salvar perfil (ignorado):", (pErr as Error)?.message);
           }
+          // Sincroniza com a Loja Integrada (se houver credenciais configuradas).
+          try {
+            const { LI_APP_KEY, LI_API_KEY } = await getSecretsLI();
+            if (LI_APP_KEY && LI_API_KEY) await criarClienteLI(e, { nome, telefone, cpf });
+          } catch (liErr) {
+            console.warn("[login-password] falha ao sincronizar com Loja Integrada (ignorado):", (liErr as Error)?.message);
+          }
           return res.json({ ok: true, session: data2.session, user: data2.user, mensagem: "Senha definida e login OK." });
         } catch (fallbackErr) {
           console.error("[login-password] fallback senha falhou:", (fallbackErr as Error)?.message);
@@ -1904,6 +1911,13 @@ app.post("/api/cliente/login-password", async (req, res) => {
       registrarTentativaSucesso(ip);
       try { await sb.from("profiles").upsert({ id: data.user!.id, email: e, nome: (nome || null), updated_at: new Date().toISOString() }, { onConflict: "id" }); } catch (pErr) {
         console.warn("[login-password] falha ao salvar perfil (ignorado):", (pErr as Error)?.message);
+      }
+      // Sincroniza com a Loja Integrada (se houver credenciais configuradas).
+      try {
+        const { LI_APP_KEY, LI_API_KEY } = await getSecretsLI();
+        if (LI_APP_KEY && LI_API_KEY) await criarClienteLI(e, { nome, telefone, cpf });
+      } catch (liErr) {
+        console.warn("[login-password] falha ao sincronizar com Loja Integrada (ignorado):", (liErr as Error)?.message);
       }
       return res.json({ ok: true, session: data.session, user: data.user, mensagem: "Login OK" });
     }
@@ -1926,9 +1940,19 @@ app.post("/api/cliente/login-password", async (req, res) => {
     registrarTentativaSucesso(ip);
     // Garante perfil na tabela profiles.
     try {
-      await sb.from("profiles").upsert({ id: data.user!.id, email: e, nome: (nome || null), updated_at: new Date().toISOString() }, { onConflict: "id" });
+      const perfil: any = { id: data.user!.id, email: e, nome: (nome || null), updated_at: new Date().toISOString() };
+      if (telefone) perfil.telefone = telefone;
+      if (cpf) perfil.cpf = cpf;
+      await sb.from("profiles").upsert(perfil, { onConflict: "id" });
     } catch (pErr) {
       console.warn("[register-password] falha ao salvar perfil (ignorado):", (pErr as Error)?.message);
+    }
+    // Sincroniza com a Loja Integrada (se houver credenciais configuradas).
+    try {
+      const { LI_APP_KEY, LI_API_KEY } = await getSecretsLI();
+      if (LI_APP_KEY && LI_API_KEY) await criarClienteLI(e, { nome, telefone, cpf });
+    } catch (liErr) {
+      console.warn("[register-password] falha ao sincronizar com Loja Integrada (ignorado):", (liErr as Error)?.message);
     }
     // Faz login para obter a sessão.
     const { data: loginData, error: loginErr } = await sb.auth.signInWithPassword({ email: e, password: s });

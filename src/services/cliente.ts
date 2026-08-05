@@ -66,12 +66,14 @@ export async function loginComSenha(
 export async function registrarComSenha(
   email: string,
   senha: string,
-  nome?: string
+  nome?: string,
+  telefone?: string,
+  cpf?: string
 ): Promise<{ ok: boolean; mensagem?: string; session?: unknown; user?: unknown }> {
   const r = await fetch(`/api/cliente/login-password`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, senha, nome }),
+    body: JSON.stringify({ email, senha, nome, telefone, cpf }),
   });
   const json = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(json.erro || `Falha no cadastro (${r.status})`);
