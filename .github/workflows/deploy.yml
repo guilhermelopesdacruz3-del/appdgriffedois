@@ -80,21 +80,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          set -euo pipefail
-          cd "$DEPLOY_DIR"
-          ACCT="${CLOUDFLARE_ACCOUNT_ID:-a4d6e3cfe8dde83c8cda8c79ad77202a}"
-          manifest="{}"
-          while IFS= read -r f; do
-            hash=$(sha256sum "$f" | cut -d' ' -f1)
-            manifest=$(echo "$manifest" | jq -c --arg p "$f" --arg h "$hash" '. + {($p): $h}')
-          done < <(find . -type f | sort | sed 's|^\./||')
-          RESP=$(curl -sS -X POST \
-            "https://api.cloudflare.com/client/v4/accounts/$ACCT/pages/projects/appdgriffedois/deployments" \
-            -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
-            -F "manifest=$manifest" \
-            $(find . -type f | sort | sed 's|^\./||' | while read -r f; do printf -- '-F "%s=@%s" ' "$f" "$f"; done))
-          echo "$RESP" | jq .
-          echo "$RESP" | jq -e '.success == true' > /dev/null || { echo "Deploy falhou"; exit 1; }
+          node scripts/deploy-cf.mjs "$DEPLOY_DIR"
 
   deploy-backend:
     needs: [test, sync-supabase]
