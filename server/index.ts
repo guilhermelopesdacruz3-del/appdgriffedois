@@ -1635,7 +1635,7 @@ app.all("/api/loja-integrada/:resource/:id?", async (req, res) => {
       });
     }
 
-    const { status, payload } = await chamarLI(req.method, resource, id, query);
+    const { status, payload } = await chamarLI(req.method, resource, id, query, req.body);
     if (req.method === "GET" && resource === "produto" && !id && status === 200 && Array.isArray(payload?.objects)) {
       // A LI lista variações (atributo_opcao) junto com produtos reais — o
       // catálogo do app mostra apenas produtos (normal/atributo). Filtramos
