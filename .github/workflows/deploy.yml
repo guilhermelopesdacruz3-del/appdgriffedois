@@ -53,34 +53,11 @@ jobs:
             -d "$(jq -n --arg q "$SQL2" '{query:$q}')")
           echo "Resposta Supabase (fidelidade): $RESP2"
 
-  deploy-front:
-    needs: test
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - name: Prepare deployment package
-        run: |
-          DEPLOY_DIR=$RUNNER_TEMP/dgriffe-deploy
-          rm -rf "$DEPLOY_DIR"
-          mkdir -p "$DEPLOY_DIR"
-          cp -r dist/. "$DEPLOY_DIR/"
-          cp -r functions/. "$DEPLOY_DIR/functions/"
-          cp _routes.json "$DEPLOY_DIR/"
-          echo "DEPLOY_DIR=$DEPLOY_DIR" >> $GITHUB_ENV
-      - name: Deploy to Cloudflare Pages via API
-        env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          node scripts/deploy-cf.mjs "$DEPLOY_DIR"
+  # Observação: o projeto CF Pages está conectado ao GitHub (source: github).
+  # O Cloudflare faz o deploy automático (build + functions + _routes.json) via webhook
+  # a cada push em main. Não é necessário (e é conflitante) fazer upload por API aqui.
+  # O _routes.json é copiado para public/ -> dist/ no build, então o Cloudflare o aplica.
+  # Mantemos o test+build para validação de CI.
 
   deploy-backend:
     needs: [test, sync-supabase]

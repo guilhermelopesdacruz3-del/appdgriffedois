@@ -8,7 +8,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "start": "tsx server/index.ts",
-    "server": "tsx server/index.ts"
+    "server": "tsx server/index.ts",
+    "deploy": "npx wrangler pages deploy dist --project-name appdgriffedois --commit-dirty=true",
+    "deploy:all": "npm run build && npx wrangler pages deploy dist --project-name appdgriffedois --commit-dirty=true"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.2",
