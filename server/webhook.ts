@@ -52,7 +52,7 @@ async function buscarPaymentMP(accessToken: string, paymentId: string | number) 
 export async function processarWebhookMP(bodyRaw: string, xSignature: string | undefined): Promise<
   { status: string; pontos?: number; erro?: string }
 > {
-  const mpToken = await getSecret("MP_ACCESS_TOKEN").catch(() => null);
+  const mpToken = (await getSecret("MP_ACCESS_TOKEN").catch(() => null)) || process.env.MP_ACCESS_TOKEN || "";
 
   // DEMO: exercita o fluxo de ponta a ponta (crédito de pontos + pedido LI)
   // sem validar assinatura nem chamar a API real do MP. Só ativo com

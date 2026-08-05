@@ -198,7 +198,7 @@ export async function processarCheckout(params: {
   total = Number((autorizado.total - desconto).toFixed(2));
   if (total <= 0) total = 0.01;
   // Em DEMO (sem token MP válido ou modo demo), mantém fluxo simulado.
-  const mpToken = await getSecret("MP_ACCESS_TOKEN").catch(() => null);
+  const mpToken = (await getSecret("MP_ACCESS_TOKEN").catch(() => null)) || process.env.MP_ACCESS_TOKEN || "";
   const demoAtivo = process.env.DEMO_MODE === "true" || !mpToken;
   if (demoAtivo) {
     const idPedido = `DEMO-${Date.now().toString().slice(-8)}`;
