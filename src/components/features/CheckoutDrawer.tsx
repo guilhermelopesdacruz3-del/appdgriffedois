@@ -257,14 +257,27 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
 async function carregarMP(publicKey: string): Promise<any> {
   const w = window as any;
   if (w.MercadoPago) return new w.MercadoPago(publicKey, { locale: "pt-BR" });
-  await new Promise<void>((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = "https://sdk.mercadopago.com/js/v2";
-    s.async = true;
-    s.onload = () => (w.MercadoPago ? resolve() : reject(new Error("SDK do Mercado Pago não carregou.")));
-    s.onerror = () => reject(new Error("Falha ao carregar o SDK do Mercado Pago."));
-    document.body.appendChild(s);
-  });
+  const tentaCarregar = (src: string): Promise<void> =>
+    new Promise<void>((resolve, reject) => {
+      const s = document.createElement("script");
+      s.src = src;
+      s.async = true;
+      const timer = setTimeout(() => reject(new Error("Tempo esgotado ao carregar o SDK do Mercado Pago (verifique sua conexão).")), 20000);
+      s.onload = () => { clearTimeout(timer); w.MercadoPago ? resolve() : reject(new Error("SDK do Mercado Pago não carregou.")); };
+      s.onerror = () => { clearTimeout(timer); reject(new Error("Falha ao carregar o SDK do Mercado Pago. Desative bloqueador de anúncios/extensões para este site e tente de novo.")); };
+      document.body.appendChild(s);
+    });
+  // Primeira tentativa + retry com cache-buster (contorna cache corrompido/bloqueio pontual).
+  try {
+    await tentaCarregar("https://sdk.mercadopago.com/js/v2");
+  } catch (e) {
+    if ((e as Error).message.includes("Tempo esgotado")) throw e;
+    try {
+      await tentaCarregar(`https://sdk.mercadopago.com/js/v2?cache=${Date.now()}`);
+    } catch (e2) {
+      throw new Error(`${(e as Error).message} ${(e2 as Error).message}`);
+    }
+  }
   return new w.MercadoPago(publicKey, { locale: "pt-BR" });
 }
 
