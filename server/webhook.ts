@@ -18,19 +18,52 @@ const MP_API = "https://api.mercadopago.com";
 const DEMO = process.env.DEMO_MODE === "true";
 
 // Valida a assinatura do webhook MP (header x-signature).
-// Formato MP: "ts=TIMESTAMP,v1=HMAC_SHA256(concat(ts, body), secret)" onde
-// secret = access_token. Retorna true se válido.
-export function validarAssinaturaMP(bodyRaw: string, xSignature: string | undefined, accessToken: string): boolean {
+// Formato oficial (v1): "ts=TIMESTAMP,v1=HMAC_SHA256(manifest, secret)" onde
+//   manifest = "id:{data.id};request-id:{x-request-id};ts:{ts};"
+//   (pares ausentes são omitidos) e secret = chave revelada no painel do MP
+//   (Webhooks > Configure notification). Também aceita o formato legado
+//   HMAC(concat(ts, body)) com o access_token como secret.
+export function validarAssinaturaMP(
+  bodyRaw: string,
+  xSignature: string | undefined,
+  accessToken: string,
+  dataId?: string,
+  xRequestId?: string,
+  webhookSecret?: string
+): boolean {
   if (!xSignature) return false;
-  const tsMatch = xSignature.match(/ts=([0-9]+)/);
-  const v1Match = xSignature.match(/v1=([a-f0-9]+)/);
-  if (!tsMatch || !v1Match) return false;
-  const ts = tsMatch[1];
-  const expected = crypto.createHmac("sha256", accessToken).update(`${ts}${bodyRaw}`).digest("hex");
-  // comparação em tempo constante
-  const a = Buffer.from(expected);
-  const b = Buffer.from(v1Match[1]);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
+  let ts = "";
+  let v1 = "";
+  for (const part of xSignature.split(",")) {
+    const eq = part.indexOf("=");
+    if (eq < 0) continue;
+    const k = part.slice(0, eq).trim();
+    const v = part.slice(eq + 1).trim();
+    if (k === "ts") ts = v;
+    if (k === "v1") v1 = v;
+  }
+  if (!ts || !v1) return false;
+
+  const secrets: string[] = [];
+  if (webhookSecret) secrets.push(webhookSecret);
+  if (accessToken) secrets.push(accessToken);
+
+  // Manifest oficial: id:...;request-id:...;ts:...; (pares ausentes omitidos).
+  const partes: string[] = [];
+  if (dataId) partes.push(`id:${dataId}`);
+  if (xRequestId) partes.push(`request-id:${xRequestId}`);
+  partes.push(`ts:${ts}`);
+  const manifest = `${partes.join(";")};`;
+
+  for (const secret of secrets) {
+    for (const alvo of [manifest, `${ts}${bodyRaw}`]) {
+      const expected = crypto.createHmac("sha256", secret).update(alvo).digest("hex");
+      const a = Buffer.from(expected);
+      const b = Buffer.from(v1);
+      if (a.length === b.length && crypto.timingSafeEqual(a, b)) return true;
+    }
+  }
+  return false;
 }
 
 // Busca os dados frescos do pagamento na API do MP.
@@ -49,10 +82,13 @@ async function buscarPaymentMP(accessToken: string, paymentId: string | number) 
  * @param xSignature header x-signature
  * @returns { status: "ignored" | "ok" | "duplicado" | "erro", pontos?: number }
  */
-export async function processarWebhookMP(bodyRaw: string, xSignature: string | undefined): Promise<
-  { status: string; pontos?: number; erro?: string }
-> {
+export async function processarWebhookMP(
+  bodyRaw: string,
+  xSignature: string | undefined,
+  opts: { dataId?: string; xRequestId?: string } = {}
+): Promise<{ status: string; pontos?: number; erro?: string }> {
   const mpToken = (await getSecret("MP_ACCESS_TOKEN").catch(() => null)) || process.env.MP_ACCESS_TOKEN || "";
+  const webhookSecret = (await getSecret("MP_WEBHOOK_SECRET").catch(() => null)) || process.env.MP_WEBHOOK_SECRET || "";
 
   // DEMO: exercita o fluxo de ponta a ponta (crédito de pontos + pedido LI)
   // sem validar assinatura nem chamar a API real do MP. Só ativo com
@@ -75,7 +111,7 @@ export async function processarWebhookMP(bodyRaw: string, xSignature: string | u
   if (!mpToken) {
     return { status: "ignored", erro: "sem MP_ACCESS_TOKEN" };
   }
-  if (!validarAssinaturaMP(bodyRaw, xSignature, mpToken)) {
+  if (!validarAssinaturaMP(bodyRaw, xSignature, mpToken, opts.dataId, opts.xRequestId, webhookSecret)) {
     return { status: "erro", erro: "assinatura inválida" };
   }
 

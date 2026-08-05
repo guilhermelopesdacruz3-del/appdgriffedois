@@ -1188,8 +1188,11 @@ app.post("/api/mp-webhook", async (req, res) => {
   const raw = req.rawBody || JSON.stringify(req.body || {});
   const sig = req.headers["x-signature"];
   const sigStr = Array.isArray(sig) ? sig[0] : sig;
+  const reqId = req.headers["x-request-id"];
+  const reqIdStr = Array.isArray(reqId) ? reqId[0] : reqId;
+  const dataId = typeof req.query?.["data.id"] === "string" ? req.query["data.id"] : undefined;
   try {
-    const r = await processarWebhookMP(raw, sigStr);
+    const r = await processarWebhookMP(raw, sigStr, { dataId, xRequestId: reqIdStr });
     if (r.status === "erro") {
       console.warn(`[webhook-mp] ${r.erro}`);
       return res.status(401).json({ erro: r.erro });
