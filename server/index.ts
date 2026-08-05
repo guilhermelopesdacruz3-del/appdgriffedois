@@ -1383,8 +1383,12 @@ function aplicarDadosSincronizados(produto) {
       }
       const fest = estoqueSync.get(filhoId);
       if (fest && produto.estoque_quantidade === undefined) {
-        produto.estoque_quantidade = fest.disponivel;
-        produto.estoque_gerenciado = fest.gerenciado;
+        if (fest.gerenciado) {
+          produto.estoque_quantidade = fest.disponivel;
+          produto.estoque_gerenciado = true;
+        } else {
+          produto.estoque_gerenciado = false;
+        }
         produto.estoque_situacao_em_estoque = fest.em_estoque;
         produto.estoque_situacao_sem_estoque = fest.sem_estoque;
       }
@@ -1408,8 +1412,14 @@ function aplicarDadosSincronizados(produto) {
   }
   const est = estoqueSync.get(id);
   if (est && produto.estoque_quantidade === undefined) {
-    produto.estoque_quantidade = est.disponivel;
-    produto.estoque_gerenciado = est.gerenciado;
+    if (est.gerenciado) {
+      produto.estoque_quantidade = est.disponivel;
+      produto.estoque_gerenciado = true;
+    } else {
+      // Loja não rastreia estoque desse produto — marca como disponível
+      // (não informado), para o app não exibir "esgotado" erroneamente.
+      produto.estoque_gerenciado = false;
+    }
     produto.estoque_situacao_em_estoque = est.em_estoque;
     produto.estoque_situacao_sem_estoque = est.sem_estoque;
   }
