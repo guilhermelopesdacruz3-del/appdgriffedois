@@ -194,6 +194,11 @@ export function mapProdutoParaProduct(
     ...calcularParcelamento(price),
     li_uri: produto.resource_uri,
     stock: produto.estoque_gerenciado ? produto.estoque_quantidade ?? undefined : undefined,
+    estoqueSituacao: produto.estoque_situacao_em_estoque ?? undefined,
+    emEstoque:
+      produto.estoque_gerenciado
+        ? (produto.estoque_quantidade ?? 0) > 0
+        : produto.estoque_situacao_em_estoque === 7,
     sobConsulta: produto.preco_sob_consulta === true || (price <= 0 && !produto.preco_sob_consulta),
   };
 }

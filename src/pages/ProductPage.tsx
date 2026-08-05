@@ -160,6 +160,12 @@ export default function ProductPage({ product, onBack, onTryOn }: ProductPagePro
               {product.stock > 0 ? `${product.stock} em estoque` : "Produto esgotado — avise-me quando voltar"}
             </p>
           )}
+          {product.stock === undefined && product.emEstoque && (
+            <p className="text-[10px] font-semibold mt-2 text-green-600">Em estoque</p>
+          )}
+          {product.stock === undefined && !product.emEstoque && product.estoqueSituacao === 20 && (
+            <p className="text-[10px] font-semibold mt-2 text-amber-600">Sob consulta — consulte-nos pelo WhatsApp</p>
+          )}
         </div>
 
         {/* Description */}

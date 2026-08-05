@@ -23,6 +23,14 @@ export interface Product {
   stock?: number;
   /** true quando o produto não tem preço cadastrado (venda sob consulta). */
   sobConsulta?: boolean;
+  /**
+   * Situação de estoque da Loja Integrada (7 = em estoque, 20 = sob consulta).
+   * A loja D'Griffe não rastreia quantidades (estoque_gerenciado=false), então
+   * disponibilidade é indicada por essa situação, não por `stock`.
+   */
+  estoqueSituacao?: number;
+  /** true quando a situação indica que o produto está em estoque (situação 7). */
+  emEstoque?: boolean;
 }
 
 /**
