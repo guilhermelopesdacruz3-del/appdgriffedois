@@ -26,7 +26,7 @@ import NotificacoesAdmin from "./admin/NotificacoesAdmin";
 import ReceitasAdmin from "./admin/ReceitasAdmin";
 import AdminDashboard from "./AdminDashboard";
 
-type Aba = "pedidos" | "dashboard" | "cupons" | "fidelidade" | "notificacoes" | "relatorios" | "logs" | "receitas";
+type Aba = "pedidos" | "dashboard" | "cupons" | "fidelidade" | "notificacoes" | "relatorios" | "logs" | "receitas" | "configuracoes";
 
 export default function AdminPage({ onExit }: { onExit: () => void }) {
   const [token, setToken] = useState<string | null>(() => getAdminToken());
@@ -52,6 +52,8 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
   const [detalheLoading, setDetalheLoading] = useState(false);
   const [salvandoStatus, setSalvandoStatus] = useState(false);
   const [statusSelecionado, setStatusSelecionado] = useState("");
+  const [historialCliente, setHistorialCliente] = useState<AdminPedido[]>([]);
+  const [carregandoHistorial, setCarregandoHistorial] = useState(false);
 
   const [relatorio, setRelatorio] = useState<RelatorioAdmin | null>(null);
   const [clientes, setClientes] = useState<ClienteRelatorio[]>([]);
@@ -184,6 +186,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
   const abrirDetalhe = async (id: number | string) => {
     setSelecionado(id);
     setDetalheLoading(true);
+    setCarregandoHistorial(true);
     try {
       const p = await buscarPedidoAdmin(id);
       const mapeado: AdminPedido = {
@@ -191,21 +194,54 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
         numero: p.numero,
         cliente_nome: p.cliente_nome,
         cliente_email: p.cliente_email,
+        cliente_cpf: p.cliente_cpf ?? null,
+        cliente_telefone: p.cliente_telefone ?? null,
+        cliente_endereco: p.cliente_endereco ?? null,
         status: p.situacao?.nome || "—",
         status_id: p.situacao?.id,
         status_uri: p.situacao?.resource_uri,
         data: new Date(p.data_criacao).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }),
         total: Number(p.valor_total) || 0,
         items: (p.itens || []).reduce((s, i) => s + (i.quantidade || 0), 0),
+        itens: (p.itens || []).map((it: any) => ({
+          nome: it.nome || "",
+          quantidade: Number(it.quantidade) || 0,
+          preco_venda: Number(it.preco_venda) || 0,
+          sku: it.sku || "",
+          variacao: it.variacao || null,
+        })),
+        pagamento: p.pagamentos?.[0]?.forma_pagamento?.nome ?? null,
+        pagamento_status: p.pagamentos?.[0]?.status ?? null,
+        pagamento_detalhes: p.pagamentos?.[0]
+          ? [
+              p.pagamentos[0].valor ? `R$ ${Number(p.pagamentos[0].valor).toFixed(2)}` : null,
+              p.pagamentos[0].parcelamento_numero_parcelas ? `${p.pagamentos[0].parcelamento_numero_parcelas}x` : null,
+              p.pagamentos[0].bandeira ?? null,
+            ].filter(Boolean).join(" · ")
+          : null,
+        envio: p.envios?.[0]?.forma_envio?.nome ?? null,
+        envio_status: p.envios?.[0]?.status ?? null,
+        envio_rastreio: p.envios?.[0]?.objeto ?? null,
+        endereco_entrega: p.endereco_entrega
+          ? `${p.endereco_entrega.endereco}, ${p.endereco_entrega.numero} — ${p.endereco_entrega.bairro}, ${p.endereco_entrega.cidade}/${p.endereco_entrega.estado} ${p.endereco_entrega.cep}`
+          : null,
         verificado: Boolean((p as any).verificado),
         verificado_em: (p as any).verificado_em || null,
       };
       setDetalhe(mapeado);
       setStatusSelecionado(String((p.situacao?.id ?? "") as any));
+      // Fetch customer order history
+      if (p.cliente_email) {
+        const hist = await listarPedidosAdmin({ cliente_email: p.cliente_email, limit: 10 });
+        setHistorialCliente(hist.pedidos);
+      } else {
+        setHistorialCliente([]);
+      }
     } catch (e) {
       setErro((e as Error).message);
     } finally {
       setDetalheLoading(false);
+      setCarregandoHistorial(false);
     }
   };
 
@@ -319,10 +355,10 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
         <div className="sticky top-[61px] z-10 bg-luxury-black/80 backdrop-blur-lg px-4 pt-3 pb-2">
           <div className="flex gap-1 p-1 rounded-2xl bg-white/[0.04] border border-white/10 overflow-x-auto">
 {([
-  "pedidos", "dashboard", "cupons", "fidelidade", "notificacoes", "relatorios", "logs", "receitas"
+  "pedidos", "dashboard", "cupons", "fidelidade", "notificacoes", "relatorios", "logs", "receitas", "configuracoes"
 ] as Aba[]).map((a) => (
   <button key={a} onClick={() => setAba(a)} className={`flex-1 min-w-[80px] h-9 rounded-xl text-[11px] font-bold transition-all whitespace-nowrap ${aba === a ? "bg-gradient-to-r from-gold to-gold-dark text-black shadow-lg shadow-gold/20" : "text-gray-300 hover:text-white hover:bg-white/5"}`}>
-    {a === "pedidos" ? "Pedidos" : a === "dashboard" ? "Dashboard" : a === "cupons" ? "Cupons" : a === "fidelidade" ? "Fidelidade" : a === "notificacoes" ? "Notificações" : a === "relatorios" ? "Relatórios" : a === "logs" ? "Logs" : "Receitas"}
+    {a === "pedidos" ? "Pedidos" : a === "dashboard" ? "Dashboard" : a === "cupons" ? "Cupons" : a === "fidelidade" ? "Fidelidade" : a === "notificacoes" ? "Notificações" : a === "relatorios" ? "Relatórios" : a === "logs" ? "Logs" : a === "receitas" ? "Receitas" : "Config"}
   </button>
 ))}
           </div>
@@ -518,7 +554,35 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
              </div>
            )}
 
-           {aba === "receitas" && <ReceitasAdmin />}
+           {aba === "configuracoes" && (
+  <div className="space-y-3">
+    <div className="bg-gradient-to-b from-white/[0.07] to-white/[0.02] border border-white/10 rounded-2xl p-4">
+      <p className="text-xs font-bold text-white mb-3 flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-gold inline-block" />Status das Integrações</p>
+      <div className="space-y-2">
+        {[
+          { label: "Loja Integrada", ok: !!process.env.LOJA_INTEGRADA_API_KEY, desc: "API key configurada" },
+          { label: "Mercado Pago", ok: !!process.env.MP_ACCESS_TOKEN, desc: "Access token configurado" },
+          { label: "Supabase", ok: !!process.env.SUPABASE_SERVICE_ROLE, desc: "Service role configurada" },
+        ].map((s) => (
+          <div key={s.label} className="flex items-center justify-between text-xs">
+            <span className="text-white/70">{s.label}</span>
+            <span className={`font-bold ${s.ok ? "text-emerald-300" : "text-red-400"}`}>{s.ok ? "✓ OK" : "✗ Ausente"}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+    <div className="bg-gradient-to-b from-white/[0.07] to-white/[0.02] border border-white/10 rounded-2xl p-4">
+      <p className="text-xs font-bold text-white mb-3 flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-gold inline-block" />Configurações da Loja</p>
+      <div className="space-y-2 text-xs text-white/60">
+        <p>Frontend: {process.env.FRONTEND_ORIGIN || "—"}</p>
+        <p>Modo: {process.env.DEMO_MODE === "true" ? "Demo" : "Produção"}</p>
+        <p>Porta: {process.env.PORT || "8787"}</p>
+      </div>
+    </div>
+  </div>
+)}
+
+{aba === "receitas" && <ReceitasAdmin />}
          </div>
        </div>
 
@@ -551,7 +615,90 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                   <p className="text-[10px] text-gold/70 uppercase tracking-wider font-bold">Cliente</p>
                   <p className="text-sm font-semibold text-white">{detalhe.cliente_nome}</p>
                   <p className="text-xs text-white/60">{detalhe.cliente_email}</p>
+                  {detalhe.cliente_cpf && <p className="text-[11px] text-white/40">CPF: {detalhe.cliente_cpf}</p>}
+                  {detalhe.cliente_telefone && <p className="text-[11px] text-white/40">Tel: {detalhe.cliente_telefone}</p>}
+                  {detalhe.cliente_endereco && <p className="text-[11px] text-white/40">{detalhe.cliente_endereco}</p>}
                 </div>
+
+                {detalhe.itens && detalhe.itens.length > 0 && (
+                  <div className="bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/10 rounded-2xl p-4 space-y-2">
+                    <p className="text-[10px] text-gold/70 uppercase tracking-wider font-bold">Especificações do Pedido</p>
+                    <div className="space-y-1.5">
+                      {detalhe.itens.map((it, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-xs">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white/90 font-medium truncate">{it.nome}</p>
+                            <p className="text-[10px] text-white/40">SKU: {it.sku}{it.variacao ? ` · ${it.variacao}` : ""}</p>
+                          </div>
+                          <div className="flex items-center gap-3 text-right">
+                            <span className="text-[10px] text-white/40">x{it.quantidade}</span>
+                            <span className="text-white font-semibold text-xs">{formatPrice(Number(it.preco_venda))}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="border-t border-white/10 pt-2 mt-2 flex justify-between text-xs">
+                      <span className="text-white/50">Subtotal</span>
+                      <span className="text-white font-bold">{formatPrice(detalhe.total)}</span>
+                    </div>
+                  </div>
+                )}
+
+                {(detalhe.pagamento || detalhe.envio || detalhe.endereco_entrega) && (
+                  <div className="bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/10 rounded-2xl p-4 space-y-1.5">
+                    <p className="text-[10px] text-gold/70 uppercase tracking-wider font-bold">Entrega & Pagamento</p>
+                    {detalhe.pagamento && <p className="text-xs text-white/70">💳 {detalhe.pagamento}</p>}
+                    {detalhe.pagamento_status && <p className="text-[10px] text-white/40">Status: {detalhe.pagamento_status}</p>}
+                    {detalhe.pagamento_detalhes && <p className="text-[10px] text-white/40">{detalhe.pagamento_detalhes}</p>}
+                    {detalhe.envio && <p className="text-xs text-white/70">📦 {detalhe.envio}</p>}
+                    {detalhe.envio_status && <p className="text-[10px] text-white/40">Status: {detalhe.envio_status}</p>}
+                    {detalhe.envio_rastreio && <p className="text-[10px] text-gold/60">Rastreio: {detalhe.envio_rastreio}</p>}
+                    {detalhe.endereco_entrega && <p className="text-[10px] text-white/40">📍 {detalhe.endereco_entrega}</p>}
+                  </div>
+                )}
+
+                {detalhe.itens && detalhe.itens.length > 0 && (
+                  <div className="bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/10 rounded-2xl p-4 space-y-2">
+                    <p className="text-[10px] text-gold/70 uppercase tracking-wider font-bold">Estoque dos Produtos</p>
+                    <div className="space-y-1.5">
+                      {detalhe.itens.map((it, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-xs">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-white/90 font-medium truncate">{it.nome}</p>
+                            <p className="text-[10px] text-white/40">SKU: {it.sku}</p>
+                          </div>
+                          <span className="text-[10px] text-white/40">x{it.quantidade}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {detalhe.cliente_email && (
+                  <div className="bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/10 rounded-2xl p-4 space-y-2">
+                    <p className="text-[10px] text-gold/70 uppercase tracking-wider font-bold">Histórico do Cliente</p>
+                    {carregandoHistorial ? (
+                      <div className="flex justify-center py-4"><div className="w-5 h-5 border-2 border-gold border-t-transparent rounded-full animate-spin" /></div>
+                    ) : historialCliente.length === 0 ? (
+                      <p className="text-[10px] text-white/40">Nenhum pedido encontrado.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {historialCliente.map((hp) => (
+                          <div key={hp.id} className="flex items-center justify-between text-xs border-b border-white/5 pb-1.5">
+                            <div>
+                              <p className="text-white/90 font-medium">#{hp.numero}</p>
+                              <p className="text-[10px] text-white/40">{hp.data}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-white font-semibold">{formatPrice(hp.total)}</p>
+                              <p className="text-[10px] text-white/40">{hp.status}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 <div className="bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/10 rounded-2xl p-4 space-y-2.5">
                   <p className="text-[10px] text-gold/70 uppercase tracking-wider font-bold">Atualizar status</p>
