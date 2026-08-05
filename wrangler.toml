@@ -1,5 +1,6 @@
 name = "appdgriffedois"
 compatibility_date = "2024-09-01"
+account_id = "a4d6e3cfe8dde83c8cda8c79ad77202a"
 
 [assets]
 directory = "./dist"
