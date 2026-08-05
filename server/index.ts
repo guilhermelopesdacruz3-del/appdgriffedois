@@ -1327,41 +1327,47 @@ setInterval(() => {
 // A listagem da LI não traz `marca` (nem sempre `categorias`). Este enriquecimento
 // percorre o catálogo local em background (GET individual, com concorrência) e
 // copia marca/categorias para o objeto em produtosSync — necessário para o
-// filtro por marca funcionar. Roda após cada sync em massa; usa o imagemCache
-// (10 min) para não repetir chamadas.
+// filtro por marca funcionar. Processa em lotes com pausa para não estourar o
+// rate limit da LI (em rajada a LI derruba parte das chamadas).
 let enriquecendoCatalogo = false;
+const LOTE_ENRIQUECIMENTO = 300;
 async function enriquecerCatalogoComDetalhes() {
   if (enriquecendoCatalogo || produtosSync.size === 0) return;
   enriquecendoCatalogo = true;
-  const precisa = [...produtosSync.values()].filter(
-    (p) => !p?.marca || (Array.isArray(p.categorias) && p.categorias.length === 0)
-  );
-  if (precisa.length === 0) {
-    enriquecendoCatalogo = false;
-    return;
-  }
-  console.log(`[loja-integrada-proxy] enriquecendo ${precisa.length} produtos com detalhes (marca/categorias)...`);
-  let fila = [...precisa];
-  async function worker() {
-    while (fila.length > 0) {
-      const produto = fila.shift();
-      try {
-        const extra = await enriquecerProdutoComImagem(produto.id);
-        const atual = produtosSync.get(produto.id);
-        if (!atual) continue;
-        if (!atual.marca && extra.marca) atual.marca = extra.marca;
-        if ((!atual.categorias || atual.categorias.length === 0) && extra.categorias?.length) {
-          atual.categorias = extra.categorias;
+  try {
+    const semMarca = [...produtosSync.values()].filter(
+      (p) => !p?.marca || (Array.isArray(p.categorias) && p.categorias.length === 0)
+    );
+    if (semMarca.length === 0) return;
+    console.log(`[loja-integrada-proxy] enriquecendo ${semMarca.length} produtos (lotes de ${LOTE_ENRIQUECIMENTO})...`);
+    for (let inicio = 0; inicio < semMarca.length; inicio += LOTE_ENRIQUECIMENTO) {
+      const lote = semMarca.slice(inicio, inicio + LOTE_ENRIQUECIMENTO);
+      let fila = [...lote];
+      async function worker() {
+        while (fila.length > 0) {
+          const produto = fila.shift();
+          try {
+            const extra = await enriquecerProdutoComImagem(produto.id);
+            const atual = produtosSync.get(produto.id);
+            if (!atual) continue;
+            if (!atual.marca && extra.marca) atual.marca = extra.marca;
+            if ((!atual.categorias || atual.categorias.length === 0) && extra.categorias?.length) {
+              atual.categorias = extra.categorias;
+            }
+          } catch {
+            /* produto individual indisponível — segue */
+          }
         }
-      } catch {
-        /* produto individual indisponível — segue */
       }
+      await Promise.all(Array.from({ length: 8 }, worker));
+      // Pausa entre lotes: evita rate limit da LI em rajada.
+      await new Promise((r) => setTimeout(r, 8000));
     }
+    const faltam = [...produtosSync.values()].filter((p) => !p?.marca).length;
+    console.log(`[loja-integrada-proxy] enriquecimento concluído; ${produtosSync.size - faltam} de ${produtosSync.size} com marca.`);
+  } finally {
+    enriquecendoCatalogo = false;
   }
-  await Promise.all(Array.from({ length: 8 }, worker));
-  const faltam = [...produtosSync.values()].filter((p) => !p?.marca).length;
-  console.log(`[loja-integrada-proxy] enriquecimento concluído; ${produtosSync.size - faltam} produtos com marca, ${faltam} sem.`);
-  enriquecendoCatalogo = false;
 }
 
 // Fallback individual (usado enquanto o sync em massa ainda não cobriu o produto).
