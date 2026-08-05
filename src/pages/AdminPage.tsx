@@ -147,6 +147,12 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
     carregarPedidos();
     carregarSituacoes();
     carregarRelatorio();
+    // Atualização em tempo real: recarrega a lista de pedidos a cada 15s
+    // enquanto a tela estiver aberta (sem interferir em filtros/edição).
+    const timer = setInterval(() => {
+      carregarPedidos();
+    }, 15000);
+    return () => clearInterval(timer);
   }, [token, carregarPedidos, carregarSituacoes, carregarRelatorio]);
 
   const fazerLogin = async (e: React.FormEvent) => {

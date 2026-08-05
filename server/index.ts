@@ -1234,12 +1234,19 @@ async function paginarRecurso(recurso, processaItem, queryExtra = {}) {
   let offset = 0;
   const limit = 100;
   for (;;) {
-    const { status, payload } = await chamarLI("GET", recurso, undefined, { limit, offset, ...queryExtra });
-    if (status !== 200) {
-      console.error(`[sync-${recurso}] status ${status} no offset ${offset}`);
+    let resp = null;
+    // Retry com backoff exponencial: a LI derruba chamadas em rajada (429/5xx).
+    for (let tentativa = 1; tentativa <= 5; tentativa++) {
+      resp = await chamarLI("GET", recurso, undefined, { limit, offset, ...queryExtra });
+      if (resp.status === 200) break;
+      console.warn(`[sync-${recurso}] status ${resp.status} no offset ${offset} (tentativa ${tentativa})`);
+      await new Promise((r) => setTimeout(r, 1500 * tentativa));
+    }
+    if (!resp || resp.status !== 200) {
+      console.error(`[sync-${recurso}] desistindo no offset ${offset} após retries`);
       return;
     }
-    const objetos = payload.objects || [];
+    const objetos = resp.payload.objects || [];
     for (const item of objetos) processaItem(item);
     if (objetos.length < limit) return;
     offset += limit;
