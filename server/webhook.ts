@@ -177,7 +177,7 @@ async function aplicarAprovacao(paymentId: string, payment: any, liPedidoFallbac
     const espelho = await buscarPedidoMP(String(paymentId));
     const liPedido = espelho?.li_pedido ?? liPedidoFallback;
     if (liPedido) {
-      await atualizarPedidoLI(liPedido, "pago");
+      await atualizarPedidoLI(liPedido, "pago", espelho?.li_dados ?? undefined);
     }
   } catch (e: any) {
     console.warn("[webhook-mp] falha ao atualizar pedido LI:", e?.message || e);

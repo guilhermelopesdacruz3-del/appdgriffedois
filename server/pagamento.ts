@@ -213,13 +213,18 @@ export async function processarCheckout(params: {
     // Cria o pedido na Loja Integrada (site) também em demo — garante que o
     // fluxo de sincronia é exercitado e o admin reflete a venda.
     let liPedido: number | string | null = null;
+    let liDados: Record<string, unknown> | null = null;
     try {
-      liPedido = await criarPedidoLI({
+      const criado = await criarPedidoLI({
         email: email || "",
         itens: items.map((it) => ({ li_uri: it.li_uri, sku: it.sku, nome: it.nome, preco: it.price, quantidade: it.qty })),
         valor: total,
         meio,
       });
+      if (criado) {
+        liPedido = criado.id;
+        liDados = criado.corpo;
+      }
     } catch (liErr: any) {
       console.warn("[checkout-demo] pedido LI não criado:", liErr?.message || liErr);
     }
@@ -231,12 +236,13 @@ export async function processarCheckout(params: {
         valor: total,
         status: "aprovado",
         li_pedido: liPedido ?? undefined,
+        li_dados: liDados ?? undefined,
         pontos_creditados: pontos > 0,
       });
     } catch { /* ignora */ }
     // Marca o pedido como pago na LI (se criamos um).
     if (liPedido) {
-      try { await atualizarPedidoLI(liPedido, "pago"); } catch { /* ignora */ }
+      try { await atualizarPedidoLI(liPedido, "pago", liDados ?? undefined); } catch { /* ignora */ }
     }
     if (meio === "pix") {
       return {
@@ -271,21 +277,23 @@ export async function processarCheckout(params: {
   // Cria o pedido na Loja Integrada (site) com status "Em aberto". Não-bloqueante:
   // se a LI falhar, a compra no app continua funcionando normalmente.
   try {
-    const liPedido = await criarPedidoLI({
+    const criado = await criarPedidoLI({
       email: email || "",
       itens: items.map((it) => ({ li_uri: it.li_uri, sku: it.sku, nome: it.nome, preco: it.price, quantidade: it.qty })),
       valor: total,
       meio,
     });
-    if (liPedido) {
-      resultado.li_pedido = liPedido;
-      // Espelha no Supabase já com o li_pedido, para o webhook saber o que atualizar.
+    if (criado) {
+      resultado.li_pedido = criado.id;
+      // Espelha no Supabase já com o li_pedido (e o corpo para atualizações),
+      // para o webhook saber o que atualizar.
       await upsertPedidoMP({
         mp_payment_id: String(resultado.id),
         email: email || null,
         valor: total,
         status: "pendente",
-        li_pedido: liPedido,
+        li_pedido: criado.id,
+        li_dados: criado.corpo,
       }).catch(() => {});
     }
   } catch (e: any) {

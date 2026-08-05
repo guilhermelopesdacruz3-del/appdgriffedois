@@ -64,12 +64,29 @@ export interface AdminPedido {
   numero: string;
   cliente_nome: string;
   cliente_email: string;
+  cliente_cpf: string | null;
+  cliente_telefone: string | null;
+  cliente_endereco: string | null;
   status: string;
   status_id?: number;
   status_uri?: string;
   data: string;
   total: number;
   items: number;
+  itens: Array<{
+    nome: string;
+    quantidade: number;
+    preco_venda: number;
+    sku: string;
+    variacao?: string | null;
+  }>;
+  pagamento?: string | null;
+  pagamento_status?: string | null;
+  envio?: string | null;
+  envio_status?: string | null;
+  envio_rastreio?: string | null;
+  endereco_entrega?: string | null;
+  pagamento_detalhes?: string | null;
   verificado: boolean;
   verificado_em: string | null;
 }
@@ -83,17 +100,48 @@ type PedidoComVerificacao = LIPedido & { verificado?: boolean; verificado_em?: s
 
 function mapAdminPedido(p: PedidoComVerificacao): AdminPedido {
   const base = mapPedidoParaApp(p);
+  const itens = (p.itens || []).map((it) => ({
+    nome: it.nome || "",
+    quantidade: Number(it.quantidade) || 0,
+    preco_venda: Number(it.preco_venda) || 0,
+    sku: it.sku || "",
+    variacao: it.variacao || null,
+  }));
+  const pagamento = p.pagamentos?.[0];
+  const envio = p.envios?.[0];
   return {
     id: (p as any).id_api ?? p.id,
     numero: p.numero,
     cliente_nome: p.cliente_nome,
     cliente_email: p.cliente_email,
+    cliente_cpf: p.cliente_cpf ?? null,
+    cliente_telefone: p.cliente_telefone ?? null,
+    cliente_endereco: p.endereco_entrega
+      ? [p.endereco_entrega.endereco, p.endereco_entrega.numero, p.endereco_entrega.bairro, p.endereco_entrega.cidade, p.endereco_entrega.estado].filter(Boolean).join(", ")
+      : null,
     status: base.status,
     status_id: p.situacao?.id,
     status_uri: p.situacao?.resource_uri,
     data: base.date,
     total: base.total,
     items: base.items,
+    itens,
+    pagamento: pagamento?.forma_pagamento?.nome ?? null,
+    pagamento_status: pagamento?.status ?? null,
+    pagamento_detalhes: pagamento
+      ? [
+          pagamento.valor ? `R$ ${Number(pagamento.valor).toFixed(2)}` : null,
+          pagamento.parcelamento_numero_parcelas ? `${pagamento.parcelamento_numero_parcelas}x` : null,
+          pagamento.bandeira ?? null,
+          pagamento.pix_code ? "PIX" : null,
+        ].filter(Boolean).join(" · ")
+      : null,
+    envio: envio?.forma_envio?.nome ?? null,
+    envio_status: envio?.status ?? null,
+    envio_rastreio: envio?.objeto ?? null,
+    endereco_entrega: p.endereco_entrega
+      ? `${p.endereco_entrega.endereco}, ${p.endereco_entrega.numero} — ${p.endereco_entrega.bairro}, ${p.endereco_entrega.cidade}/${p.endereco_entrega.estado} ${p.endereco_entrega.cep}`
+      : null,
     verificado: Boolean(p.verificado),
     verificado_em: p.verificado_em || null,
   };

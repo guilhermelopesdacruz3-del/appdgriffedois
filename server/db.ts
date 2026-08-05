@@ -457,6 +457,7 @@ export interface PedidoMP {
   external_reference?: string | null;
   pontos_creditados?: boolean;
   li_pedido?: number | null;
+  li_dados?: Record<string, unknown> | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -468,30 +469,40 @@ export async function jaProcessadoMP(mpPaymentId: string): Promise<boolean> {
   return Boolean(data);
 }
 
-// Busca o pedido espelhado pelo mp_payment_id (para recuperar o li_pedido).
-export async function buscarPedidoMP(mpPaymentId: string): Promise<{ li_pedido: number | null } | null> {
+// Busca o pedido espelhado pelo mp_payment_id (para recuperar o li_pedido e o corpo).
+export async function buscarPedidoMP(mpPaymentId: string): Promise<{ li_pedido: number | null; li_dados?: Record<string, unknown> | null } | null> {
   if (!sb) return null;
-  const { data } = await sb.from("pedidos").select("li_pedido").eq("mp_payment_id", mpPaymentId).single();
-  return data ? { li_pedido: data.li_pedido ?? null } : null;
+  const { data } = await sb.from("pedidos").select("li_pedido,li_dados").eq("mp_payment_id", mpPaymentId).single();
+  return data ? { li_pedido: data.li_pedido ?? null, li_dados: data.li_dados ?? null } : null;
+}
+
+// Busca o espelho pelo id do pedido na Loja Integrada (li_pedido). Usado pelo
+// admin para atualizar a situação de pedidos de integração, que exige o corpo
+// completo do POST (guardado no espelho). Sem Supabase, retorna null.
+export async function buscarPedidoPorLiPedido(liPedido: number | string): Promise<{ li_dados?: Record<string, unknown> | null } | null> {
+  if (!sb) return null;
+  const { data } = await sb.from("pedidos").select("li_dados").eq("li_pedido", String(liPedido)).maybeSingle();
+  return data ? { li_dados: data.li_dados ?? null } : null;
 }
 
 // Insere/atualiza o espelho do pedido MP. Se não houver Supabase, vira no-op.
+// li_pedido/li_dados só são tocados quando informados (undefined = manter o atual),
+// para que o webhook não apague o vínculo com a LI salvo no checkout.
 export async function upsertPedidoMP(p: PedidoMP): Promise<void> {
   if (!sb) return;
   const agora = new Date().toISOString();
-  await sb.from("pedidos").upsert(
-    {
-      mp_payment_id: p.mp_payment_id,
-      email: p.email,
-      valor: p.valor,
-      status: p.status,
-      external_reference: p.external_reference ?? null,
-      pontos_creditados: p.pontos_creditados ?? false,
-      li_pedido: p.li_pedido ?? null,
-      updated_at: agora,
-    },
-    { onConflict: "mp_payment_id" }
-  );
+  const row: Record<string, unknown> = {
+    mp_payment_id: p.mp_payment_id,
+    email: p.email,
+    valor: p.valor,
+    status: p.status,
+    external_reference: p.external_reference ?? null,
+    pontos_creditados: p.pontos_creditados ?? false,
+    updated_at: agora,
+  };
+  if (p.li_pedido !== undefined) row.li_pedido = p.li_pedido;
+  if (p.li_dados !== undefined) row.li_dados = p.li_dados;
+  await sb.from("pedidos").upsert(row, { onConflict: "mp_payment_id" });
 }
 
 // Marca o pedido como aprovado e registra que os pontos foram creditados.
@@ -715,6 +726,7 @@ export interface PerfilCliente {
   email: string;
   nome?: string;
   telefone?: string;
+  cpf?: string;
 }
 
 // Atualiza nome/telefone na tabela `perfis` (e no Auth user, se possível).
@@ -741,9 +753,9 @@ export async function salvarPerfil(p: PerfilCliente): Promise<void> {
 export async function buscarPerfil(email: string): Promise<PerfilCliente | null> {
   const e = (email || "").trim().toLowerCase();
   if (!e || !sb) return null;
-  const { data, error } = await sb.from("profiles").select("email,nome,telefone").eq("email", e).single();
+  const { data, error } = await sb.from("profiles").select("email,nome,telefone,cpf").eq("email", e).single();
   if (error || !data) return null;
-  return { email: e, nome: data.nome || undefined, telefone: data.telefone || undefined };
+  return { email: e, nome: data.nome || undefined, telefone: data.telefone || undefined, cpf: data.cpf || undefined };
 }
 
 // ---------------------------------------------------------------------------

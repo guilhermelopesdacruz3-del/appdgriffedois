@@ -3,17 +3,27 @@
 // Objetivo: quando o cliente compra no app D'Griffe, o pedido deve aparecer
 // também no painel da Loja Integrada (site) e no admin. O webhook do Mercado
 // Pago confirma o pagamento; aqui criamos o pedido na LI no momento do checkout
-// (status "Em aberto") e o atualizamos para "Pago" quando o MP aprovar.
+// (situação "Aguardando pagamento") e o atualizamos para "Pago" quando o MP
+// aprovar.
+//
+// Endpoint oficial de integração (Vendas):
+//   POST https://api.awsli.com.br/v1/integration/sales
+//   PUT  https://api.awsli.com.br/v1/integration/sales/{id}
+// Autenticação via header: `Authorization: chave_api {chave_api} aplicacao {aplicacao}`
+// (NÃO usa query params como o /api/v1; e o `id` retornado no POST é o que o
+// PUT espera no path — o `number` é o número do pedido na loja).
 //
 // SEGURANÇA: as chaves da LI vêm do getSecret (Supabase/env, server-only) e
 // NUNCA saem do servidor. Qualquer falha é tratada como não-bloqueante: a compra
 // no app não pode quebrar só porque a LI recusou algo.
 
-import { getSecret } from "./db.ts";
+import { getSecret, buscarPerfil, listarEnderecos } from "./db.ts";
 
 const LI_API_BASE = "https://api.awsli.com.br/api/v1";
+const LI_SALES_BASE = "https://api.awsli.com.br/v1/integration/sales";
 const DEMO = process.env.DEMO_MODE === "true";
 
+// Chama um recurso da API clássica da LI (/api/v1/...) com query params.
 async function chamarLI(method: string, resource: string, id?: string | number, query?: Record<string, string>, body?: unknown) {
   const APP_KEY = (await getSecret("LI_APP_KEY").catch(() => null)) || process.env.LOJA_INTEGRADA_APP_KEY || "";
   const API_KEY = (await getSecret("LI_API_KEY").catch(() => null)) || process.env.LOJA_INTEGRADA_API_KEY || "";
@@ -36,6 +46,78 @@ async function chamarLI(method: string, resource: string, id?: string | number, 
     method,
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: method === "POST" || method === "PUT" ? JSON.stringify(body) : undefined,
+    signal: AbortSignal.timeout(15000),
+  });
+  const ct = r.headers.get("content-type") || "";
+  const payload = ct.includes("application/json") ? await r.json().catch(() => ({})) : await r.text();
+  return { status: r.status, payload };
+}
+
+// Situação inicial do pedido na LI: id 2 = "Aguardando pagamento".
+const SITUACAO_INICIAL = "2";
+
+// Mapeia nomes usados pelo app para o id da situação na LI (GET /api/v1/situacao).
+const SITUACOES: Record<string, string> = {
+  "aguardando": "2",
+  "aguardando pagamento": "2",
+  "em aberto": "2",
+  "aberto": "2",
+  "pendente": "2",
+  "pago": "4",
+  "aprovado": "4",
+  "pedido pago": "4",
+  "cancelado": "8",
+  "efetuado": "9",
+  "separacao": "15",
+  "em separacao": "15",
+  "enviado": "11",
+  "entregue": "14",
+  "retirada": "13",
+  "pronto para retirada": "13",
+};
+
+// Endereço padrão usado quando o cliente não tem endereço salvo. Como o app
+// vende com retirada na loja, o endereço de entrega é um placeholder válido.
+const ENDERECO_LOJA = {
+  name: "D'Griffe Ótica de Luxo",
+  address: "Av. Paulista",
+  country: "BR",
+  complement: "",
+  district: "Bela Vista",
+  city: "São Paulo",
+  state: "SP",
+  zipcode: "01310100",
+  number: "1000",
+};
+
+// Chama o endpoint de Vendas da LI (header Authorization, sem query params).
+async function chamarSalesLI(
+  method: "POST" | "PUT",
+  id?: number | string,
+  body?: unknown
+): Promise<{ status: number; payload: any }> {
+  const APP_KEY = (await getSecret("LI_APP_KEY").catch(() => null)) || process.env.LOJA_INTEGRADA_APP_KEY || "";
+  const API_KEY = (await getSecret("LI_API_KEY").catch(() => null)) || process.env.LOJA_INTEGRADA_API_KEY || "";
+  if (!APP_KEY || !API_KEY) {
+    if (DEMO) {
+      // Em modo demo sem chaves, simula respostas da LI sem chamar a API real.
+      if (method === "POST") {
+        const fakeId = Math.floor(Math.random() * 900000000) + 100000000;
+        return { status: 201, payload: { id: fakeId, number: fakeId } };
+      }
+      return { status: 200, payload: {} };
+    }
+    throw new Error("Chaves da Loja Integrada não configuradas.");
+  }
+  const url = id != null ? `${LI_SALES_BASE}/${id}` : LI_SALES_BASE;
+  const r = await fetch(url, {
+    method,
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: `chave_api ${API_KEY} aplicacao ${APP_KEY}`,
+    },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(15000),
   });
   const ct = r.headers.get("content-type") || "";
@@ -103,7 +185,7 @@ export async function baixarEstoqueLI(itens: ItemPedidoLI[]): Promise<void> {
       // Lê a quantidade atual e decrementa (a LI aceita PUT com `quantidade`).
       const { status, payload } = await chamarLI("GET", "produto", id, { limit: "1" });
       if (status !== 200) continue;
-      const atual = payload?.produto?.quantidade ?? payload?.quantidade ?? null;
+      const atual = payload?.produto?.quantidade ?? payload?.quantidade ?? payload?.estoque_quantidade ?? null;
       if (atual == null) continue;
       const nova = Math.max(0, Number(atual) - item.quantidade);
       await chamarLI("PUT", "produto", id, undefined, { quantidade: nova });
@@ -113,64 +195,144 @@ export async function baixarEstoqueLI(itens: ItemPedidoLI[]): Promise<void> {
   }
 }
 
+export interface PedidoLICriado {
+  id: number; // id do pedido na LI (usado no PUT /v1/integration/sales/{id})
+  numero: number; // número do pedido na loja (aparece no admin)
+  corpo: Record<string, unknown>; // corpo completo enviado (necessário no PUT)
+}
+
 export async function criarPedidoLI(opts: {
   email: string;
   itens: ItemPedidoLI[];
   valor: number;
   meio: "pix" | "cartao";
-}): Promise<number | null> {
-  // Situação inicial: "Em aberto" / "Aguardando pagamento". Se não achar nenhuma
-  // das esperadas, usa a PRIMEIRA situação disponível (fallback) para garantir
-  // que o pedido sempre tenha uma situação válida na LI.
-  let situacao = await buscarUri("situacaopedido", ["em aberto", "aguardando", "aberto", "pendente"]);
-  if (!situacao) {
-    try {
-      const { status, payload } = await chamarLI("GET", "situacaopedido", undefined, { limit: 100 });
-      if (status === 200 && Array.isArray(payload?.objects) && payload.objects[0]) {
-        const o = payload.objects[0];
-        situacao = o.resource_uri || (o.id ? `/api/v1/situacaopedido/${o.id}/` : null);
-      }
-    } catch { /* ignora */ }
-  }
-  const pagamento = await buscarUri("formapagamento", [opts.meio === "pix" ? "pix" : "cartao", "cartão"]);
-
+}): Promise<PedidoLICriado | null> {
   const itens = opts.itens
-    .filter((i) => i.li_uri || i.sku)
-    .map((i) => ({
-      produto: i.li_uri ? { resource_uri: i.li_uri } : { sku: i.sku },
-      quantidade: i.quantidade,
-      preco: Number(i.preco.toFixed(2)),
-    }));
+    .map((i) => {
+      const product_id = extrairIdProduto(i);
+      if (!product_id || !(i.quantidade > 0)) return null;
+      return { product_id, quantity: i.quantidade, unit_value: i.preco, line_value: i.preco * i.quantidade };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null);
 
   if (itens.length === 0) return null; // sem itens válidos, não cria
 
   // Garante que o cliente exista na LI antes de criar o pedido (idempotente:
   // se já existe, a LI apenas retorna o cliente). Evita erro de "cliente inexistente".
-  await criarClienteLI(opts.email, {});
+  await criarClienteLI(opts.email, {}).catch(() => false);
 
-  const body: any = {
-    cliente: { email: opts.email },
-    itens,
-    valor_total: Number(opts.valor.toFixed(2)),
+  // Buyer: usa nome/telefone/CPF do perfil do cliente quando disponíveis;
+  // fallback para valores neutros (a LI exige document, mas aceita 00000000000).
+  const perfil = await buscarPerfil(opts.email).catch(() => null);
+  const enderecos = await listarEnderecos(opts.email).catch(() => []);
+  const end = enderecos[0];
+  const endereco = end
+    ? {
+        name: perfil?.nome || opts.email.split("@")[0],
+        address: end.endereco,
+        country: "BR",
+        complement: end.complemento || "",
+        district: end.bairro || "",
+        city: end.cidade,
+        state: end.estado,
+        zipcode: String(end.cep).replace(/\D/g, ""),
+        number: end.numero || "0",
+      }
+    : ENDERECO_LOJA;
+
+  const timestamp = Date.now();
+  const corpo: Record<string, unknown> = {
+    buyer: {
+      name: perfil?.nome || opts.email.split("@")[0] || "Cliente",
+      email: opts.email,
+      document: (perfil as any)?.cpf || "00000000000",
+      external_id: String(timestamp),
+      phone: (perfil as any)?.telefone || "",
+      type: "CPF",
+      cellPhone: "",
+    },
+    shipping: {
+      address: endereco,
+      option: "retirar_pessoalmente",
+    },
+    amount: {
+      discount: null,
+      freight: 0,
+      fees: null,
+      total: Number(opts.valor.toFixed(2)),
+      gross: Number(opts.valor.toFixed(2)),
+    },
+    items: itens,
+    info: {
+      status: SITUACAO_INICIAL,
+      marketPlaceId: null,
+      reference: `dgriffe-app/${timestamp}`,
+      comment: `Pedido do app D'Griffe (${opts.meio})`,
+    },
+    integration_data: {
+      integrator: "dgriffe-app",
+      marketplace: "app",
+      external_id: timestamp,
+      unique_id: null,
+    },
   };
-  if (situacao) body.situacao = { resource_uri: situacao };
-  if (pagamento) body.forma_pagamento = { resource_uri: pagamento };
 
-  const { status, payload } = await chamarLI("POST", "pedido", undefined, undefined, body);
+  const { status, payload } = await chamarSalesLI("POST", undefined, corpo);
   if (status !== 200 && status !== 201) {
-    console.warn(`[LI] falha ao criar pedido (${status}):`, JSON.stringify(payload).slice(0, 200));
+    console.warn(`[LI] falha ao criar pedido (${status}):`, JSON.stringify(payload).slice(0, 300));
+    return null;
+  }
+  const id = Number(payload?.id || null);
+  const numero = Number(payload?.number || payload?.id || null);
+  if (!id) {
+    console.warn("[LI] pedido criado sem id:", JSON.stringify(payload).slice(0, 300));
     return null;
   }
   // Baixa o estoque dos itens na LI (não-bloqueante).
   await baixarEstoqueLI(opts.itens).catch(() => {});
-  return Number(payload?.pedido?.id || payload?.id || null);
+  return { id, numero, corpo };
 }
 
-export async function atualizarPedidoLI(id: number | string, situacaoNome: string): Promise<boolean> {
-  const uri = await buscarUri("situacaopedido", [situacaoNome.toLowerCase()]);
-  if (!uri) return false;
+// Atualiza a situação do pedido na LI. O endpoint de Vendas exige o CORPO
+// COMPLETO do pedido (com a mesma reference do POST); por isso `corpo` deve ser
+// o objeto retornado por criarPedidoLI (guardado no espelho do pedido).
+export async function atualizarPedidoLI(
+  id: number | string,
+  situacaoNome: string,
+  corpo?: Record<string, unknown>
+): Promise<boolean> {
+  const situacaoId = SITUACOES[situacaoNome.trim().toLowerCase()];
+  if (!situacaoId) return false;
+  if (!corpo) {
+    console.warn(`[LI] não é possível atualizar o pedido ${id}: corpo do pedido não informado.`);
+    return false;
+  }
   try {
-    const { status } = await chamarLI("PUT", "pedido", id, undefined, { situacao: { resource_uri: uri } });
+    const novo: Record<string, unknown> = JSON.parse(JSON.stringify(corpo));
+    novo.info = { ...(novo.info as Record<string, unknown>), status: situacaoId };
+    const { status } = await chamarSalesLI("PUT", id, novo);
+    return status === 200 || status === 204;
+  } catch {
+    return false;
+  }
+}
+
+// Atualiza a situação do pedido de integração usando o corpo do espelho
+// (li_dados) e o id da situação da LI (ex.: 4 = pago) — caminho usado pelo
+// admin, que manda o id da situação em vez do nome.
+export async function atualizarPedidoLISituacao(
+  id: number | string,
+  situacaoId: string | number,
+  corpo?: Record<string, unknown>
+): Promise<boolean> {
+  if (!corpo) {
+    console.warn(`[LI] não é possível atualizar o pedido ${id}: corpo do pedido não informado.`);
+    return false;
+  }
+  try {
+    const novo: Record<string, unknown> = JSON.parse(JSON.stringify(corpo));
+    novo.info = { ...(novo.info as Record<string, unknown>), status: String(situacaoId) };
+    const { status } = await chamarSalesLI("PUT", id, novo);
     return status === 200 || status === 204;
   } catch {
     return false;

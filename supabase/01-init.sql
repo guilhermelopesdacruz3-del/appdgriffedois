@@ -40,6 +40,7 @@ alter table public.pedidos add column if not exists li_pedido text;
 alter table public.pedidos add column if not exists external_reference text;
 alter table public.pedidos add column if not exists pontos_creditados boolean not null default false;
 alter table public.pedidos add column if not exists updated_at timestamptz not null default now();
+alter table public.pedidos add column if not exists li_dados jsonb;
 
 -- 4) admin_users: quem tem acesso ao painel admin.
 create table if not exists public.admin_users (

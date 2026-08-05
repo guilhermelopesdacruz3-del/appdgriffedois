@@ -17,7 +17,7 @@
 // Como hospedar: qualquer serviço que rode Node (Render, Railway, Fly.io, VPS).
 // Para Vercel/Netlify, use api/loja-integrada/[...path].js e api/admin/[...path].js.
 
-import "dotenv/config";
+import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
@@ -25,6 +25,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+dotenv.config({ path: path.resolve(__dirname, ".env") });
 const DIST_DIR = path.resolve(__dirname, "..", "..", "dist");
 import {
   demoResponder,
@@ -36,6 +37,7 @@ import {
 import * as segredos from "./db.ts";
 import { processarCheckout } from "./pagamento.ts";
 import { processarWebhookMP } from "./webhook.ts";
+import { atualizarPedidoLISituacao } from "./liClient.ts";
 import { listarVideosRecentes } from "./youtube.ts";
 import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade, salvarNotificacao, listarNotificacoes, marcarNotificacaoLida, salvarPerfil, buscarPerfil, listarEnderecos, salvarEndereco, excluirEndereco, salvarPreferencias, buscarPreferencias, getNiveis, NIVEIS_PADRAO, calcularNivel, calcularCashback, BENEFICIO_BASE, TETO_BENEFICIOS_PERC, CASHBACK_BASE, gerarCodigoIndicacao, registrarIndicacao, creditarIndicacao, getIndicacoes, getClubeFamilia, adicionarFamiliar, creditarFamilia, getCreditosFamilia, MISSOES, VALIDADE_PONTOS_MESES_SEM_MOV, VALIDADE_PONTOS_MESES_EXPIRACAO, VALIDADE_CASHBACK_MESES_SEM_MOV, VALIDADE_CASHBACK_DIAS_ADICIONAIS, getSecret } from "./db.ts";
 import cupomApp from "./cupom.ts";
@@ -482,8 +484,29 @@ app.get("/api/admin/pedidos/:id", requireAdmin, async (req, res) => {
     const { status, payload } = await chamarLI("GET", "pedido", req.params.id);
     if (status !== 200) return res.status(status).json(payload);
     const obj = payload;
+    let cliente_nome = obj.cliente_nome;
+    let cliente_email = obj.cliente_email;
+    if (!cliente_nome && obj.cliente) {
+      if (typeof obj.cliente === "object") {
+        cliente_nome = obj.cliente.nome || obj.cliente.razao_social || null;
+        cliente_email = obj.cliente.email || null;
+      } else {
+        const clienteId = extrairIdDaUri(obj.cliente);
+        if (clienteId) {
+          try {
+            const { status: cs, payload: cp } = await chamarLI("GET", "cliente", clienteId);
+            if (cs === 200) {
+              cliente_nome = cp.nome || cp.razao_social || null;
+              cliente_email = cp.email || null;
+            }
+          } catch { /* ignora */ }
+        }
+      }
+    }
     return res.json({
       ...obj,
+      cliente_nome,
+      cliente_email,
       id_api: extrairIdDaUri(obj.resource_uri) ?? obj.id,
       verificado: Boolean(estado.verificacoes[String(obj.id)]),
       verificado_em: estado.verificacoes[String(obj.id)] ? estado.verificacoes[String(obj.id)].em : null,
@@ -505,15 +528,51 @@ app.put("/api/admin/pedidos/:id", requireAdmin, async (req, res) => {
   }
   try {
     const body = req.body || {};
+    const situacaoId = body.situacao !== undefined ? String(body.situacao) : undefined;
+
+    // Pedidos criados pela integração (/v1/integration/sales) NÃO são
+    // atualizáveis pelo endpoint clássico /api/v1/pedido/{id}: a LI exige o
+    // PUT /v1/integration/sales/{id} com o CORPO COMPLETO (reference do POST +
+    // info.status). Detectamos pelo GET (integration_data presente) e usamos o
+    // corpo guardado no espelho do Supabase quando disponível.
+    const atual = await chamarLI("GET", "pedido", req.params.id);
+    const pedido = atual.status === 200 ? atual.payload : null;
+    const ehIntegracao = Boolean(
+      pedido?.integration_data &&
+      (pedido.integration_data.integrator || pedido.integration_data.marketplace)
+    );
+
+    if (ehIntegracao && situacaoId !== undefined) {
+      const idIntegracao = pedido.id;
+      if (!idIntegracao) {
+        console.warn(`[admin-put-pedido] pedido ${req.params.id} de integração sem id.`);
+        return res.status(400).json({ erro: "Pedido de integração sem id na LI." });
+      }
+      const espelho = await segredos.buscarPedidoPorLiPedido(idIntegracao).catch(() => null);
+      const corpo = espelho?.li_dados;
+      if (!corpo) {
+        console.warn(`[admin-put-pedido] pedido ${req.params.id} de integração sem espelho (li_dados) no Supabase.`);
+        return res.status(409).json({
+          erro: "Pedido de integração sem corpo salvo no espelho (Supabase indisponível ou pedido antigo). Não é possível alterar a situação pela LI.",
+        });
+      }
+      const ok = await atualizarPedidoLISituacao(idIntegracao, situacaoId, corpo as Record<string, unknown>);
+      if (!ok) {
+        return res.status(502).json({ erro: "A LI recusou a atualização do pedido de integração." });
+      }
+      console.error(`[admin-put-pedido] id=${req.params.id} integracao id=${idIntegracao} novaSituacao=${situacaoId} (via /v1/integration/sales)`);
+      return res.json({ ...pedido, situacao: { id: Number(situacaoId) } });
+    }
+
     const liBody = {};
-    if (body.situacao !== undefined) liBody.situacao = body.situacao;
+    if (situacaoId !== undefined) liBody.situacao = situacaoId;
     // A LI exige `id_externo` no PUT de pedido (regra da API). Buscamos o
     // pedido e injetamos o id_externo atual automaticamente, para a mudança
     // de status do admin não depender do front enviar esse campo.
     if (liBody.situacao !== undefined && body.id_externo === undefined) {
-      const atual = await chamarLI("GET", "pedido", req.params.id);
-      if (atual.status === 200 && atual.payload?.id_externo != null) {
-        liBody.id_externo = atual.payload.id_externo;
+      const atual2 = await chamarLI("GET", "pedido", req.params.id);
+      if (atual2.status === 200 && atual2.payload?.id_externo != null) {
+        liBody.id_externo = atual2.payload.id_externo;
       }
     }
     console.error(`[admin-put-pedido] id=${req.params.id} body=${JSON.stringify(req.body)} liBody=${JSON.stringify(liBody)}`);
@@ -1002,7 +1061,7 @@ app.post("/api/admin/fidelidade/ajustar", requireAdmin, async (req, res) => {
     let saldo = 0;
     if (op === "resgatar") saldo = await segredos.resgatarPontos(e, pts);
     else if (op === "definir") saldo = await setarPontos(e, pts);
-    else saldo = await segredos.creditarPontos(e, pts / (await segredos.getRegrasFidelidade()).pontosPorReal, motivo || "ajuste admin");
+    else saldo = await segredos.setarPontos(e, (await segredos.getPontos(e)) + pts);
     // Avisa o cliente no app (sino de notificações) sobre a mudança de pontos.
     const verbo = op === "resgatar" ? "resgatou" : op === "definir" ? "atualizou para" : "creditou";
     await salvarNotificacao({

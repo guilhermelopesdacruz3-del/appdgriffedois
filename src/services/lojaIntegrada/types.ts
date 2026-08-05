@@ -181,6 +181,7 @@ export interface LIPagamentoPedido {
   pix_qrcode?: string | null;
   boleto_url?: string | null;
   bandeira?: string | null;
+  status?: string | null;
 }
 
 export interface LIEnvioPedido {
@@ -193,6 +194,7 @@ export interface LIEnvioPedido {
   valor: string | number;
   prazo: number;
   objeto?: string | null;
+  status?: string | null;
 }
 
 export interface LISituacaoPedido {
@@ -219,6 +221,8 @@ export interface LIPedido {
   cliente_cnpj?: string | null;
   situacao: LISituacaoPedido;
   data_criacao: string;
+  cliente_telefone?: string | null;
+  cliente_endereco?: string | null;
   data_modificacao: string;
   valor_subtotal: string | number;
   valor_desconto: string | number;
