@@ -1399,12 +1399,19 @@ async function enriquecerProdutoComImagem(id) {
     // Produtos pai (tipo "atributo") não têm preço/imagem próprios — os dados
     // estão no primeiro filho (variação). Herda os dados do primeiro filho.
     if (obj && !obj.preco_cheio && Array.isArray(obj.filhos) && obj.filhos.length > 0) {
+      const marcaDoPai = obj.marca;
+      const categoriasDoPai = obj.categorias;
       const primeiroFilhoId = extrairIdDaUri(obj.filhos[0]);
       if (primeiroFilhoId) {
         const filho = await chamarLI("GET", "produto", primeiroFilhoId, {});
         const filhoObj = Array.isArray(filho.payload?.objects) ? filho.payload.objects[0] : filho.payload;
         if (filhoObj) {
           obj = { ...obj, ...filhoObj, id: obj.id };
+          // Variações (atributo_opcao) não têm marca/categorias — preserva as do pai.
+          if (!obj.marca && marcaDoPai) obj.marca = marcaDoPai;
+          if ((!obj.categorias || obj.categorias.length === 0) && categoriasDoPai?.length) {
+            obj.categorias = categoriasDoPai;
+          }
         }
       }
     }
