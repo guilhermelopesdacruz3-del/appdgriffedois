@@ -80,6 +80,7 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
+          set -euo pipefail
           cd "$DEPLOY_DIR"
           manifest="{}"
           curl_args=""
@@ -88,11 +89,13 @@ jobs:
             manifest=$(echo "$manifest" | jq -c --arg p "$f" --arg h "$hash" '. + {($p): $h}')
             curl_args="$curl_args -F \"$f=@$f\""
           done
-          curl -sS -X POST \
+          RESP=$(curl -sS -X POST \
             "https://api.cloudflare.com/client/v4/accounts/$CLOUDFLARE_ACCOUNT_ID/pages/projects/appdgriffedois/deployments" \
             -H "Authorization: Bearer $CLOUDFLARE_API_TOKEN" \
             -F "manifest=$manifest" \
-            $curl_args | jq .
+            $curl_args)
+          echo "$RESP" | jq .
+          echo "$RESP" | jq -e '.success == true' > /dev/null || { echo "Deploy falhou"; exit 1; }
 
   deploy-backend:
     needs: [test, sync-supabase]
