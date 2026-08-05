@@ -8,9 +8,8 @@ import type { LICliente } from "./types";
  * sempre retorna o primeiro cliente — por isso usamos /busca/ (doc oficial).
  */
 export async function buscarClientePorEmail(email: string): Promise<ClienteApp | null> {
-  const resposta = await request<{ objects: LICliente[] }>("/cliente/busca/", {
-    email,
-    limit: 1,
+  const resposta = await request<{ objects: LICliente[] }>("/cliente/search/", {
+    cliente_email: email,
   });
   const cliente = resposta.objects?.[0];
   return cliente ? mapClienteParaApp(cliente) : null;
@@ -18,9 +17,8 @@ export async function buscarClientePorEmail(email: string): Promise<ClienteApp |
 
 export async function buscarClientePorCpf(cpf: string): Promise<ClienteApp | null> {
   const cpfLimpo = cpf.replace(/\D/g, "");
-  const resposta = await request<{ objects: LICliente[] }>("/cliente/busca/", {
-    cpf: cpfLimpo,
-    limit: 1,
+  const resposta = await request<{ objects: LICliente[] }>("/cliente/search/", {
+    cliente_cpf: cpfLimpo,
   });
   const cliente = resposta.objects?.[0];
   return cliente ? mapClienteParaApp(cliente) : null;

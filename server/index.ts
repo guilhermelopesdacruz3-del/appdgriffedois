@@ -1674,7 +1674,7 @@ async function criarClienteLI(email: string, dados: { nome?: string; telefone?: 
   // Se o cliente já existe na Loja Integrada (busca por e-mail dedicada),
   // reaproveita o id em vez de tentar criar de novo (evita erro "já existe").
   try {
-    const busca = await chamarLI("GET", "cliente", "busca", { email, limit: 1 });
+    const busca = await chamarLI("GET", "cliente", "search", { cliente_email: email });
     const objs = (busca.payload && (busca.payload as any).objects) || [];
     if (busca.status === 200 && objs[0]?.id) {
       return objs[0];
@@ -2085,10 +2085,14 @@ app.post("/api/cliente/excluir-confirmar", async (req, res) => {
     try {
       const { LI_APP_KEY, LI_API_KEY } = await getSecretsLI();
       if (LI_APP_KEY && LI_API_KEY) {
-        // A LI não tem DELETE por e-mail direto via proxy simples; tentamos a
-        // rota de exclusão apenas se existir. Por segurança, não quebramos o fluxo
-        // se a LI não suportar — o dado do app (Supabase) é a fonte de verdade.
-        await chamarLI("DELETE", "cliente", "busca", { email: e }).catch(() => {});
+        // A LI não tem DELETE por e-mail direto: busca o id via /cliente/search/
+        // e exclui pelo id. Por segurança, não quebramos o fluxo se a LI falhar —
+        // o dado do app (Supabase) é a fonte de verdade.
+        const busca = await chamarLI("GET", "cliente", "search", { cliente_email: e }).catch(() => null);
+        const objs = (busca?.payload && (busca.payload as any).objects) || [];
+        if (busca?.status === 200 && objs[0]?.id) {
+          await chamarLI("DELETE", "cliente", objs[0].id, {}).catch(() => {});
+        }
       }
     } catch (liErr) {
       console.warn("[exclusao] falha ao remover da LI (ignorado):", (liErr as Error)?.message);
