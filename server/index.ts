@@ -1382,12 +1382,15 @@ function aplicarDadosSincronizados(produto) {
         };
       }
       const fest = estoqueSync.get(filhoId);
-      if (fest && produto.estoque_quantidade === undefined) {
+      // Produtos pai (atributo) nunca têm estoque próprio (LI retorna 0/0) —
+      // a situação real vem do primeiro filho (variação).
+      if (fest) {
         if (fest.gerenciado) {
           produto.estoque_quantidade = fest.disponivel;
           produto.estoque_gerenciado = true;
         } else {
           produto.estoque_gerenciado = false;
+          produto.estoque_quantidade = undefined;
         }
         produto.estoque_situacao_em_estoque = fest.em_estoque;
         produto.estoque_situacao_sem_estoque = fest.sem_estoque;

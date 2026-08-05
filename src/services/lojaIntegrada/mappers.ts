@@ -198,7 +198,13 @@ export function mapProdutoParaProduct(
     emEstoque:
       produto.estoque_gerenciado
         ? (produto.estoque_quantidade ?? 0) > 0
-        : produto.estoque_situacao_em_estoque === 7,
+        : // Não gerenciado: disponibilidade vem da situação (7 = imediata,
+          // outros códigos = prazo de dias úteis). 20 = sob consulta, 0 = sem
+          // configuração — ambos não contam como "em estoque".
+          produto.estoque_situacao_em_estoque !== undefined &&
+          produto.estoque_situacao_em_estoque !== null &&
+          produto.estoque_situacao_em_estoque !== 0 &&
+          produto.estoque_situacao_em_estoque !== 20,
     sobConsulta: produto.preco_sob_consulta === true || (price <= 0 && !produto.preco_sob_consulta),
   };
 }
