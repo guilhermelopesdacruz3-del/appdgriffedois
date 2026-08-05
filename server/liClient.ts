@@ -60,12 +60,13 @@ async function buscarUri(recurso: string, nomes: string[]): Promise<string | nul
 export async function criarClienteLI(email: string, dados: { nome?: string; telefone?: string; cpf?: string }): Promise<boolean> {
   if (!email) return false;
   try {
-    // Se já existe, a LI retorna o cliente (não duplica).
+    // A LI exige nome e (para PF) CPF; enderecos pode ser lista vazia.
     const { status } = await chamarLI("POST", "cliente", undefined, undefined, {
       email,
       nome: dados.nome || email.split("@")[0],
-      telefone: dados.telefone || "",
+      telefone_celular: dados.telefone || "",
       cpf: dados.cpf || "",
+      enderecos: [],
     });
     return status === 200 || status === 201;
   } catch {

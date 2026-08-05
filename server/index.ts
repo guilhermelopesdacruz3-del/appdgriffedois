@@ -1683,8 +1683,9 @@ async function criarClienteLI(email: string, dados: { nome?: string; telefone?: 
     /* segue para criação */
   }
 
-  const body: any = { email };
+  const body: any = { email, enderecos: [] };
   if (dados.nome) body.nome = dados.nome;
+  else body.nome = email.split("@")[0];
   if (dados.telefone) body.telefone_celular = dados.telefone;
   if (dados.cpf) body.cpf = dados.cpf;
   const { status, payload } = await chamarLI("POST", "cliente", undefined, {}, body);
