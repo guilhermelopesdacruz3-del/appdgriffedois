@@ -187,7 +187,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
     try {
       const p = await buscarPedidoAdmin(id);
       const mapeado: AdminPedido = {
-        id: p.id,
+        id: (p as any).id_api ?? p.id,
         numero: p.numero,
         cliente_nome: p.cliente_nome,
         cliente_email: p.cliente_email,

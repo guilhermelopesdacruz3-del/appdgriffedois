@@ -319,7 +319,7 @@ const RECURSOS_PERMITIDOS = new Set([
   "pedido",
   "formapagamento",
   "formaenvio",
-  "situacaopedido",
+  "situacao",
 ]);
 
 const RECURSOS_ESCRITA_PERMITIDOS = new Set(["cliente", "pedido"]);
@@ -450,6 +450,9 @@ app.get("/api/admin/pedidos", requireAdmin, async (req, res) => {
     const obj = payload;
     const objects = (obj.objects || []).map((p) => ({
       ...p,
+      // A LI expõe `id` (interno) e `resource_uri` (ex.: /api/v1/pedido/1) —
+      // o id usado em GET/PUT individuais é o da resource_uri, não o campo id.
+      id_api: extrairIdDaUri(p.resource_uri) ?? p.id,
       verificado: Boolean(estado.verificacoes[String(p.id)]),
       verificado_em: estado.verificacoes[String(p.id)] ? estado.verificacoes[String(p.id)].em : null,
     }));
@@ -481,6 +484,7 @@ app.get("/api/admin/pedidos/:id", requireAdmin, async (req, res) => {
     const obj = payload;
     return res.json({
       ...obj,
+      id_api: extrairIdDaUri(obj.resource_uri) ?? obj.id,
       verificado: Boolean(estado.verificacoes[String(obj.id)]),
       verificado_em: estado.verificacoes[String(obj.id)] ? estado.verificacoes[String(obj.id)].em : null,
     });
@@ -503,6 +507,15 @@ app.put("/api/admin/pedidos/:id", requireAdmin, async (req, res) => {
     const body = req.body || {};
     const liBody = {};
     if (body.situacao !== undefined) liBody.situacao = body.situacao;
+    // A LI exige `id_externo` no PUT de pedido (regra da API). Buscamos o
+    // pedido e injetamos o id_externo atual automaticamente, para a mudança
+    // de status do admin não depender do front enviar esse campo.
+    if (liBody.situacao !== undefined && body.id_externo === undefined) {
+      const atual = await chamarLI("GET", "pedido", req.params.id);
+      if (atual.status === 200 && atual.payload?.id_externo != null) {
+        liBody.id_externo = atual.payload.id_externo;
+      }
+    }
     console.error(`[admin-put-pedido] id=${req.params.id} body=${JSON.stringify(req.body)} liBody=${JSON.stringify(liBody)}`);
     const { status, payload } = await chamarLI("PUT", "pedido", req.params.id, undefined, liBody);
     return res.status(status).json(payload);
@@ -538,7 +551,7 @@ app.get("/api/admin/situacoes", requireAdmin, async (_req, res) => {
   if (MOCK) return res.json(mockSituacoes);
   if (DEMO) return res.json(demoAdminSituacoes());
   try {
-    const { status, payload } = await chamarLI("GET", "situacaopedido", undefined, { limit: 100 });
+    const { status, payload } = await chamarLI("GET", "situacao", undefined, { limit: 100 });
     if (status !== 200) return res.status(status).json(payload);
     return res.json((payload.objects || []));
   } catch (err) {

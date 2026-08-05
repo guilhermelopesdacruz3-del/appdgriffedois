@@ -84,7 +84,7 @@ type PedidoComVerificacao = LIPedido & { verificado?: boolean; verificado_em?: s
 function mapAdminPedido(p: PedidoComVerificacao): AdminPedido {
   const base = mapPedidoParaApp(p);
   return {
-    id: p.id,
+    id: (p as any).id_api ?? p.id,
     numero: p.numero,
     cliente_nome: p.cliente_nome,
     cliente_email: p.cliente_email,
