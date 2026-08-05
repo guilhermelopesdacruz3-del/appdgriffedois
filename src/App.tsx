@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { Product } from "./data";
 import { useProdutos } from "./hooks/useProdutos";
+import { useFiltrosCatalogo } from "./hooks/useFiltrosCatalogo";
 import Header from "./components/layout/Header";
 import BottomNav from "./components/layout/BottomNav";
 import PurchaseDrawer from "./components/features/PurchaseDrawer";
@@ -58,6 +59,8 @@ function AppInner() {
   const [showCartNotification, setShowCartNotification] = useState(false);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [filtroMarcaId, setFiltroMarcaId] = useState<number | null>(null);
+  const [filtroCategoriaId, setFiltroCategoriaId] = useState<number | null>(null);
   const [dark, setDark] = useState<boolean>(() => {
     try {
       return window.localStorage.getItem("dgriffe:theme") === "dark";
@@ -152,7 +155,8 @@ function AppInner() {
     return <AdminPage onExit={() => { window.location.hash = ""; }} />;
   }
 
-  const { produtos: products, total, loading: loadingProducts, error: productsError, reload: reloadProducts, loadMore: loadMoreProducts, loadingMore, hasMore } = useProdutos({ limit: 100 });
+  const { produtos: products, total, loading: loadingProducts, error: productsError, reload: reloadProducts, loadMore: loadMoreProducts, loadingMore, hasMore } = useProdutos({ limit: 100, marcaId: filtroMarcaId ?? undefined, categoriaId: filtroCategoriaId ?? undefined });
+  const filtrosCatalogo = useFiltrosCatalogo();
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
   const handleSelectProduct = useCallback((product: Product) => {
@@ -252,7 +256,7 @@ function AppInner() {
           <HomePage products={products} onSelectProduct={handleSelectProduct} onAddToCart={handleAddToCart} onNavigate={handleNavigate} onTryOn={handleTryOn} recentIds={recentIds} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} />
         )}
         {currentPage === "catalog" && !(loadingProducts && products.length === 0) && (
-          <CatalogPage products={products} onSelectProduct={handleSelectProduct} onAddToCart={handleAddToCart} onTryOn={handleTryOn} searchQuery={searchQuery} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} hasMore={hasMore} onLoadMore={loadMoreProducts} loadingMore={loadingMore} total={total} />
+          <CatalogPage products={products} onSelectProduct={handleSelectProduct} onAddToCart={handleAddToCart} onTryOn={handleTryOn} searchQuery={searchQuery} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} hasMore={hasMore} onLoadMore={loadMoreProducts} loadingMore={loadingMore} total={total} categorias={filtrosCatalogo.categorias} marcas={filtrosCatalogo.marcas} filtroMarcaId={filtroMarcaId} filtroCategoriaId={filtroCategoriaId} onFiltroMarca={setFiltroMarcaId} onFiltroCategoria={setFiltroCategoriaId} />
         )}
         {currentPage === "product" && selectedProduct && (
           <ProductPage product={selectedProduct} onBack={handleBackFromProduct} onTryOn={handleTryOn} />

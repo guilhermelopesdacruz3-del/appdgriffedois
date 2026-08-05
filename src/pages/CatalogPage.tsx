@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Product } from "../data";
 import ProductCard from "../components/features/ProductCard";
+import type { FiltroCatalogo } from "../services/lojaIntegrada";
 
 interface CatalogPageProps {
   products: Product[];
@@ -14,18 +15,21 @@ interface CatalogPageProps {
   onLoadMore?: () => void;
   loadingMore?: boolean;
   total?: number;
+  /** Categorias reais da loja (chips de filtro). */
+  categorias?: FiltroCatalogo[];
+  /** Marcas reais da loja (chips de filtro). */
+  marcas?: FiltroCatalogo[];
+  /** Filtro ativo (server-side): id da marca selecionada ou null. */
+  filtroMarcaId?: number | null;
+  /** Filtro ativo (server-side): id da categoria selecionada ou null. */
+  filtroCategoriaId?: number | null;
+  onFiltroMarca?: (id: number | null) => void;
+  onFiltroCategoria?: (id: number | null) => void;
 }
 
 const filterOptions = [
   { id: "all", label: "Todos" },
   { id: "favoritos", label: "Favoritos ❤️" },
-  { id: "Sol", label: "Sol ☀️" },
-  { id: "Grau", label: "Grau 👓" },
-  { id: "Ray-Ban", label: "Ray-Ban" },
-  { id: "Michael Kors", label: "MK" },
-  { id: "Grazi Massafera", label: "Grazi" },
-  { id: "3D", label: "3D" },
-  { id: "Provador", label: "Provador 📸" },
 ];
 
 const sortOptions = [
@@ -47,6 +51,12 @@ export default function CatalogPage({
   onLoadMore,
   loadingMore = false,
   total = 0,
+  categorias = [],
+  marcas = [],
+  filtroMarcaId = null,
+  filtroCategoriaId = null,
+  onFiltroMarca,
+  onFiltroCategoria,
 }: CatalogPageProps) {
   const [activeFilter, setActiveFilter] = useState("all");
   const [activeSort, setActiveSort] = useState("featured");
@@ -54,20 +64,14 @@ export default function CatalogPage({
   const termo = searchQuery.trim().toLowerCase();
 
   const filteredProducts = products.filter((p) => {
-    // Busca textual (nome, marca, categoria)
+    // Busca textual (nome, marca, categoria) — filtro local por cima do server-side
     if (termo) {
       const alvo = `${p.name} ${p.brand} ${p.category}`.toLowerCase();
       if (!alvo.includes(termo)) return false;
     }
     if (activeFilter === "all") return true;
     if (activeFilter === "favoritos") return isFavorite ? isFavorite(p.id) : false;
-    if (activeFilter === "3D") return p.has3D;
-    if (activeFilter === "Provador") return p.hasTryOn;
-    if (activeFilter === "Sol" || activeFilter === "Grau") {
-      const re = activeFilter === "Sol" ? /sol/i : /grau/i;
-      return re.test(p.category);
-    }
-    return p.brand === activeFilter;
+    return true;
   });
 
   const sortedProducts = [...filteredProducts].sort((a, b) => {
@@ -77,24 +81,38 @@ export default function CatalogPage({
     return 0;
   });
 
+  const filtroAtivo = filtroMarcaId !== null || filtroCategoriaId !== null;
+  const nomeFiltro = filtroMarcaId !== null
+    ? marcas.find((m) => m.id === filtroMarcaId)?.nome
+    : filtroCategoriaId !== null
+      ? categorias.find((c) => c.id === filtroCategoriaId)?.nome
+      : undefined;
+
   return (
     <div className="pb-4">
       <div className="px-5 mb-3">
         <h2 className="text-xl font-bold text-luxury-black">Catálogo</h2>
         <p className="text-xs text-gray-500 mt-0.5">
           {termo ? `"${searchQuery}" — ` : ""}
-          {sortedProducts.length} produtos encontrados
+          {nomeFiltro ? `${nomeFiltro} — ` : ""}
+          {total > 0 ? `${total} produtos` : `${sortedProducts.length} produtos encontrados`}
         </p>
       </div>
 
-      {/* Filters */}
+      {/* Filters gerais */}
       <div className="flex gap-2 px-4 overflow-x-auto no-scrollbar mb-3">
         {filterOptions.map((filter) => (
           <button
             key={filter.id}
-            onClick={() => setActiveFilter(filter.id)}
+            onClick={() => {
+              setActiveFilter(filter.id);
+              if (filter.id === "all") {
+                onFiltroMarca?.(null);
+                onFiltroCategoria?.(null);
+              }
+            }}
             className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
-              activeFilter === filter.id
+              activeFilter === filter.id && !filtroAtivo
                 ? "bg-luxury-black text-white shadow-sm"
                 : "bg-white text-gray-600 border border-ice-dark hover:border-luxury-black/20"
             }`}
@@ -103,6 +121,50 @@ export default function CatalogPage({
           </button>
         ))}
       </div>
+
+      {/* Marcas (reais, da loja) */}
+      {marcas.length > 0 && (
+        <div className="flex gap-2 px-4 overflow-x-auto no-scrollbar mb-2">
+          {marcas.map((marca) => (
+            <button
+              key={marca.id}
+              onClick={() => {
+                setActiveFilter("all");
+                onFiltroMarca?.(filtroMarcaId === marca.id ? null : marca.id);
+              }}
+              className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
+                filtroMarcaId === marca.id
+                  ? "bg-luxury-black text-white shadow-sm"
+                  : "bg-white text-gray-600 border border-ice-dark hover:border-luxury-black/20"
+              }`}
+            >
+              {marca.nome}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Categorias (reais, da loja) */}
+      {categorias.length > 0 && (
+        <div className="flex gap-2 px-4 overflow-x-auto no-scrollbar mb-3">
+          {categorias.map((categoria) => (
+            <button
+              key={categoria.id}
+              onClick={() => {
+                setActiveFilter("all");
+                onFiltroCategoria?.(filtroCategoriaId === categoria.id ? null : categoria.id);
+              }}
+              className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
+                filtroCategoriaId === categoria.id
+                  ? "bg-gold text-luxury-black shadow-sm"
+                  : "bg-white text-gray-600 border border-ice-dark hover:border-luxury-black/20"
+              }`}
+            >
+              {categoria.nome}
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Sort */}
       <div className="flex gap-2 px-4 overflow-x-auto no-scrollbar mb-4">
@@ -136,7 +198,7 @@ export default function CatalogPage({
         ))}
       </div>
 
-      {/* Load more (paginação server-side; oculto quando há filtro/busca ativos) */}
+      {/* Load more (paginação server-side; oculto quando há filtro local ativo) */}
       {!termo && activeFilter === "all" && hasMore && onLoadMore && (
         <div className="flex justify-center pt-5 pb-2">
           <button

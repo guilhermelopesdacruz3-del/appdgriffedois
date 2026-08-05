@@ -9,7 +9,9 @@ export interface ListarProdutosOpts {
   offset?: number;
   /** filtra por categoria (id da categoria na Loja Integrada) */
   categoriaId?: number;
-  /** busca textual pelo nome do produto, quando suportado pela API */
+  /** filtra por marca (id da marca na Loja Integrada) */
+  marcaId?: number;
+  /** busca textual pelo nome do produto */
   busca?: string;
   /** apenas produtos ativos e não removidos (padrão true) */
   apenasAtivos?: boolean;
@@ -37,13 +39,14 @@ export async function listarProdutos(opts: ListarProdutosOpts = {}): Promise<{
   produtos: Product[];
   total: number;
 }> {
-  const { limit = 20, offset = 0, categoriaId, busca, apenasAtivos = true } = opts;
+  const { limit = 20, offset = 0, categoriaId, marcaId, busca, apenasAtivos = true } = opts;
 
   const [resposta, categoriasLookup, marcasLookup] = await Promise.all([
     listResource<LIProduto>("produto", {
       limit,
       offset,
       categorias: categoriaId,
+      marca: marcaId,
       nome__icontains: busca,
       ativo: apenasAtivos ? true : undefined,
       removido: apenasAtivos ? false : undefined,
@@ -56,6 +59,23 @@ export async function listarProdutos(opts: ListarProdutosOpts = {}): Promise<{
     produtos: resposta.objects.map((p) => mapProdutoParaProduct(p, categoriasLookup, marcasLookup)),
     total: resposta.meta.total_count,
   };
+}
+
+export interface FiltroCatalogo {
+  id: number;
+  nome: string;
+}
+
+/** Lista as categorias da loja (para os chips de filtro do catálogo). */
+export async function listarCategorias(): Promise<FiltroCatalogo[]> {
+  const resposta = await listResource<LICategoria>("categoria", { limit: 100 });
+  return resposta.objects.map((c) => ({ id: c.id, nome: c.nome }));
+}
+
+/** Lista as marcas da loja (para os chips de filtro do catálogo). */
+export async function listarMarcas(): Promise<FiltroCatalogo[]> {
+  const resposta = await listResource<LIMarca>("marca", { limit: 100 });
+  return resposta.objects.map((m) => ({ id: m.id, nome: m.nome }));
 }
 
 /** Busca um produto específico por id, com dados atualizados (preço/estoque em tempo real). */

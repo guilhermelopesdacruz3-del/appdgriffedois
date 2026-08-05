@@ -1215,6 +1215,11 @@ const CDN_PREFIX = "https://cdn.awsli.com.br";
 const imagemSync = new Map(); // produtoId -> { principal: string, todas: string[] }
 const precoSync = new Map(); // produtoId -> { cheio, promocional, sob_consulta }
 const estoqueSync = new Map(); // produtoId -> { quantidade, disponivel, gerenciado }
+// Catálogo real (listagem da LI, sem variações): produtoId -> objeto da listagem.
+// A LI ignora filtros (marca/categorias/nome) na listagem, então o proxy guarda
+// o catálogo em memória e filtra/pagina localmente — permitindo total correto e
+// busca/filtro rápidos sem chamadas extras à LI.
+const produtosSync = new Map();
 let syncState = { rodando: false, ultimoOk: 0, progresso: "" };
 
 function extrairIdDaUri(uri) {
@@ -1222,11 +1227,11 @@ function extrairIdDaUri(uri) {
   return m ? Number(m[1]) : null;
 }
 
-async function paginarRecurso(recurso, processaItem) {
+async function paginarRecurso(recurso, processaItem, queryExtra = {}) {
   let offset = 0;
   const limit = 100;
   for (;;) {
-    const { status, payload } = await chamarLI("GET", recurso, undefined, { limit, offset });
+    const { status, payload } = await chamarLI("GET", recurso, undefined, { limit, offset, ...queryExtra });
     if (status !== 200) {
       console.error(`[sync-${recurso}] status ${status} no offset ${offset}`);
       return;
@@ -1282,8 +1287,20 @@ async function sincronizarDadosLoja() {
       });
     });
 
+    // Catálogo (listagem completa, sem variações) — usado para filtros locais
+    // (marca/categoria/busca) e total real, já que a LI ignora filtros na listagem.
+    produtosSync.clear();
+    await paginarRecurso(
+      "produto",
+      (p) => {
+        if (!p?.id || p?.tipo === "atributo_opcao") return;
+        produtosSync.set(p.id, p);
+      },
+      { ativo: "true", removido: "false" }
+    );
+
     syncState.ultimoOk = Date.now();
-    syncState.progresso = `ok: ${imagemSync.size} imagens, ${precoSync.size} precos, ${estoqueSync.size} estoques em ${((Date.now() - t0) / 1000).toFixed(0)}s`;
+    syncState.progresso = `ok: ${imagemSync.size} imagens, ${precoSync.size} precos, ${estoqueSync.size} estoques, ${produtosSync.size} produtos em ${((Date.now() - t0) / 1000).toFixed(0)}s`;
     console.log(`[loja-integrada-proxy] sync em massa: ${syncState.progresso}`);
   } catch (e) {
     console.error("[loja-integrada-proxy] sync em massa falhou:", e?.message);
@@ -1428,6 +1445,51 @@ function aplicarDadosSincronizados(produto) {
   }
 }
 
+/** Filtra e pagina o catálogo local (produtosSync) com os mesmos parâmetros
+ *  que a LI aceitaria, mas funcionando de verdade (a LI ignora filtros na
+ *  listagem). Retorna { objects, total_count }. */
+function listarProdutosLocal(query) {
+  const limit = Math.min(parseInt(query.limit, 10) || 100, 200);
+  const offset = Math.max(parseInt(query.offset, 10) || 0, 0);
+  const marca = query.marca ? String(query.marca).trim() : null;
+  const categorias = query.categorias
+    ? String(query.categorias).split(",").map((s) => s.trim()).filter(Boolean)
+    : [];
+  const busca = query.nome__icontains ? String(query.nome__icontains).trim().toLowerCase() : null;
+
+  let objetos = [...produtosSync.values()];
+
+  if (marca) {
+    const marcaId = extrairIdDaUri(marca);
+    objetos = objetos.filter((p) => {
+      if (marcaId && extrairIdDaUri(p.marca) === marcaId) return true;
+      return String(p.marca || "") === marca;
+    });
+  }
+
+  if (categorias.length > 0) {
+    const ids = new Set(categorias.map(extrairIdDaUri).filter(Boolean));
+    objetos = objetos.filter((p) => {
+      const uris = Array.isArray(p.categorias) ? p.categorias : p.categoria ? [p.categoria] : [];
+      return uris.some((u) => ids.has(extrairIdDaUri(u)) || categorias.includes(String(u)));
+    });
+  }
+
+  if (busca) {
+    objetos = objetos.filter(
+      (p) =>
+        (p.nome || "").toLowerCase().includes(busca) ||
+        (p.sku || "").toLowerCase().includes(busca)
+    );
+  }
+
+  const total = objetos.length;
+  return {
+    objects: objetos.slice(offset, offset + limit).map((p) => ({ ...p })),
+    total_count: total,
+  };
+}
+
 async function enriquecerListaProdutos(objects) {
   const semDetalhes = objects.filter(
     (p) => !p?.imagem_principal && !(p?.imagens && p.imagens.length > 0) && p?.preco_cheio === undefined
@@ -1499,6 +1561,19 @@ app.all("/api/loja-integrada/:resource/:id?", async (req, res) => {
 
   try {
     const query = Object.fromEntries(Object.entries(req.query).map(([k, v]) => [k, String(v)]));
+
+    // Catálogo servido do sync em memória: filtros reais (marca/categoria/busca),
+    // total exato e sem chamadas extras à LI. Usado sempre que o catálogo já
+    // foi sincronizado (produtosSync populado).
+    if (req.method === "GET" && resource === "produto" && !id && produtosSync.size > 0) {
+      const { objects, total_count } = listarProdutosLocal(query);
+      await enriquecerListaProdutos(objects);
+      return res.status(200).json({
+        meta: { total_count, limit: Number(query.limit) || 100, offset: Number(query.offset) || 0 },
+        objects,
+      });
+    }
+
     const { status, payload } = await chamarLI(req.method, resource, id, query);
     if (req.method === "GET" && resource === "produto" && !id && status === 200 && Array.isArray(payload?.objects)) {
       // A LI lista variações (atributo_opcao) junto com produtos reais — o
