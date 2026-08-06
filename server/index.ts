@@ -1622,7 +1622,7 @@ function aplicarDadosSincronizados(produto) {
     const filhoId = extrairIdDaUri(produto.filhos[0]);
     if (filhoId && precoSync.has(filhoId)) {
       const fp = precoSync.get(filhoId);
-      if (produto.preco_cheio === undefined) {
+      if (!produto.preco_cheio) {
         produto.preco_cheio = fp.cheio ?? 0;
         produto.preco_promocional = fp.promocional ?? null;
         produto.preco_sob_consulta = fp.sob_consulta ?? false;
@@ -1664,7 +1664,7 @@ function aplicarDadosSincronizados(produto) {
     };
   }
   const preco = precoSync.get(id);
-  if (preco && produto.preco_cheio === undefined) {
+  if (preco && !produto.preco_cheio) {
     produto.preco_cheio = preco.cheio ?? 0;
     produto.preco_promocional = preco.promocional ?? null;
     produto.preco_sob_consulta = preco.sob_consulta ?? false;
@@ -1821,10 +1821,13 @@ app.all("/api/loja-integrada/:resource/:id?", async (req, res) => {
     // o app exibir preço certo na tela do produto e nos destaques da home.
     if (req.method === "GET" && resource === "produto" && id && status === 200 && payload && typeof payload === "object" && !Array.isArray(payload)) {
       aplicarDadosSincronizados(payload);
-      if (payload.destaque === undefined || payload.preco_cheio === undefined) {
+      if (payload.destaque === undefined || !payload.preco_cheio) {
         const extra = await enriquecerProdutoComImagem(payload.id || id).catch(() => ({}));
         for (const campo of CAMPOS_DO_INDIVIDUAL) {
-          if (extra[campo] !== undefined && extra[campo] !== null && payload[campo] === undefined) {
+          if (
+            extra[campo] !== undefined && extra[campo] !== null && extra[campo] !== "" &&
+            (payload[campo] === undefined || payload[campo] === null || payload[campo] === "")
+          ) {
             payload[campo] = extra[campo];
           }
         }
