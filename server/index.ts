@@ -1253,7 +1253,23 @@ async function criarPedidoLI(email, items, total) {
 
 app.post("/api/checkout", async (req, res) => {
   const body = req.body || {};
-  const { items, meio, email, card_token, pontosResgate, cupom } = body;
+  const { items, meio, email, card_token, pontosResgate, cupom, cliente } = body;
+  const dadosCliente = (cliente && typeof cliente === "object" ? cliente : {}) as {
+    nome?: string;
+    telefone?: string;
+    cpf?: string;
+    forma_entrega?: string;
+    endereco?: {
+      endereco?: string;
+      numero?: string;
+      complemento?: string;
+      bairro?: string;
+      cidade?: string;
+      estado?: string;
+      cep?: string;
+    };
+    observacoes?: string;
+  };
 
   if (!Array.isArray(items) || items.length === 0) {
     return res.status(400).json({ erro: "Carrinho vazio." });
@@ -1264,21 +1280,63 @@ app.post("/api/checkout", async (req, res) => {
   if (email && (typeof email !== "string" || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
     return res.status(400).json({ erro: "E-mail inválido." });
   }
+  if (!email) {
+    return res.status(400).json({ erro: "Informe o e-mail para receber a cobrança." });
+  }
   if (meio === "cartao" && (!card_token || typeof card_token !== "string")) {
     return res.status(400).json({ erro: "Token de cartão ausente (gere-o com o SDK do Mercado Pago no cliente)." });
   }
   if (items.length > 50) {
     return res.status(400).json({ erro: "Carrinho excede o limite de itens." });
   }
+  if (dadosCliente.nome !== undefined && (typeof dadosCliente.nome !== "string" || dadosCliente.nome.length > 120)) {
+    return res.status(400).json({ erro: "Nome inválido." });
+  }
+  if (dadosCliente.telefone !== undefined && (typeof dadosCliente.telefone !== "string" || dadosCliente.telefone.length > 30)) {
+    return res.status(400).json({ erro: "Telefone inválido." });
+  }
+  if (dadosCliente.cpf !== undefined && dadosCliente.cpf && !/^[\d. -]{11,14}$/.test(String(dadosCliente.cpf))) {
+    return res.status(400).json({ erro: "CPF inválido." });
+  }
+  if (dadosCliente.observacoes !== undefined && (typeof dadosCliente.observacoes !== "string" || dadosCliente.observacoes.length > 500)) {
+    return res.status(400).json({ erro: "Observações muito longas (máx. 500 caracteres)." });
+  }
 
   try {
+    // Salva perfil/endereço do cliente (Supabase) quando informados — o pedido
+    // na LI é criado com esses dados (buyer + endereço), e o admin os exibe.
+    if (dadosCliente.nome || dadosCliente.telefone) {
+      await salvarPerfil({
+        email,
+        nome: dadosCliente.nome || undefined,
+        telefone: dadosCliente.telefone || undefined,
+      }).catch((err) => console.warn("[checkout] falha ao salvar perfil:", err?.message));
+    }
+    const end = dadosCliente.endereco;
+    if (dadosCliente.forma_entrega === "entrega" && end?.endereco && end?.cidade && end?.estado && end?.cep) {
+      await salvarEndereco({
+        email,
+        nome: dadosCliente.nome || email.split("@")[0],
+        endereco: String(end.endereco),
+        numero: end.numero ? String(end.numero) : "",
+        complemento: end.complemento ? String(end.complemento) : undefined,
+        bairro: end.bairro ? String(end.bairro) : undefined,
+        cidade: String(end.cidade),
+        estado: String(end.estado),
+        cep: String(end.cep).replace(/\D/g, ""),
+        principal: true,
+      }).catch((err) => console.warn("[checkout] falha ao salvar endereço:", err?.message));
+    }
+
     const resultado = await processarCheckout({
-      items: items.map((it) => ({ price: Number(it.price), qty: Number(it.qty), sku: String(it.sku || it.product_id || "") })),
+      items: items.map((it) => ({ price: Number(it.price), qty: Number(it.qty), sku: String(it.sku || it.product_id || ""), nome: it.nome })),
       meio,
       email,
       card_token,
       pontosResgate: Number(pontosResgate || 0) || undefined,
       cupom: cupom || undefined,
+      observacoes: dadosCliente.observacoes || undefined,
+      formaEntrega: dadosCliente.forma_entrega || "retirada",
     });
     return res.json(resultado);
   } catch (e: any) {

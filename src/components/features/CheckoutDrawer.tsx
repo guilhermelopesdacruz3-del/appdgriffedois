@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { formatPrice } from "../../utils";
 import { useCliente } from "../../hooks/useCliente";
 import { validarCupom, usarCupom } from "../../services/cupomApp";
@@ -18,12 +18,25 @@ interface CheckoutDrawerProps {
   onSuccess?: (info: unknown) => void;
 }
 
-type Passo = "escolher" | "processando" | "pix" | "cartao" | "sucesso" | "erro";
+type Passo = "resumo" | "dados" | "escolher" | "processando" | "pix" | "cartao" | "sucesso" | "erro";
+
+const ETAPAS: { id: Passo; rotulo: string }[] = [
+  { id: "resumo", rotulo: "Carrinho" },
+  { id: "dados", rotulo: "Seus dados" },
+  { id: "escolher", rotulo: "Pagamento" },
+];
+
+function mascaraCpf(v: string): string {
+  const d = v.replace(/\D/g, "").slice(0, 11);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `${d.slice(0, 3)}.${d.slice(3)}`;
+  if (d.length <= 9) return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6)}`;
+  return `${d.slice(0, 3)}.${d.slice(3, 6)}.${d.slice(6, 9)}-${d.slice(9)}`;
+}
 
 export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fidelidade: fid }: CheckoutDrawerProps & { fidelidade?: any }) {
-  const { cliente } = useCliente();
-  const [email, setEmail] = useState(cliente?.email || "");
-  const [passo, setPasso] = useState<Passo>("escolher");
+  const { cliente, perfil, enderecos } = useCliente();
+  const [passo, setPasso] = useState<Passo>("resumo");
   const [erro, setErro] = useState<string | null>(null);
   const [pix, setPix] = useState<{ qr: string; copia: string } | null>(null);
   const [pontosC, setPontosC] = useState(0);
@@ -32,12 +45,56 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
   const [cupomAplicado, setCupomAplicado] = useState<{ codigo: string; tipo: string; valor: number; id: string } | null>(null);
   const [cupomErro, setCupomErro] = useState<string | null>(null);
 
+  const [email, setEmail] = useState(cliente?.email || perfil?.email || "");
+  const [nome, setNome] = useState(perfil?.nome || cliente?.nome || "");
+  const [telefone, setTelefone] = useState(perfil?.telefone || cliente?.telefone || "");
+  const [cpf, setCpf] = useState(cliente?.cpf || "");
+  const [forma, setForma] = useState<"retirada" | "entrega">("retirada");
+  const [endereco, setEndereco] = useState({ endereco: "", numero: "", complemento: "", bairro: "", cidade: "", estado: "", cep: "" });
+  const [observacoes, setObservacoes] = useState("");
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setPasso("resumo");
+    setErro(null);
+    setPix(null);
+    setCupomErro(null);
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (cliente?.email) setEmail(cliente.email);
+    if (perfil?.nome) setNome(perfil.nome);
+    if (perfil?.telefone) setTelefone(perfil.telefone);
+  }, [cliente, perfil]);
+
+  useEffect(() => {
+    const prim = enderecos.find((e) => e.principal) || enderecos[0];
+    if (prim) {
+      setEndereco({
+        endereco: prim.endereco || "",
+        numero: prim.numero || "",
+        complemento: prim.complemento || "",
+        bairro: prim.bairro || "",
+        cidade: prim.cidade || "",
+        estado: prim.estado || "",
+        cep: prim.cep || "",
+      });
+    }
+  }, [enderecos]);
+
   if (!isOpen) return null;
 
   const total = items.reduce((s, it) => s + it.product.price * it.quantity, 0);
   const descontoPontos = fid ? Math.min(fid.desconto_max, Math.floor((pontosResgate || 0) / fid.regras.pontosPorDesconto) * 10) : 0;
   const descontoCupom = cupomAplicado ? (cupomAplicado.tipo === "percentual" ? total * (cupomAplicado.valor / 100) : Number(cupomAplicado.valor)) : 0;
   const totalComDesconto = Math.max(0, total - descontoPontos - descontoCupom);
+
+  const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const dadosValidos =
+    emailValido &&
+    nome.trim().length >= 2 &&
+    (forma === "retirada" ||
+      (endereco.endereco.trim().length >= 3 && endereco.cidade.trim().length >= 2 && endereco.estado.trim().length >= 2 && endereco.cep.replace(/\D/g, "").length === 8));
 
   const aplicarCupom = async () => {
     setCupomErro(null);
@@ -50,21 +107,27 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
   };
 
   const iniciar = async (meio: "pix" | "cartao") => {
-    // O Mercado Pago exige e-mail válido para gerar a cobrança (PIX ou cartão).
-    // Em demo, seguimos sem bloquear; em produção o backend usa fallback se necessário.
     setPasso("processando");
     setErro(null);
     try {
       const resultado = await iniciarCheckout({
-        items: items.map((it) => ({ price: it.product.price, qty: it.quantity, sku: String(it.product.id), li_uri: it.product.li_uri })),
+        items: items.map((it) => ({ price: it.product.price, qty: it.quantity, sku: String(it.product.id), li_uri: it.product.li_uri, nome: it.product.name })),
+        cliente: {
+          email: email.trim(),
+          nome: nome.trim(),
+          telefone: telefone.trim() || undefined,
+          cpf: cpf.replace(/\D/g, "") || undefined,
+          forma_entrega: forma,
+          endereco: forma === "entrega" ? endereco : undefined,
+          observacoes: observacoes.trim() || undefined,
+        },
         meio,
-        email: email || undefined,
+        email: email.trim(),
         pontosResgate: pontosResgate > 0 ? pontosResgate : undefined,
         cupom: cupomAplicado || undefined,
       });
       if (meio === "pix") {
         setPix({ qr: resultado.pix_qr_base64 || "", copia: resultado.pix_copia_cola || "" });
-        // No demo o PIX é simulado e já confirma; em produção o webhook confirma depois.
         if (resultado.demo) {
           setPontosC(Number(resultado.pontos_creditados || 0));
           setPasso("sucesso");
@@ -85,31 +148,168 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
 
   const copiar = () => { if (pix?.copia) navigator.clipboard?.writeText(pix.copia); };
 
+  const etapaAtual = ETAPAS.findIndex((e) => e.id === passo);
+  const emFluxo = passo === "resumo" || passo === "dados" || passo === "escolher";
+
   return (
     <>
       <div className="fixed inset-0 z-[60] bg-black/60 animate-fade-in" onClick={onClose} />
       <div className="fixed bottom-0 left-0 right-0 z-[70] animate-slide-up">
-        <div className="bg-white rounded-t-3xl max-h-[90vh] overflow-y-auto no-scrollbar">
+        <div className="bg-white rounded-t-3xl max-h-[92vh] overflow-y-auto no-scrollbar">
           <div className="flex justify-center pt-3 pb-1">
             <div className="w-10 h-1 bg-gray-300 rounded-full" />
           </div>
-          <div className="px-5 pb-8">
-            <div className="flex items-center justify-between mb-4">
+
+          {/* Cabeçalho + barra de progresso */}
+          {emFluxo && (
+            <div className="px-5 pt-2 pb-1">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-lg font-bold text-luxury-black">Finalizar Compra</h3>
+                <button onClick={onClose} className="w-8 h-8 bg-ice rounded-full flex items-center justify-center text-gray-400">×</button>
+              </div>
+              <div className="flex items-center gap-1">
+                {ETAPAS.map((et, i) => (
+                  <div key={et.id} className="flex-1 flex items-center gap-1">
+                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                      <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[9px] font-bold flex-shrink-0 transition-all ${passo === et.id || etapaAtual > i ? "bg-luxury-black text-white" : "bg-gray-200 text-gray-400"}`}>
+                        {etapaAtual > i ? "✓" : i + 1}
+                      </span>
+                      <span className={`text-[9px] font-bold truncate transition-colors ${passo === et.id ? "text-luxury-black" : etapaAtual > i ? "text-gray-500" : "text-gray-300"}`}>{et.rotulo}</span>
+                    </div>
+                    {i < ETAPAS.length - 1 && <div className={`h-0.5 flex-1 rounded-full ${etapaAtual > i ? "bg-luxury-black" : "bg-gray-200"}`} />}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!emFluxo && passo !== "erro" && (
+            <div className="px-5 pt-2 pb-1">
               <h3 className="text-lg font-bold text-luxury-black">Finalizar Compra</h3>
-              <button onClick={onClose} className="w-8 h-8 bg-ice rounded-full flex items-center justify-center text-gray-400">×</button>
             </div>
+          )}
 
-            <div className="bg-ice rounded-2xl p-3 mb-4 flex justify-between">
-              <span className="text-xs text-gray-500">Total</span>
-              <span className="text-lg font-bold text-luxury-black">{formatPrice(total)}</span>
-            </div>
+          <div className="px-5 pb-8 pt-3">
+            {/* ETAPA 1 — RESUMO DO CARRINHO */}
+            {passo === "resumo" && (
+              <div className="space-y-3">
+                <div className="bg-ice rounded-2xl p-3 space-y-2.5">
+                  {items.map((it) => (
+                    <div key={`${it.product.id}-${it.colorIndex}`} className="flex items-center gap-3">
+                      {it.product.image ? (
+                        <img src={it.product.image} alt={it.product.name} className="w-12 h-12 rounded-xl object-cover bg-white flex-shrink-0" />
+                      ) : (
+                        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-luxury-black to-gray-700 flex items-center justify-center text-white text-xs font-bold flex-shrink-0">
+                          {(it.product.name || "D").charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-semibold text-luxury-black truncate">{it.product.name}</p>
+                        <p className="text-[10px] text-gray-400">Qtd: {it.quantity}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <p className="text-xs font-bold text-luxury-black">{formatPrice(it.product.price * it.quantity)}</p>
+                        <p className="text-[9px] text-gray-400">{formatPrice(it.product.price)} cada</p>
+                      </div>
+                    </div>
+                  ))}
+                  {items.length === 0 && <p className="text-xs text-gray-400 text-center py-4">Carrinho vazio.</p>}
+                </div>
 
+                <div className="bg-luxury-black rounded-2xl p-4 text-white">
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-white/70">Total</span>
+                    <span className="text-xl font-bold text-gold">{formatPrice(total)}</span>
+                  </div>
+                  <p className="text-[10px] text-white/40 mt-1">Retirada na loja ou entrega — sem custo de frete.</p>
+                </div>
+
+                <button onClick={() => setPasso("dados")} disabled={items.length === 0} className="w-full h-14 bg-luxury-black text-white font-bold rounded-2xl active:scale-[0.98] transition-all disabled:opacity-40">
+                  Continuar
+                </button>
+              </div>
+            )}
+
+            {/* ETAPA 2 — DADOS DO CLIENTE */}
+            {passo === "dados" && (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-2">
+                  <button onClick={() => setForma("retirada")} className={`h-14 rounded-2xl border-2 text-xs font-bold transition-all ${forma === "retirada" ? "border-luxury-black bg-luxury-black text-white" : "border-gray-200 text-gray-500"}`}>
+                    🏬 Retirada na loja
+                  </button>
+                  <button onClick={() => setForma("entrega")} className={`h-14 rounded-2xl border-2 text-xs font-bold transition-all ${forma === "entrega" ? "border-luxury-black bg-luxury-black text-white" : "border-gray-200 text-gray-500"}`}>
+                    📦 Entrega
+                  </button>
+                </div>
+
+                <div className="bg-ice rounded-2xl p-3 space-y-2">
+                  <input
+                    type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                    placeholder="E-mail *" className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+                  />
+                  <input
+                    value={nome} onChange={(e) => setNome(e.target.value)}
+                    placeholder="Nome completo *" className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input
+                      value={telefone} onChange={(e) => setTelefone(e.target.value)}
+                      placeholder="Telefone (opcional)" inputMode="tel" className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+                    />
+                    <input
+                      value={cpf} onChange={(e) => setCpf(mascaraCpf(e.target.value))}
+                      placeholder="CPF (opcional)" inputMode="numeric" className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+                    />
+                  </div>
+                </div>
+
+                {forma === "entrega" && (
+                  <div className="bg-ice rounded-2xl p-3 space-y-2">
+                    <p className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">Endereço de entrega</p>
+                    <input value={endereco.endereco} onChange={(e) => setEndereco((s) => ({ ...s, endereco: e.target.value }))} placeholder="Rua / Av. *" className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold" />
+                    <div className="grid grid-cols-3 gap-2">
+                      <input value={endereco.numero} onChange={(e) => setEndereco((s) => ({ ...s, numero: e.target.value }))} placeholder="Nº" className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold" />
+                      <input value={endereco.complemento} onChange={(e) => setEndereco((s) => ({ ...s, complemento: e.target.value }))} placeholder="Compl." className="col-span-2 w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold" />
+                    </div>
+                    <input value={endereco.bairro} onChange={(e) => setEndereco((s) => ({ ...s, bairro: e.target.value }))} placeholder="Bairro" className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold" />
+                    <div className="grid grid-cols-[1fr_1fr_90px] gap-2">
+                      <input value={endereco.cidade} onChange={(e) => setEndereco((s) => ({ ...s, cidade: e.target.value }))} placeholder="Cidade *" className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold" />
+                      <input value={endereco.estado} onChange={(e) => setEndereco((s) => ({ ...s, estado: e.target.value.toUpperCase() }))} placeholder="UF *" maxLength={2} className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold" />
+                      <input value={endereco.cep} onChange={(e) => setEndereco((s) => ({ ...s, cep: e.target.value.replace(/\D/g, "").slice(0, 8) }))} placeholder="CEP *" inputMode="numeric" className="w-full h-11 px-4 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-gold" />
+                    </div>
+                  </div>
+                )}
+
+                <input
+                  value={observacoes} onChange={(e) => setObservacoes(e.target.value)}
+                  placeholder="Observações (ex.: grau das lentes, preferências) — opcional" maxLength={500}
+                  className="w-full h-14 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
+                />
+
+                {!emailValido && <p className="text-[10px] text-red-500 px-1">Informe um e-mail válido para receber a cobrança.</p>}
+                {emailValido && !dadosValidos && nome.trim().length < 2 && <p className="text-[10px] text-red-500 px-1">Informe seu nome completo.</p>}
+                {emailValido && nome.trim().length >= 2 && !dadosValidos && forma === "entrega" && (
+                  <p className="text-[10px] text-red-500 px-1">Preencha o endereço de entrega (rua, cidade, UF e CEP de 8 dígitos).</p>
+                )}
+
+                <div className="flex gap-2">
+                  <button onClick={() => setPasso("resumo")} className="h-14 px-4 border border-gray-200 text-gray-500 text-xs font-bold rounded-2xl active:scale-[0.98] transition-all">Voltar</button>
+                  <button onClick={() => setPasso("escolher")} disabled={!dadosValidos} className="flex-1 h-14 bg-luxury-black text-white font-bold rounded-2xl active:scale-[0.98] transition-all disabled:opacity-40">
+                    Ir para pagamento
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* ETAPA 3 — PAGAMENTO */}
             {passo === "escolher" && (
               <div className="space-y-3">
-                <input
-                  type="email" value={email} onChange={(e) => { setEmail(e.target.value); setPontosResgate(0); }}
-                  placeholder="Seu e-mail" className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
-                />
+                <div className="bg-luxury-black rounded-2xl p-4 text-white flex justify-between items-center">
+                  <span className="text-xs text-white/70">Total a pagar</span>
+                  <span className="text-xl font-bold text-gold">{formatPrice(totalComDesconto)}</span>
+                </div>
+                <p className="text-[10px] text-gray-400 px-1">Recebendo em: {forma === "retirada" ? "retirada na loja" : "entrega no endereço informado"} · {nome.split(" ")[0]} · {email}</p>
+
                 {fid && fid.pontos > 0 && (
                   <div className="bg-ice rounded-2xl p-3">
                     <div className="flex justify-between items-center">
@@ -154,14 +354,17 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
                   <span className="font-bold text-luxury-black">{formatPrice(totalComDesconto)}</span>
                 </div>
                 <button onClick={() => iniciar("pix")} className="w-full h-14 bg-luxury-black text-white font-bold rounded-2xl active:scale-[0.98] transition-all">
-                  Pagar com PIX{totalComDesconto < total ? ` ${formatPrice(totalComDesconto)}` : ""}
+                  Pagar com PIX
                 </button>
                 <button onClick={() => iniciar("cartao")} className="w-full h-14 border border-luxury-black text-luxury-black font-bold rounded-2xl active:scale-[0.98] transition-all">
                   Cartão de Crédito
                 </button>
-                <p className="text-[10px] text-gray-400 text-center">
-                  Pagamento processado dentro do app (Mercado Pago).
-                </p>
+                <div className="flex gap-2">
+                  <button onClick={() => setPasso("dados")} className="h-10 px-4 text-xs font-bold text-gray-400">Voltar</button>
+                  <p className="flex-1 text-[10px] text-gray-400 text-right self-center">
+                    Pagamento processado dentro do app (Mercado Pago).
+                  </p>
+                </div>
               </div>
             )}
 
@@ -175,6 +378,7 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
             {passo === "pix" && pix && (
               <div className="space-y-4">
                 <p className="text-sm font-semibold text-luxury-black text-center">Pague com PIX</p>
+                <p className="text-[10px] text-gray-400 text-center">Valor: <span className="font-bold text-luxury-black">{formatPrice(totalComDesconto)}</span></p>
                 {pix.qr
                   ? <img src={`data:image/png;base64,${pix.qr}`} alt="PIX QR" className="w-48 h-48 mx-auto" />
                   : <div className="w-48 h-48 mx-auto bg-ice rounded-2xl flex items-center justify-center text-xs text-gray-400">QR indisponível</div>}
@@ -196,7 +400,7 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
                 </div>
                 <p className="text-base font-bold text-luxury-black">Pagamento confirmado!</p>
                 <p className="text-xs text-gray-500 text-center px-6">
-                  Seu pedido foi enviado para a loja e o estoque foi atualizado.
+                  {forma === "retirada" ? "Retire na loja D'Griffe. Seu pedido foi enviado e o estoque atualizado." : "Seu pedido foi enviado para entrega e o estoque foi atualizado."}
                 </p>
                 {pontosC > 0 && (
                   <div className="bg-ice rounded-2xl p-3 text-center">
@@ -219,9 +423,18 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
                   setErro(null);
                   try {
                     const resultado = await iniciarCheckout({
-                      items: items.map((it) => ({ price: it.product.price, qty: it.quantity, sku: String(it.product.id), li_uri: it.product.li_uri })),
+                      items: items.map((it) => ({ price: it.product.price, qty: it.quantity, sku: String(it.product.id), li_uri: it.product.li_uri, nome: it.product.name })),
+                      cliente: {
+                        email: email.trim(),
+                        nome: nome.trim(),
+                        telefone: telefone.trim() || undefined,
+                        cpf: cpf.replace(/\D/g, "") || undefined,
+                        forma_entrega: forma,
+                        endereco: forma === "entrega" ? endereco : undefined,
+                        observacoes: observacoes.trim() || undefined,
+                      },
                       meio: "cartao",
-                      email: email || undefined,
+                      email: email.trim(),
                       card_token: cardToken,
                       pontosResgate: pontosResgate > 0 ? pontosResgate : undefined,
                       cupom: cupomAplicado || undefined,
@@ -267,7 +480,6 @@ async function carregarMP(publicKey: string): Promise<any> {
       s.onerror = () => { clearTimeout(timer); reject(new Error("Falha ao carregar o SDK do Mercado Pago. Desative bloqueador de anúncios/extensões para este site e tente de novo.")); };
       document.body.appendChild(s);
     });
-  // Primeira tentativa + retry com cache-buster (contorna cache corrompido/bloqueio pontual).
   try {
     await tentaCarregar("https://sdk.mercadopago.com/js/v2");
   } catch (e) {
@@ -314,12 +526,10 @@ function CartaoForm({
     setTokenizando(true);
     setErroF(null);
     try {
-      // 1) Busca a chave PÚBLICA do MP (nunca a access_token).
       const cfg = await fetch("/api/mp-public-key").then((r) => r.json()).catch(() => ({ public_key: null }));
       const publicKey = cfg?.public_key || null;
       if (!publicKey) throw new Error("Pagamento por cartão indisponível (configure a chave do Mercado Pago no admin).");
 
-      // 2) Tokeniza no navegador (sem o número sair do cliente).
       const mp = await carregarMP(publicKey);
       const tokenResp: any = await mp.createCardToken({
         cardNumber: limpo,
@@ -331,7 +541,6 @@ function CartaoForm({
       const cardToken = tokenResp?.id;
       if (!cardToken) throw new Error("Não foi possível gerar o token do cartão.");
 
-      // 3) Envia SÓ o token para o servidor.
       onPagar(String(cardToken));
     } catch (e: any) {
       setErroF(e?.message || "Falha ao tokenizar o cartão.");
@@ -342,6 +551,10 @@ function CartaoForm({
   return (
     <div className="space-y-3">
       <p className="text-sm font-semibold text-luxury-black text-center">Cartão de Crédito</p>
+      <div className="bg-luxury-black rounded-2xl p-4 text-white flex justify-between items-center">
+        <span className="text-xs text-white/70">Total a pagar</span>
+        <span className="text-xl font-bold text-gold">{total.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</span>
+      </div>
       <input
         inputMode="numeric"
         value={numero}

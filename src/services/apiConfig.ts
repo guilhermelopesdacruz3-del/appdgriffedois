@@ -97,8 +97,24 @@ export interface CheckoutResult {
 }
 
 export async function iniciarCheckout(payload: {
-  items: { price: number; qty: number; li_uri?: string; sku?: string }[];
-  cliente?: { email?: string };
+  items: { price: number; qty: number; li_uri?: string; sku?: string; nome?: string }[];
+  cliente?: {
+    email?: string;
+    nome?: string;
+    telefone?: string;
+    cpf?: string;
+    forma_entrega?: "retirada" | "entrega";
+    endereco?: {
+      endereco?: string;
+      numero?: string;
+      complemento?: string;
+      bairro?: string;
+      cidade?: string;
+      estado?: string;
+      cep?: string;
+    };
+    observacoes?: string;
+  };
   meio: "pix" | "cartao";
   card_token?: string;
   email?: string;

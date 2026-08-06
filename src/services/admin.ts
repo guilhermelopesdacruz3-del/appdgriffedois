@@ -87,6 +87,8 @@ export interface AdminPedido {
   envio_rastreio?: string | null;
   endereco_entrega?: string | null;
   pagamento_detalhes?: string | null;
+  observacoes?: string | null;
+  forma_entrega?: "retirada" | "entrega";
   verificado: boolean;
   verificado_em: string | null;
 }
@@ -109,6 +111,11 @@ function mapAdminPedido(p: PedidoComVerificacao): AdminPedido {
   }));
   const pagamento = p.pagamentos?.[0];
   const envio = p.envios?.[0];
+  const endEntrega = p.endereco_entrega as
+    | { endereco?: string; numero?: string; bairro?: string; cidade?: string; estado?: string; cep?: string; nome?: string }
+    | null
+    | undefined;
+  const enderecoLoja = /d'griffe/i.test(endEntrega?.nome || "") && endEntrega?.bairro === "Bela Vista";
   return {
     id: (p as any).id_api ?? p.id,
     numero: p.numero,
@@ -116,8 +123,8 @@ function mapAdminPedido(p: PedidoComVerificacao): AdminPedido {
     cliente_email: p.cliente_email,
     cliente_cpf: p.cliente_cpf ?? null,
     cliente_telefone: p.cliente_telefone ?? null,
-    cliente_endereco: p.endereco_entrega
-      ? [p.endereco_entrega.endereco, p.endereco_entrega.numero, p.endereco_entrega.bairro, p.endereco_entrega.cidade, p.endereco_entrega.estado].filter(Boolean).join(", ")
+    cliente_endereco: endEntrega
+      ? [endEntrega.endereco, endEntrega.numero, endEntrega.bairro, endEntrega.cidade, endEntrega.estado].filter(Boolean).join(", ")
       : null,
     status: base.status,
     status_id: p.situacao?.id,
@@ -139,9 +146,11 @@ function mapAdminPedido(p: PedidoComVerificacao): AdminPedido {
     envio: envio?.forma_envio?.nome ?? null,
     envio_status: envio?.status ?? null,
     envio_rastreio: envio?.objeto ?? null,
-    endereco_entrega: p.endereco_entrega
-      ? `${p.endereco_entrega.endereco}, ${p.endereco_entrega.numero} — ${p.endereco_entrega.bairro}, ${p.endereco_entrega.cidade}/${p.endereco_entrega.estado} ${p.endereco_entrega.cep}`
+    endereco_entrega: endEntrega
+      ? `${endEntrega.endereco}, ${endEntrega.numero} — ${endEntrega.bairro}, ${endEntrega.cidade}/${endEntrega.estado} ${endEntrega.cep}`
       : null,
+    observacoes: (p as any).cliente_obs || null,
+    forma_entrega: endEntrega && !enderecoLoja ? "entrega" : "retirada",
     verificado: Boolean(p.verificado),
     verificado_em: p.verificado_em || null,
   };

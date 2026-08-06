@@ -206,6 +206,8 @@ export async function criarPedidoLI(opts: {
   itens: ItemPedidoLI[];
   valor: number;
   meio: "pix" | "cartao";
+  observacoes?: string;
+  formaEntrega?: "retirada" | "entrega";
 }): Promise<PedidoLICriado | null> {
   const itens = opts.itens
     .map((i) => {
@@ -240,6 +242,16 @@ export async function criarPedidoLI(opts: {
       }
     : ENDERECO_LOJA;
 
+  const formaEntrega = opts.formaEntrega || "retirada";
+  const comentarios = [
+    `Pedido do app D'Griffe (${opts.meio})`,
+    formaEntrega === "entrega" ? "Entrega no endereço informado" : "Retirada na loja",
+    opts.observacoes ? `Obs: ${opts.observacoes}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ")
+    .slice(0, 500);
+
   const timestamp = Date.now();
   const corpo: Record<string, unknown> = {
     buyer: {
@@ -253,7 +265,7 @@ export async function criarPedidoLI(opts: {
     },
     shipping: {
       address: endereco,
-      option: "retirar_pessoalmente",
+      option: formaEntrega === "entrega" ? "entrega" : "retirar_pessoalmente",
     },
     amount: {
       discount: null,
@@ -267,7 +279,7 @@ export async function criarPedidoLI(opts: {
       status: SITUACAO_INICIAL,
       marketPlaceId: null,
       reference: `dgriffe-app/${timestamp}`,
-      comment: `Pedido do app D'Griffe (${opts.meio})`,
+      comment: comentarios,
     },
     integration_data: {
       integrator: "dgriffe-app",

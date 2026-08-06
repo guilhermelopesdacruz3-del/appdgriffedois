@@ -225,6 +225,11 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
         endereco_entrega: p.endereco_entrega
           ? `${p.endereco_entrega.endereco}, ${p.endereco_entrega.numero} — ${p.endereco_entrega.bairro}, ${p.endereco_entrega.cidade}/${p.endereco_entrega.estado} ${p.endereco_entrega.cep}`
           : null,
+        observacoes: (p as any).cliente_obs || null,
+        forma_entrega:
+          p.endereco_entrega && !/d'griffe/i.test(String(p.endereco_entrega.nome || ""))
+            ? "entrega"
+            : "retirada",
         verificado: Boolean((p as any).verificado),
         verificado_em: (p as any).verificado_em || null,
       };
@@ -644,16 +649,23 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                   </div>
                 )}
 
-                {(detalhe.pagamento || detalhe.envio || detalhe.endereco_entrega) && (
+                {(detalhe.pagamento || detalhe.envio || detalhe.endereco_entrega || detalhe.observacoes) && (
                   <div className="bg-gradient-to-b from-white/[0.06] to-white/[0.02] border border-white/10 rounded-2xl p-4 space-y-1.5">
                     <p className="text-[10px] text-gold/70 uppercase tracking-wider font-bold">Entrega & Pagamento</p>
+                    {detalhe.forma_entrega && <p className="text-xs text-white/70">📦 {detalhe.forma_entrega === "entrega" ? "Entrega no endereço" : "Retirada na loja"}</p>}
+                    {detalhe.endereco_entrega && <p className="text-[10px] text-white/40">📍 {detalhe.endereco_entrega}</p>}
                     {detalhe.pagamento && <p className="text-xs text-white/70">💳 {detalhe.pagamento}</p>}
                     {detalhe.pagamento_status && <p className="text-[10px] text-white/40">Status: {detalhe.pagamento_status}</p>}
                     {detalhe.pagamento_detalhes && <p className="text-[10px] text-white/40">{detalhe.pagamento_detalhes}</p>}
-                    {detalhe.envio && <p className="text-xs text-white/70">📦 {detalhe.envio}</p>}
+                    {detalhe.envio && <p className="text-xs text-white/70">🚚 {detalhe.envio}</p>}
                     {detalhe.envio_status && <p className="text-[10px] text-white/40">Status: {detalhe.envio_status}</p>}
                     {detalhe.envio_rastreio && <p className="text-[10px] text-gold/60">Rastreio: {detalhe.envio_rastreio}</p>}
-                    {detalhe.endereco_entrega && <p className="text-[10px] text-white/40">📍 {detalhe.endereco_entrega}</p>}
+                    {detalhe.observacoes && (
+                      <div className="bg-gold/10 border border-gold/20 rounded-xl p-2.5 mt-1">
+                        <p className="text-[9px] text-gold/70 uppercase tracking-wider font-bold mb-0.5">Observações do cliente</p>
+                        <p className="text-[11px] text-amber-100/90 whitespace-pre-wrap break-words">{detalhe.observacoes}</p>
+                      </div>
+                    )}
                   </div>
                 )}
 

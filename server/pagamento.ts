@@ -152,8 +152,10 @@ export async function processarCheckout(params: {
   card_token?: string;
   pontosResgate?: number;
   cupom?: { codigo: string; tipo: string; valor: number; id: string };
+  observacoes?: string;
+  formaEntrega?: "retirada" | "entrega";
 }): Promise<CheckoutResult> {
-  const { items, meio, email, card_token, pontosResgate, cupom } = params;
+  const { items, meio, email, card_token, pontosResgate, cupom, observacoes, formaEntrega = "retirada" } = params;
 
   const autorizado = await obterValorAutorizado(items);
   if (!autorizado.ok) throw new Error(autorizado.erro || "Valor inválido.");
@@ -220,6 +222,8 @@ export async function processarCheckout(params: {
         itens: items.map((it) => ({ li_uri: it.li_uri, sku: it.sku, nome: it.nome, preco: it.price, quantidade: it.qty })),
         valor: total,
         meio,
+        observacoes,
+        formaEntrega,
       });
       if (criado) {
         liPedido = criado.id;
@@ -282,6 +286,8 @@ export async function processarCheckout(params: {
       itens: items.map((it) => ({ li_uri: it.li_uri, sku: it.sku, nome: it.nome, preco: it.price, quantidade: it.qty })),
       valor: total,
       meio,
+      observacoes,
+      formaEntrega,
     });
     if (criado) {
       resultado.li_pedido = criado.id;
