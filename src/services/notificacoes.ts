@@ -41,6 +41,36 @@ export async function notificarClientesAdmin(p: {
   corpo: string;
   tipo: Notificacao["tipo"];
   filtros: FiltrosNotificar;
-}): Promise<{ ok: boolean; enviadas: number; destinatarios: number }> {
+}): Promise<{ ok: boolean; enviadas: number; destinatarios: number; pushEnviados?: number }> {
   return req("/admin/notificar", { method: "POST", body: p });
+}
+
+// --- Web Push ---
+export interface PushSubscriptionInput {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+}
+
+export async function getPushPublicKey(): Promise<string | null> {
+  const r = await fetch(`${BASE}/notificacoes/push-config`);
+  if (!r.ok) return null;
+  const j = await r.json();
+  return j?.publicKey || null;
+}
+
+export async function assinarPush(email: string, subscription: PushSubscriptionInput): Promise<void> {
+  await req("/notificacoes/subscribe", { method: "POST", body: { email, subscription } });
+}
+
+export async function cancelarPush(email: string, endpoint: string): Promise<void> {
+  await req("/notificacoes/unsubscribe", { method: "POST", body: { email, endpoint } });
+}
+
+export function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {
+  const padding = "=".repeat((4 - (base64.length % 4)) % 4);
+  const b64 = (base64 + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const raw = atob(b64);
+  const arr = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i++) arr[i] = raw.charCodeAt(i);
+  return arr;
 }

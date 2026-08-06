@@ -39,10 +39,11 @@ import { processarCheckout } from "./pagamento.ts";
 import { processarWebhookMP } from "./webhook.ts";
 import { atualizarPedidoLISituacao } from "./liClient.ts";
 import { listarVideosRecentes } from "./youtube.ts";
-import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade, salvarNotificacao, listarNotificacoes, marcarNotificacaoLida, salvarPerfil, buscarPerfil, listarEnderecos, salvarEndereco, excluirEndereco, salvarPreferencias, buscarPreferencias, getNiveis, NIVEIS_PADRAO, calcularNivel, calcularCashback, BENEFICIO_BASE, TETO_BENEFICIOS_PERC, CASHBACK_BASE, gerarCodigoIndicacao, registrarIndicacao, creditarIndicacao, getIndicacoes, getClubeFamilia, adicionarFamiliar, creditarFamilia, getCreditosFamilia, MISSOES, VALIDADE_PONTOS_MESES_SEM_MOV, VALIDADE_PONTOS_MESES_EXPIRACAO, VALIDADE_CASHBACK_MESES_SEM_MOV, VALIDADE_CASHBACK_DIAS_ADICIONAIS, getSecret } from "./db.ts";
+import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade, salvarNotificacao, listarNotificacoes, marcarNotificacaoLida, salvarPerfil, buscarPerfil, listarEnderecos, salvarEndereco, excluirEndereco, salvarPreferencias, buscarPreferencias, getNiveis, NIVEIS_PADRAO, calcularNivel, calcularCashback, BENEFICIO_BASE, TETO_BENEFICIOS_PERC, CASHBACK_BASE, gerarCodigoIndicacao, registrarIndicacao, creditarIndicacao, getIndicacoes, getClubeFamilia, adicionarFamiliar, creditarFamilia, getCreditosFamilia, MISSOES, VALIDADE_PONTOS_MESES_SEM_MOV, VALIDADE_PONTOS_MESES_EXPIRACAO, VALIDADE_CASHBACK_MESES_SEM_MOV, VALIDADE_CASHBACK_DIAS_ADICIONAIS, getSecret, invalidarCacheChave, salvarPushSubscription, removerPushSubscription, listarPushSubscriptions } from "./db.ts";
 import cupomApp from "./cupom.ts";
 import { receitasApp } from "./receitas";
 import { favoritosApp } from "./favoritos";
+import webpush from "web-push";
 
 const {
   LOJA_INTEGRADA_APP_KEY,
@@ -1161,42 +1162,67 @@ app.post("/api/admin/notificar", requireAdmin, async (req, res) => {
     const { titulo, corpo, tipo, filtros } = req.body || {};
     if (!titulo || !corpo) return res.status(400).json({ erro: "Informe título e corpo." });
     const f = filtros || {};
-    // Busca a base de clientes e aplica filtros.
-    const { clientes } = await (async () => {
-      const objects = await buscarTodosPedidos();
-      const mapa = new Map();
-      for (const p of objects) {
-        const email = (p.cliente_email || "").toLowerCase();
-        if (!email) continue;
-        if (!mapa.has(email)) mapa.set(email, { email, nome: p.cliente_nome || "" });
-        const c = mapa.get(email);
-        c.pedidos = (c.pedidos || 0) + 1;
-      }
-      return { clientes: Array.from(mapa.values()) };
-    })();
-    const alvo = clientes.filter((c: any) => {
+    // Base de clientes: TODOS os cadastrados na Loja Integrada (via lista de
+    // clientes), não só quem já comprou. Complementa com pedidos quando o
+    // e-mail aparece em pedidos mas não na lista de clientes.
+    const clientesLI = await buscarClientesLI().catch(() => new Map());
+    const mapa = new Map<string, { email: string; nome: string; pedidos: number }>();
+    for (const c of clientesLI.values()) {
+      const email = (c.email || "").trim().toLowerCase();
+      if (!email) continue;
+      mapa.set(email, { email, nome: c.nome || "", pedidos: 0 });
+    }
+    const objects = await buscarTodosPedidos();
+    for (const p of objects) {
+      const email = (p.cliente_email || "").toLowerCase();
+      if (!email) continue;
+      if (!mapa.has(email)) mapa.set(email, { email, nome: p.cliente_nome || "", pedidos: 0 });
+      const c = mapa.get(email)!;
+      c.pedidos = (c.pedidos || 0) + 1;
+      if (!c.nome) c.nome = p.cliente_nome || "";
+    }
+    const clientes = Array.from(mapa.values());
+    const alvo = clientes.filter((c) => {
       if (f.email && !c.email.includes(String(f.email).toLowerCase())) return false;
       if (f.nome && !c.nome.toLowerCase().includes(String(f.nome).toLowerCase())) return false;
-      if (typeof f.pontosMin === "number" && f.pontosMin > 0) {
-        // Enriquecido com pontos sob demanda (só quem passou no filtro).
-        // Feito abaixo em duas etapas para não buscar pontos de todos.
-      }
       return true;
     });
     // Filtro de pontos mínimos (busca pontos só dos já filtrados).
     let final = alvo;
     if (typeof f.pontosMin === "number" && f.pontosMin > 0) {
-      const comPontos = await Promise.all(alvo.map(async (c: any) => ({ ...c, pontos: await segredos.getPontos(c.email) })));
-      final = comPontos.filter((c: any) => (c.pontos || 0) >= f.pontosMin);
+      const comPontos = await Promise.all(alvo.map(async (c) => ({ ...c, pontos: await segredos.getPontos(c.email) })));
+      final = comPontos.filter((c) => (c.pontos || 0) >= f.pontosMin);
     }
     if (final.length === 0) return res.status(400).json({ erro: "Nenhum cliente corresponde aos filtros." });
     let enviadas = 0;
+    let pushEnviados = 0;
     for (const c of final) {
       await salvarNotificacao({ email: c.email, titulo, corpo, tipo: tipo || "geral" });
       enviadas++;
     }
-    await registrarLog({ admin_email: (req as any).adminEmail || "admin", acao: "notificar", detalhe: { titulo, tipo, filtros, destinatarios: enviadas } }).catch(() => {});
-    return res.json({ ok: true, enviadas, destinatarios: final.length });
+    // Push web: envia para os dispositivos assinados dos destinatários.
+    const subs = await listarPushSubscriptions(final.map((c) => c.email)).catch(() => new Map());
+    const pushes: Promise<void>[] = [];
+    for (const c of final) {
+      const lista = subs.get(c.email.toLowerCase()) || [];
+      for (const s of lista) {
+        pushes.push(
+          webpush
+            .sendNotification({ endpoint: s.endpoint, keys: s.keys }, JSON.stringify({ title: titulo, body: corpo, tipo: tipo || "geral" }))
+            .then(() => { pushEnviados++; })
+            .catch((err: any) => {
+              const status = err?.statusCode;
+              if (status === 404 || status === 410) {
+                // Dispositivo deixou de existir — limpa a subscription.
+                removerPushSubscription(c.email, s.endpoint).catch(() => {});
+              }
+            })
+        );
+      }
+    }
+    await Promise.all(pushes).catch(() => {});
+    await registrarLog({ admin_email: (req as any).adminEmail || "admin", acao: "notificar", detalhe: { titulo, tipo, filtros, destinatarios: enviadas, pushEnviados } }).catch(() => {});
+    return res.json({ ok: true, enviadas, destinatarios: final.length, pushEnviados });
   } catch (err: any) {
     console.error("[notificar] falha:", err);
     return res.status(502).json({ erro: "Falha ao enviar notificações." });
@@ -1225,6 +1251,76 @@ app.post("/api/notificacoes/:id/lida", async (req, res) => {
     return res.json({ ok: true });
   } catch (err) {
     return res.status(500).json({ erro: "Falha ao marcar como lida." });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// NOTIFICAÇÕES PUSH (web) — VAPID + subscriptions por e-mail.
+// Chaves VAPID geradas no primeiro boot e guardadas em store_config.
+// ---------------------------------------------------------------------------
+const VAPID_PUBLIC_KEY = "VAPID_PUBLIC_KEY";
+const VAPID_PRIVATE_KEY = "VAPID_PRIVATE_KEY";
+
+async function garantirVapid(): Promise<boolean> {
+  try {
+    let pub = await getSecret(VAPID_PUBLIC_KEY as any);
+    let priv = await getSecret(VAPID_PRIVATE_KEY as any);
+    if (!pub || !priv) {
+      const keys = webpush.generateVAPIDKeys();
+      pub = keys.publicKey;
+      priv = keys.privateKey;
+      const sb = supabaseClient();
+      if (sb) {
+        const { error } = await sb.from("store_config").upsert([
+          { key: VAPID_PUBLIC_KEY, value: pub, is_secret: false, updated_at: new Date().toISOString() },
+          { key: VAPID_PRIVATE_KEY, value: priv, is_secret: true, updated_at: new Date().toISOString() },
+        ], { onConflict: "key" });
+        if (error) console.error("[vapid] upsert falhou:", error.message);
+        invalidarCacheChave(VAPID_PUBLIC_KEY as any);
+        invalidarCacheChave(VAPID_PRIVATE_KEY as any);
+      } else {
+        console.error("[vapid] Supabase indisponível — VAPID não persistido");
+      }
+    }
+    webpush.setVapidDetails("mailto:contato@dgriffedois.com.br", pub, priv);
+    return true;
+  } catch (err) {
+    console.error("[vapid] falha ao configurar:", err);
+    return false;
+  }
+}
+
+// Expoe a chave pública para o app assinar as notificações.
+app.get("/api/notificacoes/push-config", async (_req, res) => {
+  const pub = await getSecret(VAPID_PUBLIC_KEY as any).catch(() => null);
+  return res.json({ publicKey: pub });
+});
+
+// Cliente salva a subscription do dispositivo (associada ao e-mail).
+app.post("/api/notificacoes/subscribe", async (req, res) => {
+  const email = String((req.body?.email || "").trim().toLowerCase());
+  const sub = req.body?.subscription;
+  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ erro: "E-mail inválido." });
+  if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) return res.status(400).json({ erro: "Subscription inválida." });
+  try {
+    await salvarPushSubscription(email, { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } });
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error("[push] falha ao assinar:", err);
+    return res.status(500).json({ erro: "Falha ao assinar notificações." });
+  }
+});
+
+// Cliente cancela a subscription de um dispositivo.
+app.post("/api/notificacoes/unsubscribe", async (req, res) => {
+  const email = String((req.body?.email || "").trim().toLowerCase());
+  const endpoint = String(req.body?.endpoint || "");
+  if (!email || !endpoint) return res.status(400).json({ erro: "Dados incompletos." });
+  try {
+    await removerPushSubscription(email, endpoint);
+    return res.json({ ok: true });
+  } catch (err) {
+    return res.status(500).json({ erro: "Falha ao cancelar notificações." });
   }
 });
 
@@ -2440,6 +2536,7 @@ app.listen(PORT, () => {
   console.log(`[loja-integrada-proxy] endpoint: http://localhost:${PORT}/api/loja-integrada/produto/`);
   console.log(`[loja-integrada-proxy] admin:    http://localhost:${PORT}/api/admin/login`);
   if (ADMIN_PASSWORD) console.log(`[loja-integrada-proxy] segurança: rate-limit ${MAX_TENTATIVAS} tentativas / ${LOCKOUT_MS / 1000}s, token revogável, CSP/HSTS ativos.`);
+  garantirVapid().then((ok) => console.log(`[vapid] ${ok ? "push web configurado" : "push web INDISPONÍVEL (sem VAPID)"}`));
 });
 
 

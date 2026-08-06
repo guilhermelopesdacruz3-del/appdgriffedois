@@ -13,6 +13,7 @@
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import fs from "node:fs";
 import path from "node:path";
+import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -130,6 +131,11 @@ export async function getSecret(key: ConfigKey): Promise<string | null> {
   }
   secretCache.set(key, { value, expira: Date.now() + SECRET_TTL_MS });
   return value;
+}
+
+// Invalida o cache de uma chave imediatamente (após gravar fora de saveConfig).
+export function invalidarCacheChave(key: ConfigKey): void {
+  secretCache.delete(key);
 }
 
 // ---------------------------------------------------------------------------
@@ -657,8 +663,12 @@ function salvarNotificacoesLocal(lista: Notificacao[]): void {
 }
 
 export async function salvarNotificacao(n: Omit<Notificacao, "id" | "lida" | "created_at"> & Partial<Notificacao>): Promise<Notificacao> {
+  // IMPORTANTE: a tabela `notificacoes` do Supabase tem `id uuid` — ids no
+  // formato `ntf_...` fazem o insert falhar (22P02) e caíam no JSON local
+  // efêmero (notificações sumiam a cada deploy). Usamos UUID quando o
+  // Supabase está disponível.
   const notif: Notificacao = {
-    id: n.id || `ntf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    id: n.id || (sb ? randomUUID() : `ntf_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`),
     email: (n.email || "").trim().toLowerCase(),
     titulo: n.titulo || "",
     corpo: n.corpo || "",
@@ -668,12 +678,21 @@ export async function salvarNotificacao(n: Omit<Notificacao, "id" | "lida" | "cr
   };
   if (!notif.email) return notif;
   if (sb) {
+    // Tabela mais nova tem a coluna `tipo`; tabelas antigas não. O insert NÃO
+    // lança em erro de query (resolve com {error}), por isso verificamos o retorno
+    // e fazemos retry sem `tipo` se a coluna não existir (PGRST204).
     try {
-      await sb.from("notificacoes").insert({
-        id: notif.id, email: notif.email, titulo: notif.titulo, corpo: notif.corpo,
-        tipo: notif.tipo, lida: notif.lida, created_at: notif.created_at,
-      });
-      return notif;
+      const base = { id: notif.id, email: notif.email, titulo: notif.titulo, corpo: notif.corpo, lida: notif.lida, created_at: notif.created_at };
+      const { error } = await sb.from("notificacoes").insert({ ...base, tipo: notif.tipo });
+      if (!error) return notif;
+      if (String(error.message || "").includes("PGRST204") || String(error.message || "").includes("column") || String(error.message || "").includes("'tipo'")) {
+        const { error: e2 } = await sb.from("notificacoes").insert(base);
+        if (!e2) return notif;
+        console.warn("[notificacoes] retry sem tipo falhou:", e2?.message);
+      } else {
+        console.warn("[notificacoes] insert no Supabase falhou:", error.message);
+      }
+      // Outro erro persistente — cai para o JSON local.
     } catch {
       // Tabela pode não existir ainda — fallback para JSON local.
     }
@@ -730,6 +749,8 @@ export interface PerfilCliente {
 }
 
 // Atualiza nome/telefone na tabela `perfis` (e no Auth user, se possível).
+// NOTA: profiles.id é FK do auth.users e NÃO há unique em email — upsert com
+// onConflict:"email" falha (42P10). Buscamos o id do auth user para upsert.
 export async function salvarPerfil(p: PerfilCliente): Promise<void> {
   const e = (p.email || "").trim().toLowerCase();
   if (!e || !sb) return;
@@ -739,7 +760,18 @@ export async function salvarPerfil(p: PerfilCliente): Promise<void> {
     telefone: p.telefone || null,
     updated_at: new Date().toISOString(),
   };
-  await sb.from("profiles").upsert(row, { onConflict: "email" });
+  const { data: existente } = await sb.from("profiles").select("id").eq("email", e).single();
+  if (existente?.id) {
+    await sb.from("profiles").update(row).eq("id", existente.id);
+  } else {
+    try {
+      const { data: users } = await sb.auth.admin.listUsers();
+      const user = users?.users.find((u) => u.email?.toLowerCase() === e);
+      if (user) {
+        await sb.from("profiles").upsert({ id: user.id, ...row }, { onConflict: "id" });
+      }
+    } catch { /* ignora — perfil não criável sem auth user */ }
+  }
   // Espelha no Auth metadata (para o nome aparecer no login futuro).
   try {
     const { data } = await sb.auth.admin.listUsers();
@@ -809,10 +841,21 @@ export async function excluirEndereco(email: string, id: string): Promise<void> 
 export async function salvarPreferencias(email: string, prefs: Record<string, boolean>): Promise<void> {
   const e = (email || "").trim().toLowerCase();
   if (!e || !sb) return;
-  await sb.from("profiles").upsert(
-    { email: e, preferencias: prefs, updated_at: new Date().toISOString() },
-    { onConflict: "email" }
-  );
+  const { data: existente } = await sb.from("profiles").select("id").eq("email", e).single();
+  if (existente?.id) {
+    await sb.from("profiles").update({ preferencias: prefs, updated_at: new Date().toISOString() }).eq("id", existente.id);
+  } else {
+    try {
+      const { data } = await sb.auth.admin.listUsers();
+      const user = data.users.find((u) => u.email?.toLowerCase() === e);
+      if (user) {
+        await sb.from("profiles").upsert(
+          { id: user.id, email: e, preferencias: prefs, updated_at: new Date().toISOString() },
+          { onConflict: "id" }
+        );
+      }
+    } catch { /* ignora — sem auth user não há perfil */ }
+  }
 }
 
 export async function buscarPreferencias(email: string): Promise<Record<string, boolean> | null> {
@@ -821,4 +864,74 @@ export async function buscarPreferencias(email: string): Promise<Record<string, 
   const { data, error } = await sb.from("profiles").select("preferencias").eq("email", e).single();
   if (error || !data) return null;
   return (data.preferencias as Record<string, boolean>) || null;
+}
+
+// ---------------------------------------------------------------------------
+// PUSH (web push) — subscriptions por e-mail guardadas em store_config
+// (key `PUSH_SUB_<email>` = JSON com o array de subscriptions).
+// ---------------------------------------------------------------------------
+export interface PushSubscriptionRow {
+  endpoint: string;
+  keys: { p256dh: string; auth: string };
+  created_at?: string;
+}
+
+// NOTA: não usamos profiles — o id lá é FK do auth.users (insert exige user
+// existente) e não há unique em email (upsert falha). store_config tem key PK
+// e upsert validado, então é o local confiável.
+const pushKeyDe = (email: string) => `PUSH_SUB_${email}`;
+
+async function lerPushList(email: string): Promise<PushSubscriptionRow[]> {
+  if (!sb) return [];
+  const { data, error } = await sb.from("store_config").select("value").eq("key", pushKeyDe(email)).single();
+  if (error || !data?.value) return [];
+  try {
+    const arr = JSON.parse(data.value);
+    if (!Array.isArray(arr)) return [];
+    return arr.filter((x: any) => !!x && typeof x?.endpoint === "string" && typeof x?.keys === "object");
+  } catch {
+    return [];
+  }
+}
+
+async function gravarPushList(email: string, lista: PushSubscriptionRow[]): Promise<void> {
+  if (!sb) return;
+  const { error } = await sb.from("store_config").upsert(
+    { key: pushKeyDe(email), value: JSON.stringify(lista), is_secret: false, updated_at: new Date().toISOString() },
+    { onConflict: "key" }
+  );
+  if (error) console.warn("[push] falha ao gravar subscriptions:", error.message);
+}
+
+export async function salvarPushSubscription(email: string, sub: PushSubscriptionRow): Promise<void> {
+  const e = (email || "").trim().toLowerCase();
+  if (!e || !sb || !sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) return;
+  const lista = (await lerPushList(e)).filter((x) => x.endpoint !== sub.endpoint);
+  lista.push({ ...sub, created_at: sub.created_at || new Date().toISOString() });
+  await gravarPushList(e, lista);
+}
+
+export async function removerPushSubscription(email: string, endpoint: string): Promise<void> {
+  const e = (email || "").trim().toLowerCase();
+  if (!e || !sb || !endpoint) return;
+  const lista = (await lerPushList(e)).filter((x) => x.endpoint !== endpoint);
+  await gravarPushList(e, lista);
+}
+
+export async function listarPushSubscriptions(emails: string[]): Promise<Map<string, PushSubscriptionRow[]>> {
+  const mapa = new Map<string, PushSubscriptionRow[]>();
+  if (!sb || !emails.length) return mapa;
+  const unicos = Array.from(new Set(emails.map((x) => String(x || "").trim().toLowerCase()).filter(Boolean)));
+  if (!unicos.length) return mapa;
+  const keys = unicos.map(pushKeyDe);
+  const { data, error } = await sb.from("store_config").select("key,value").in("key", keys);
+  if (error || !data) return mapa;
+  for (const row of data) {
+    const email = String(row.key).replace(/^PUSH_SUB_/, "");
+    try {
+      const arr = JSON.parse(row.value || "[]");
+      if (Array.isArray(arr)) mapa.set(email, arr);
+    } catch { /* ignora */ }
+  }
+  return mapa;
 }

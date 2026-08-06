@@ -16,6 +16,7 @@ import { salvarClienteSessao } from "../utils/cookies";
 
 import { getFavoritos, apagarFavorito } from "../services/favoritos";
 import type { Favorito } from "../types";
+import { getPushPublicKey, assinarPush, cancelarPush, urlBase64ToUint8Array } from "../services/notificacoes";
 
 function ReceitasSalvas({ email }: { email: string }) {
   const [itens, setItens] = useState<Receita[]>([]);
@@ -423,9 +424,10 @@ function EnderecosPage({ voltar }: { voltar: () => void }) {
 // C7 — Preferências de notificação
 // ---------------------------------------------------------------------------
 function PreferenciasPage({ voltar }: { voltar: () => void }) {
-  const { preferencias, salvarPreferencias } = useCliente();
+  const { preferencias, salvarPreferencias, cliente } = useCliente();
   const [opts, setOpts] = useState<Record<string, boolean>>(preferencias);
   const [salvo, setSalvo] = useState(false);
+  const [pushMsg, setPushMsg] = useState<string | null>(null);
 
   useEffect(() => { setOpts(preferencias); }, [preferencias]);
 
@@ -435,6 +437,48 @@ function PreferenciasPage({ voltar }: { voltar: () => void }) {
     { key: "push_promocoes", label: "Cupons e promoções" },
   ];
 
+  const gerenciarPush = async (ligado: boolean): Promise<void> => {
+    setPushMsg(null);
+    const email = cliente?.email;
+    if (!email || typeof Notification === "undefined" || !("serviceWorker" in navigator)) {
+      if (ligado) setPushMsg("Notificações não suportadas neste navegador.");
+      return;
+    }
+    const chaveParaBase64 = (k: string | ArrayBuffer | null): string => {
+      if (!k) return "";
+      if (typeof k === "string") return k;
+      return btoa(String.fromCharCode(...new Uint8Array(k)));
+    };
+    try {
+      const reg = await navigator.serviceWorker.ready;
+      const existente = await reg.pushManager.getSubscription();
+      if (ligado) {
+        if (!existente) {
+          if (Notification.permission !== "granted") {
+            const perm = await Notification.requestPermission();
+            if (perm !== "granted") {
+              setPushMsg("Permissão negada pelo navegador.");
+              return;
+            }
+          }
+          const pub = await getPushPublicKey();
+          if (!pub) { setPushMsg("Push indisponível no momento."); return; }
+          const nova = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(pub) });
+          await assinarPush(email, { endpoint: nova.endpoint, keys: { p256dh: chaveParaBase64(nova.getKey("p256dh")), auth: chaveParaBase64(nova.getKey("auth")) } });
+          setPushMsg("Notificações ativadas neste dispositivo.");
+        } else {
+          await assinarPush(email, { endpoint: existente.endpoint, keys: { p256dh: chaveParaBase64(existente.getKey("p256dh")), auth: chaveParaBase64(existente.getKey("auth")) } });
+        }
+      } else if (existente) {
+        await cancelarPush(email, existente.endpoint);
+        await existente.unsubscribe().catch(() => {});
+        setPushMsg("Notificações desativadas neste dispositivo.");
+      }
+    } catch {
+      if (ligado) setPushMsg("Não foi possível ativar as notificações.");
+    }
+  };
+
   return (
     <div className="px-5 pt-6 pb-4">
       <button onClick={voltar} className="text-xs text-gray-400 mb-3">‹ Voltar</button>
@@ -443,11 +487,17 @@ function PreferenciasPage({ voltar }: { voltar: () => void }) {
         {items.map((it) => (
           <label key={it.key} className="flex items-center justify-between cursor-pointer">
             <span className="text-xs font-semibold text-luxury-black">{it.label}</span>
-            <input type="checkbox" checked={Boolean(opts[it.key])} onChange={() => setOpts({ ...opts, [it.key]: !opts[it.key] })} className="w-5 h-5 accent-gold" />
+            <input type="checkbox" checked={Boolean(opts[it.key])} onChange={() => { const novo = { ...opts, [it.key]: !opts[it.key] }; setOpts(novo); }} className="w-5 h-5 accent-gold" />
           </label>
         ))}
+        {pushMsg && <p className="text-[11px] text-gray-500">{pushMsg}</p>}
         <button
-          onClick={async () => { await salvarPreferencias(opts); setSalvo(true); setTimeout(() => setSalvo(false), 2000); }}
+          onClick={async () => {
+            await salvarPreferencias(opts);
+            if (opts.push_promocoes) await gerenciarPush(true);
+            else await gerenciarPush(false);
+            setSalvo(true); setTimeout(() => setSalvo(false), 2000);
+          }}
           className="w-full h-10 bg-luxury-black text-white text-xs font-bold rounded-xl mt-2"
         >
           {salvo ? "Salvo!" : "Salvar preferências"}

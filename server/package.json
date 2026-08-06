@@ -17,6 +17,7 @@
     "express": "4.21.2",
     "ioredis": "^5.6.1",
     "react-vite-tailwind": "file:..",
-    "tsx": "^4.23.1"
+    "tsx": "^4.23.1",
+    "web-push": "^3.6.7"
   }
 }

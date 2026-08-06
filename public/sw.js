@@ -2,6 +2,7 @@
 // Estratégia:
 //  - / e assets estáticos (ícones, manifest): cache-first (app funciona offline)
 //  - /api/* (proxy → Render): SEMPRE network (dados dinâmicos, nunca cachear)
+//  - push: mostra notificação nativa (web push) e abre o app ao clicar
 const CACHE = "dgriffe-v1";
 const STATIC = ["/", "/index.html", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/maskable-192.png", "/maskable-512.png"];
 
@@ -44,4 +45,45 @@ self.addEventListener("fetch", (event) => {
       return cached || network;
     })
   );
+});
+
+// ---------------------------------------------------------------------------
+// WEB PUSH — notificações nativas (cupons/promoções enviadas pelo admin)
+// ---------------------------------------------------------------------------
+self.addEventListener("push", (event) => {
+  let dados = { title: "D'Griffe", body: "", tipo: "geral", url: "/" };
+  try {
+    if (event.data) {
+      const parsed = event.data.json();
+      dados = { ...dados, ...parsed };
+    }
+  } catch {
+    dados.body = event.data ? event.data.text() : "";
+  }
+  event.waitUntil(
+    self.registration.showNotification(dados.title || "D'Griffe", {
+      body: dados.body || "",
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      data: { url: dados.url || "/" },
+      vibrate: [100, 50, 100],
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || "/";
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ("focus" in client) { client.navigate(url); return client.focus(); }
+      }
+      return self.clients.openWindow(url);
+    })
+  );
+});
+
+self.addEventListener("notificationclose", (event) => {
+  event.notification.close();
 });
