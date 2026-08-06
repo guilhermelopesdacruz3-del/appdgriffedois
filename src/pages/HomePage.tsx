@@ -121,9 +121,11 @@ export default function HomePage({ products, onSelectProduct, onAddToCart, onNav
           <h3 className="text-sm font-bold text-luxury-black">Destaques</h3>
           <button onClick={() => onNavigate("catalog")} className="text-[10px] font-semibold text-gold uppercase tracking-wider">Ver mais</button>
         </div>
-        <div className="grid grid-cols-2 gap-3 px-4">
+        <div className="flex gap-3 px-4 overflow-x-auto no-scrollbar snap-x snap-mandatory pb-1">
           {featuredProducts.map((product) => (
-            <ProductCard key={product.id} product={product} onSelect={onSelectProduct} onAddToCart={onAddToCart} onTryOn={onTryOn} isFavorite={isFavorite ? isFavorite(product.id) : undefined} onToggleFavorite={onToggleFavorite} />
+            <div key={product.id} className="flex-shrink-0 w-44 snap-start">
+              <ProductCard product={product} onSelect={onSelectProduct} onAddToCart={onAddToCart} onTryOn={onTryOn} isFavorite={isFavorite ? isFavorite(product.id) : undefined} onToggleFavorite={onToggleFavorite} />
+            </div>
           ))}
         </div>
       </div>
