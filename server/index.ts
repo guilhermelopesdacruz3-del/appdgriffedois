@@ -1816,6 +1816,20 @@ app.all("/api/loja-integrada/:resource/:id?", async (req, res) => {
     }
 
     const { status, payload } = await chamarLI(req.method, resource, id, query, req.body);
+    // GET individual de produto: a listagem sincronizada tem preço/imagem/estoque
+    // reais (sync em massa), o detalhe da LI nem sempre traz — aplica o sync para
+    // o app exibir preço certo na tela do produto e nos destaques da home.
+    if (req.method === "GET" && resource === "produto" && id && status === 200 && payload && typeof payload === "object" && !Array.isArray(payload)) {
+      aplicarDadosSincronizados(payload);
+      if (payload.destaque === undefined || payload.preco_cheio === undefined) {
+        const extra = await enriquecerProdutoComImagem(payload.id || id).catch(() => ({}));
+        for (const campo of CAMPOS_DO_INDIVIDUAL) {
+          if (extra[campo] !== undefined && extra[campo] !== null && payload[campo] === undefined) {
+            payload[campo] = extra[campo];
+          }
+        }
+      }
+    }
     if (req.method === "GET" && resource === "produto" && !id && status === 200 && Array.isArray(payload?.objects)) {
       // A LI lista variações (atributo_opcao) junto com produtos reais — o
       // catálogo do app mostra apenas produtos (normal/atributo). Filtramos

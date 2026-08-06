@@ -1,8 +1,21 @@
+import { useEffect, useState } from "react";
 import { Product } from "../data";
 import { categories } from "../data";
 import ProductCard from "../components/features/ProductCard";
 import YouTubeSection from "../components/features/YouTubeSection";
 import CategoryIcon from "../components/features/CategoryIcon";
+import { buscarProduto } from "../services/lojaIntegrada";
+
+// Curadoria de destaques da home (ids de produtos reais da Loja Integrada).
+// Troque os ids para exibir outros produtos na seção "Destaques".
+const PRODUTOS_DESTAQUE: number[] = [
+  401382709, // Vogue 0VO4342S
+  401120677, // Vogue 0VO5683SL
+  400997953, // Vogue 0VO5590L
+  401134237, // Arnette 0AN4376
+  401115803, // Arnette 0AN4374
+  401089862, // Arnette 0AN4364 Dinsky
+];
 
 interface HomePageProps {
   products: Product[];
@@ -21,7 +34,21 @@ export default function HomePage({ products, onSelectProduct, onAddToCart, onNav
   // que as seções da home não fiquem vazias quando a LI usa nomes diferentes.
   const isCategoriaSol = (cat: string) => /sol/i.test(cat);
 
-  const featuredProducts = products.filter(p => p.badge === "Destaque").slice(0, 4);
+  const [destaques, setDestaques] = useState<Product[]>([]);
+
+  useEffect(() => {
+    let ativo = true;
+    Promise.all(PRODUTOS_DESTAQUE.map((id) => buscarProduto(id).catch(() => null)))
+      .then((res) => {
+        if (ativo) setDestaques(res.filter((p): p is Product => Boolean(p)));
+      })
+      .catch(() => {});
+    return () => {
+      ativo = false;
+    };
+  }, []);
+
+  const featuredProducts = (destaques.length > 0 ? destaques : products.filter((p) => p.badge === "Destaque")).slice(0, 6);
   const solProducts = products.filter(p => isCategoriaSol(p.category)).slice(0, 4);
   const recentProducts = recentIds
     .map((id) => products.find((p) => p.id === id))
