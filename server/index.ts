@@ -1821,13 +1821,15 @@ app.all("/api/loja-integrada/:resource/:id?", async (req, res) => {
     // o app exibir preço certo na tela do produto e nos destaques da home.
     if (req.method === "GET" && resource === "produto" && id && status === 200 && payload && typeof payload === "object" && !Array.isArray(payload)) {
       aplicarDadosSincronizados(payload);
-      if (payload.destaque === undefined || !payload.preco_cheio) {
+      const semImagem = !payload.imagem_principal || !(Array.isArray(payload.imagens) && payload.imagens.length > 0);
+      if (payload.destaque === undefined || !payload.preco_cheio || semImagem) {
         const extra = await enriquecerProdutoComImagem(payload.id || id).catch(() => ({}));
         for (const campo of CAMPOS_DO_INDIVIDUAL) {
-          if (
-            extra[campo] !== undefined && extra[campo] !== null && extra[campo] !== "" &&
-            (payload[campo] === undefined || payload[campo] === null || payload[campo] === "")
-          ) {
+          const alvo = payload[campo];
+          const alvoVazio =
+            alvo === undefined || alvo === null || alvo === "" ||
+            (Array.isArray(alvo) && alvo.length === 0);
+          if (extra[campo] !== undefined && extra[campo] !== null && extra[campo] !== "" && alvoVazio) {
             payload[campo] = extra[campo];
           }
         }
