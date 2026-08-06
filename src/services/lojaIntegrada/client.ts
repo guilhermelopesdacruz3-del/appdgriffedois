@@ -30,10 +30,13 @@ export class LojaIntegradaError extends Error {
   }
 }
 
-function buildQuery(params: Record<string, string | number | boolean | undefined>): string {
+function buildQuery(params: Record<string, string | number | boolean | undefined | Array<string | number>>): string {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined && value !== null && value !== "") {
+    if (value === undefined || value === null || value === "") return;
+    if (Array.isArray(value)) {
+      value.forEach((v) => search.append(key, String(v)));
+    } else {
       search.append(key, String(value));
     }
   });
@@ -43,7 +46,7 @@ function buildQuery(params: Record<string, string | number | boolean | undefined
 
 export async function request<T>(
   path: string,
-  params: Record<string, string | number | boolean | undefined> = {},
+  params: Record<string, string | number | boolean | undefined | Array<string | number>> = {},
   init: RequestInit = {}
 ): Promise<T> {
   const url = `${PROXY_BASE_URL}${path}${buildQuery(params)}`;
@@ -64,6 +67,22 @@ export async function request<T>(
     );
   }
 
+  // Retry simples contra rate limit (429) / erros transitórios da LI.
+  if ((response.status === 429 || response.status === 502 || response.status === 504) && !init.signal) {
+    await new Promise((r) => setTimeout(r, 800));
+    try {
+      response = await fetch(url, {
+        ...init,
+        headers: {
+          Accept: "application/json",
+          ...(init.headers || {}),
+        },
+      });
+    } catch {
+      /* mantém a resposta anterior */
+    }
+  }
+
   if (!response.ok) {
     const body = await response.text().catch(() => "");
     throw new LojaIntegradaError(
@@ -78,7 +97,7 @@ export async function request<T>(
 /** GET de listagem paginada (produtos, clientes, pedidos, categorias, etc.) */
 export function listResource<T>(
   resource: string,
-  params: Record<string, string | number | boolean | undefined> = {}
+  params: Record<string, string | number | boolean | undefined | Array<string | number>> = {}
 ): Promise<LIListResponse<T>> {
   return request<LIListResponse<T>>(`/${resource}/`, { limit: 20, offset: 0, ...params });
 }
@@ -87,7 +106,7 @@ export function listResource<T>(
 export function getResource<T>(
   resource: string,
   id: number | string,
-  params: Record<string, string | number | boolean | undefined> = {}
+  params: Record<string, string | number | boolean | undefined | Array<string | number>> = {}
 ): Promise<T> {
   return request<T>(`/${resource}/${id}/`, params);
 }

@@ -450,14 +450,14 @@ app.get("/api/admin/pedidos", requireAdmin, async (req, res) => {
     if (status !== 200) return res.status(status).json(payload);
 
     const obj = payload;
-    const objects = (obj.objects || []).map((p) => ({
+    const objects = await anexarClientesPedidos((obj.objects || []).map((p) => ({
       ...p,
       // A LI expõe `id` (interno) e `resource_uri` (ex.: /api/v1/pedido/1) —
       // o id usado em GET/PUT individuais é o da resource_uri, não o campo id.
       id_api: extrairIdDaUri(p.resource_uri) ?? p.id,
       verificado: Boolean(estado.verificacoes[String(p.id)]),
       verificado_em: estado.verificacoes[String(p.id)] ? estado.verificacoes[String(p.id)].em : null,
-    }));
+    })));
     return res.json({ ...obj, objects });
   } catch (err) {
     console.error("[admin] erro ao listar pedidos:", err);
@@ -682,7 +682,47 @@ async function buscarTodosPedidos() {
     if (objs.length < limit) break;
     offset += limit;
   }
-  return todos;
+  return anexarClientesPedidos(todos);
+}
+
+// Cache em memória de clientes da LI (id -> {nome, email}) com TTL curto,
+// para enriquecer pedidos sem estourar o rate limit da LI (1 chamada total).
+let cacheClientesLI: { mapa: Map<number, { nome: string | null; email: string | null }>; expiraEm: number } | null = null;
+
+async function buscarClientesLI(): Promise<Map<number, { nome: string | null; email: string | null }>> {
+  const agora = Date.now();
+  if (cacheClientesLI && cacheClientesLI.expiraEm > agora) return cacheClientesLI.mapa;
+  const mapa = new Map<number, { nome: string | null; email: string | null }>();
+  let offset = 0;
+  const limit = 50;
+  for (let i = 0; i < 20; i++) {
+    const { status, payload } = await chamarLI("GET", "cliente", undefined, { limit, offset });
+    if (status !== 200) break;
+    const objs = payload.objects || [];
+    for (const c of objs) {
+      if (c.id) mapa.set(Number(c.id), { nome: c.nome || c.razao_social || null, email: c.email || null });
+    }
+    if (objs.length < limit) break;
+    offset += limit;
+  }
+  cacheClientesLI = { mapa, expiraEm: agora + 60_000 };
+  return mapa;
+}
+
+// A LI retorna `cliente` como resource_uri (ex.: /api/v1/cliente/44255391) e não
+// os campos cliente_nome/cliente_email — preenche a partir da lista de clientes.
+async function anexarClientesPedidos(objects: any[]): Promise<any[]> {
+  if (!Array.isArray(objects) || objects.length === 0) return objects || [];
+  const clientes = await buscarClientesLI().catch(() => new Map());
+  return objects.map((p) => {
+    if (p.cliente_nome && p.cliente_email) return p;
+    let id: number | null = null;
+    if (typeof p.cliente === "object" && p.cliente) id = Number(p.cliente.id) || null;
+    else if (typeof p.cliente === "string") id = extrairIdDaUri(p.cliente);
+    const c = id != null ? clientes.get(id) : null;
+    if (!c) return p;
+    return { ...p, cliente_nome: p.cliente_nome || c.nome, cliente_email: p.cliente_email || c.email };
+  });
 }
 
 app.get("/api/admin/relatorio", requireAdmin, async (req, res) => {

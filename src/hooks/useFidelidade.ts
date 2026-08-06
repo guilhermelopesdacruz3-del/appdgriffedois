@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from "react";
+import { obterTokenValido } from "../services/cliente";
 
 const PROXY = (import.meta.env.VITE_LOJA_INTEGRADA_PROXY_URL as string | undefined)?.replace(/\/api\/loja-integrada\/?$/, "") || "";
 
@@ -36,10 +37,15 @@ export function useFidelidade(email: string | null | undefined) {
     const id = ++reqId.current;
     setLoading(true);
     setErro(null);
-    Promise.all([
-      fetch(`${PROXY}/api/fidelidade?email=${encodeURIComponent(e)}`).then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))),
-      fetch(`${PROXY}/api/fidelidade/historico?email=${encodeURIComponent(e)}`).then((r) => (r.ok ? r.json() : { historico: [] })),
-    ])
+    obterTokenValido()
+      .then((token) => {
+        const headers: Record<string, string> = { Accept: "application/json" };
+        if (token) headers["Authorization"] = `Bearer ${token}`;
+        return Promise.all([
+          fetch(`${PROXY}/api/fidelidade?email=${encodeURIComponent(e)}`, { headers }).then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))),
+          fetch(`${PROXY}/api/fidelidade/historico?email=${encodeURIComponent(e)}`, { headers }).then((r) => (r.ok ? r.json() : { historico: [] })),
+        ]);
+      })
       .then(([d, h]) => {
         if (id !== reqId.current) return;
         setInfo(d);

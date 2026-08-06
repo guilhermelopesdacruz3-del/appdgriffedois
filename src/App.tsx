@@ -155,7 +155,7 @@ function AppInner() {
     return <AdminPage onExit={() => { window.location.hash = ""; }} />;
   }
 
-  const { produtos: products, total, loading: loadingProducts, error: productsError, reload: reloadProducts, loadMore: loadMoreProducts, loadingMore, hasMore } = useProdutos({ limit: 100, marcaId: filtroMarcaId ?? undefined, categoriaId: filtroCategoriaId ?? undefined });
+  const { produtos: products, total, loading: loadingProducts, error: productsError, reload: reloadProducts, loadMore: loadMoreProducts, loadingMore, hasMore } = useProdutos({ limit: 100, marcaId: filtroMarcaId ?? undefined, categoriaId: filtroCategoriaId ?? undefined, busca: searchQuery.trim() || undefined });
   const filtrosCatalogo = useFiltrosCatalogo();
   const cartCount = cartItems.reduce((sum, item) => sum + item.quantity, 0);
 

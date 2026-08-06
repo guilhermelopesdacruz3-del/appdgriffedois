@@ -20,6 +20,15 @@
   -webkit-font-smoothing: antialiased;
 }
 
+/* Esconde scrollbars em carrosséis/chips horizontais mantendo o scroll */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 html {
   font-family: 'Inter', Arial, sans-serif;
 }

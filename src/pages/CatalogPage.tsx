@@ -63,6 +63,21 @@ export default function CatalogPage({
 
   const termo = searchQuery.trim().toLowerCase();
 
+  // ---- Hierarquia de categorias ----
+  const categoriasPai = categorias.filter((c) => c.paiId === null);
+  const catSelecionada = filtroCategoriaId !== null
+    ? categorias.find((c) => c.id === filtroCategoriaId)
+    : undefined;
+  const filhosDaSelecionada = catSelecionada
+    ? categorias.filter((c) => c.paiId === catSelecionada.id)
+    : [];
+  const subCategorias = catSelecionada
+    ? (filhosDaSelecionada.length > 0
+        ? filhosDaSelecionada
+        : categorias.filter((c) => c.paiId === catSelecionada.paiId))
+    : [];
+  const paiRaizId = catSelecionada?.paiId === null ? catSelecionada.id : null;
+
   const filteredProducts = products.filter((p) => {
     // Busca textual (nome, marca, categoria) — filtro local por cima do server-side
     if (termo) {
@@ -87,6 +102,12 @@ export default function CatalogPage({
     : filtroCategoriaId !== null
       ? categorias.find((c) => c.id === filtroCategoriaId)?.nome
       : undefined;
+
+  const limparFiltros = () => {
+    setActiveFilter("all");
+    onFiltroMarca?.(null);
+    onFiltroCategoria?.(null);
+  };
 
   return (
     <div className="pb-4">
@@ -122,47 +143,129 @@ export default function CatalogPage({
         ))}
       </div>
 
-      {/* Marcas (reais, da loja) */}
-      {marcas.length > 0 && (
-        <div className="flex gap-2 px-4 overflow-x-auto no-scrollbar mb-2">
-          {marcas.map((marca) => (
+      {/* Filtros: Categorias (principais + subcategorias) */}
+      {categoriasPai.length > 0 && (
+        <div className="mb-3">
+          <div className="flex gap-2 px-4 overflow-x-auto no-scrollbar">
             <button
-              key={marca.id}
-              onClick={() => {
-                setActiveFilter("all");
-                onFiltroMarca?.(filtroMarcaId === marca.id ? null : marca.id);
-              }}
-              className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
-                filtroMarcaId === marca.id
-                  ? "bg-luxury-black text-white shadow-sm"
-                  : "bg-white text-gray-600 border border-ice-dark hover:border-luxury-black/20"
+              onClick={() => onFiltroCategoria?.(null)}
+              className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-200 flex-shrink-0 border ${
+                filtroCategoriaId === null
+                  ? "bg-gradient-to-r from-gold to-gold-dark text-black border-gold/50 shadow-lg shadow-gold/20"
+                  : "bg-white/70 text-gray-500 border-ice-dark hover:border-gold/40"
               }`}
             >
-              {marca.nome}
+              Todos
             </button>
-          ))}
+            {categoriasPai.map((categoria) => {
+              const ativa = paiRaizId === categoria.id;
+              return (
+                <button
+                  key={categoria.id}
+                  onClick={() => {
+                    setActiveFilter("all");
+                    onFiltroCategoria?.(filtroCategoriaId === categoria.id ? null : categoria.id);
+                  }}
+                  className={`px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all duration-200 flex-shrink-0 border ${
+                    ativa
+                      ? "bg-gradient-to-r from-gold to-gold-dark text-black border-gold/50 shadow-lg shadow-gold/25 scale-[1.03]"
+                      : "bg-white text-gray-600 border-ice-dark hover:border-gold/50 hover:text-gold-dark"
+                  }`}
+                >
+                  {categoria.nome}
+                </button>
+              );
+            })}
+          </div>
+
+          {subCategorias.length > 0 && (
+            <div className="mt-2 px-4">
+              <div className="flex gap-2 overflow-x-auto no-scrollbar border-t border-ice-dark/60 pt-2">
+                {catSelecionada?.paiId !== null && (
+                  <button
+                    onClick={() => {
+                      setActiveFilter("all");
+                      onFiltroCategoria?.(catSelecionada?.paiId ?? null);
+                    }}
+                    className="px-3 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all duration-200 flex-shrink-0 border border-ice-dark text-gray-400 hover:border-luxury-black/30"
+                  >
+                    ← {categorias.find((c) => c.id === catSelecionada?.paiId)?.nome}
+                  </button>
+                )}
+                {subCategorias.map((sub) => {
+                  const ativa = filtroCategoriaId === sub.id;
+                  return (
+                    <button
+                      key={sub.id}
+                      onClick={() => {
+                        setActiveFilter("all");
+                        onFiltroCategoria?.(filtroCategoriaId === sub.id ? null : sub.id);
+                      }}
+                      className={`px-3 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all duration-200 flex-shrink-0 border ${
+                        ativa
+                          ? "bg-luxury-black text-white border-luxury-black shadow-md"
+                          : "bg-white/60 text-gray-500 border-ice-dark hover:border-luxury-black/30"
+                      }`}
+                    >
+                      {sub.nome}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Categorias (reais, da loja) */}
-      {categorias.length > 0 && (
-        <div className="flex gap-2 px-4 overflow-x-auto no-scrollbar mb-3">
-          {categorias.map((categoria) => (
+      {/* Filtros: Marcas (reais, da loja) */}
+      {marcas.length > 0 && (
+        <div className="mb-3">
+          <p className="px-4 mb-1.5 text-[9px] uppercase tracking-widest font-bold text-gray-400">Marcas</p>
+          <div className="flex gap-2 px-4 overflow-x-auto no-scrollbar">
+            {marcas.map((marca) => {
+              const ativa = filtroMarcaId === marca.id;
+              const inicial = marca.nome.charAt(0).toUpperCase();
+              return (
+                <button
+                  key={marca.id}
+                  onClick={() => {
+                    setActiveFilter("all");
+                    onFiltroMarca?.(filtroMarcaId === marca.id ? null : marca.id);
+                  }}
+                  className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold whitespace-nowrap transition-all duration-200 flex-shrink-0 border ${
+                    ativa
+                      ? "bg-luxury-black text-white border-luxury-black shadow-md"
+                      : "bg-white text-gray-600 border-ice-dark hover:border-luxury-black/40"
+                  }`}
+                >
+                  <span
+                    className={`w-4.5 h-4.5 min-w-[18px] min-h-[18px] rounded-full flex items-center justify-center text-[9px] font-black ${
+                      ativa ? "bg-gold text-black" : "bg-ice text-gray-500"
+                    }`}
+                  >
+                    {inicial}
+                  </span>
+                  {marca.nome}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Filtro ativo: barra de contexto + limpar */}
+      {filtroAtivo && (
+        <div className="flex items-center gap-2 px-4 mb-3">
+          <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gold/15 border border-gold/30 text-gold-dark text-[11px] font-bold">
+            {nomeFiltro}
             <button
-              key={categoria.id}
-              onClick={() => {
-                setActiveFilter("all");
-                onFiltroCategoria?.(filtroCategoriaId === categoria.id ? null : categoria.id);
-              }}
-              className={`px-4 py-2 rounded-full text-xs font-semibold whitespace-nowrap transition-all duration-200 flex-shrink-0 ${
-                filtroCategoriaId === categoria.id
-                  ? "bg-gold text-luxury-black shadow-sm"
-                  : "bg-white text-gray-600 border border-ice-dark hover:border-luxury-black/20"
-              }`}
+              onClick={limparFiltros}
+              className="w-4 h-4 rounded-full bg-gold/20 hover:bg-gold/40 flex items-center justify-center leading-none"
+              aria-label="Remover filtro"
             >
-              {categoria.nome}
+              ×
             </button>
-          ))}
+          </span>
         </div>
       )}
 
@@ -198,8 +301,8 @@ export default function CatalogPage({
         ))}
       </div>
 
-      {/* Load more (paginação server-side; oculto quando há filtro local ativo) */}
-      {!termo && activeFilter === "all" && hasMore && onLoadMore && (
+      {/* Load more (paginação server-side, incluindo durante a busca) */}
+      {activeFilter === "all" && hasMore && onLoadMore && (
         <div className="flex justify-center pt-5 pb-2">
           <button
             onClick={onLoadMore}
