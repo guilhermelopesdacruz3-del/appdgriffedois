@@ -9,7 +9,7 @@ import { buscarProduto } from "../services/lojaIntegrada";
 // Curadoria de destaques da home (ids de produtos reais da Loja Integrada).
 // Troque os ids para exibir outros produtos na seção "Destaques".
 const PRODUTOS_DESTAQUE: number[] = [
-  401382709, // Vogue 0VO4342S
+  401078724, // Vogue 0VO5426S
   401120677, // Vogue 0VO5683SL
   400997953, // Vogue 0VO5590L
   401134237, // Arnette 0AN4376
