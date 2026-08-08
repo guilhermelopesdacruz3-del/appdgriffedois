@@ -293,8 +293,17 @@ function app() {
         }
       }
 
-      const { error } = await sb.rpc("incrementar_usos_cupom", { cupom_id });
-      if (error) return res.status(500).json({ erro: error.message });
+      // Incrementa o contador de usos. Se a função SQL incrementar_usos_cupom
+      // não existir no Supabase (schema antigo), faz o incremento direto.
+      const { error: rpcErr } = await sb.rpc("incrementar_usos_cupom", { cupom_id });
+      if (rpcErr) {
+        const { data: cupomAtual } = await sb.from("cupons").select("usos").eq("id", cupom_id).maybeSingle();
+        const { error: upErr } = await sb
+          .from("cupons")
+          .update({ usos: ((cupomAtual?.usos || 0) + 1) })
+          .eq("id", cupom_id);
+        if (upErr) return res.status(500).json({ erro: upErr.message });
+      }
 
       return res.json({ ok: true, desconto: Number(discount || 0) });
     } catch (err) {
