@@ -1296,6 +1296,29 @@ app.get("/api/notificacoes/push-config", async (_req, res) => {
   return res.json({ publicKey: pub });
 });
 
+// Diagnóstico temporário: status do Supabase + prefixo da key (sem expor segredo).
+app.get("/api/diag/supabase", async (_req, res) => {
+  const sb = supabaseClient();
+  let role = "sem-sb";
+  let count = -1;
+  if (sb) {
+    try {
+      const { data } = await sb.auth.admin.listUsers({ page: 1, perPage: 1 });
+      role = "service_role";
+      count = data?.total ?? -1;
+    } catch (e: any) {
+      role = `nao-service-role: ${String(e?.message || e).slice(0, 60)}`;
+    }
+  }
+  const key = String(process.env.SUPABASE_SERVICE_ROLE || "");
+  return res.json({
+    url: String(process.env.SUPABASE_URL || "").slice(0, 40),
+    keyPrefix: key.slice(0, 14),
+    role,
+    users: count,
+  });
+});
+
 // Cliente salva a subscription do dispositivo (associada ao e-mail).
 app.post("/api/notificacoes/subscribe", async (req, res) => {
   const email = String((req.body?.email || "").trim().toLowerCase());
