@@ -376,6 +376,8 @@ app.get("/health", (_req, res) =>
     ok: true,
     sync: syncState.progresso,
     syncOffsets: syncState.offsets,
+    totalLi: syncState.totalLi,
+    paginasPorRecurso: syncState.paginasPorRecurso,
     paginasVazias: syncState.paginasVazias,
     rodando: syncState.rodando,
     ultimoOk: syncState.ultimoOk,
@@ -1503,7 +1505,7 @@ const estoqueSync = new Map(); // produtoId -> { quantidade, disponivel, gerenci
 const produtosSync = new Map();
 // progresso: string legível; offsets: onde cada recurso parou (0 = nenhum sync
 // desse recurso ainda; null = recurso 100% sincronizado).
-let syncState = { rodando: false, ultimoOk: 0, progresso: "", offsets: {}, paginasVazias: 0 };
+let syncState = { rodando: false, ultimoOk: 0, progresso: "", offsets: {}, paginasVazias: 0, totalLi: {}, paginasPorRecurso: {} };
 
 function extrairIdDaUri(uri) {
   const m = String(uri || "").match(/(\d+)\/?$/);
@@ -1535,6 +1537,13 @@ async function paginarRecurso(recurso, processaItem, queryExtra = {}, offsetInic
     }
     const objetos = resp.payload.objects || [];
     const totalLi = Number(resp.payload?.meta?.total_count) || 0;
+    if (totalLi > 0) {
+      if (syncState.totalLi[recurso] === undefined) syncState.totalLi[recurso] = totalLi;
+      syncState.paginasPorRecurso[recurso] = (syncState.paginasPorRecurso[recurso] || 0) + 1;
+    } else if (!resp.payload?.meta) {
+      // Resposta 200 sem meta — a LI devolveu vazio estranho; registra para diag.
+      syncState.totalLi[recurso] = syncState.totalLi[recurso] === undefined ? "sem-meta" : syncState.totalLi[recurso];
+    }
     for (const item of objetos) processaItem(item);
 
     // Fim REAL: página parcial e já cobrimos todo o total informado pela LI.
