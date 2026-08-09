@@ -1297,7 +1297,7 @@ app.get("/api/notificacoes/push-config", async (_req, res) => {
 });
 
 // Diagnóstico temporário: status do Supabase + prefixo da key (sem expor segredo).
-app.get("/api/diag/supabase", async (_req, res) => {
+app.get("/api/diag/supabase", async (req, res) => {
   const sb = supabaseClient();
   let role = "sem-sb";
   let count = -1;
@@ -1341,6 +1341,31 @@ app.get("/api/diag/supabase", async (_req, res) => {
       insertTeste = { ok: false, erro: String(e?.message || e).slice(0, 200), modo: "supabase-js+select+single" };
     }
   }
+  let authTeste: any = null;
+  if (sb) {
+    try {
+      const emailTeste = `testeopencode${Date.now() % 1000}@dgriffe.com.br`;
+      const { data: criado, error: cErr } = await sb.auth.admin.createUser({ email: emailTeste, password: "SenhaTeste123!", email_confirm: true });
+      if (cErr) { authTeste = { ok: false, pass: "createUser", erro: String(cErr.message).slice(0, 150) }; }
+      else {
+        const uid = criado?.user?.id;
+        if (uid) await sb.from("profiles").upsert({ id: uid, email: emailTeste, created_at: new Date().toISOString() });
+        const { error: attrErr } = await sb
+          .from("cupons_usuarios")
+          .upsert({ cupom_id: "2ba2a139-6149-4e99-8684-bc62257ebcdf", user_id: uid }, { onConflict: "cupom_id,user_id" });
+        const { data: signin, error: sErr } = await sb.auth.signInWithPassword({ email: emailTeste, password: "SenhaTeste123!" });
+        if (sErr) { authTeste = { ok: false, pass: "signIn", erro: String(sErr.message).slice(0, 150), email: emailTeste }; }
+        else {
+          const token = signin?.session?.access_token || "";
+          const meus = await fetch(`https://${req.headers.host}/api/cupons/meus`, { headers: { Authorization: `Bearer ${token}` } });
+          const meusJson = await meus.json().catch(() => null);
+          authTeste = { ok: meus.ok, email: emailTeste, atribuiUpsert: attrErr ? "erro" : "ok", meusStatus: meus.status, meus: Array.isArray(meusJson) ? meusJson.map((m: any) => ({ codigo: m.codigo, id: m.id })) : meusJson };
+        }
+      }
+    } catch (e: any) {
+      authTeste = { ok: false, erro: String(e?.message || e).slice(0, 150) };
+    }
+  }
   return res.json({
     url: String(process.env.SUPABASE_URL || "").slice(0, 40),
     keyPrefix: key.slice(0, 14),
@@ -1350,6 +1375,8 @@ app.get("/api/diag/supabase", async (_req, res) => {
     role,
     users: count,
     insertTeste,
+    authTeste,
+    agora: new Date().toISOString(),
   });
 });
 
