@@ -1318,6 +1318,32 @@ app.get("/api/diag/supabase", async (_req, res) => {
       keyClaims = JSON.parse(Buffer.from(pay.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8"));
     }
   } catch { /* ignora */ }
+  let insertTeste: { ok: boolean; erro?: string } | null = null;
+  try {
+    const url = String(process.env.SUPABASE_URL || "");
+    const resp = await fetch(`${url}/rest/v1/cupons`, {
+      method: "POST",
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        "Content-Type": "application/json",
+        Prefer: "return=minimal",
+      },
+      body: JSON.stringify({
+        codigo: `DIAG${Math.floor(Math.random() * 9999)}`,
+        tipo: "percentual",
+        valor: 1,
+        data_inicio: new Date().toISOString(),
+        data_fim: new Date(Date.now() + 86400000).toISOString(),
+        ativo: true,
+        usos: 0,
+      }),
+    });
+    if (resp.ok) insertTeste = { ok: true };
+    else insertTeste = { ok: false, erro: (await resp.text()).slice(0, 120) };
+  } catch (e: any) {
+    insertTeste = { ok: false, erro: String(e?.message || e).slice(0, 120) };
+  }
   return res.json({
     url: String(process.env.SUPABASE_URL || "").slice(0, 40),
     keyPrefix: key.slice(0, 14),
@@ -1326,6 +1352,7 @@ app.get("/api/diag/supabase", async (_req, res) => {
       : "nao-jwt",
     role,
     users: count,
+    insertTeste,
   });
 });
 
