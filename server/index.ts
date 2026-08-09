@@ -1318,7 +1318,7 @@ app.get("/api/diag/supabase", async (_req, res) => {
       keyClaims = JSON.parse(Buffer.from(pay.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8"));
     }
   } catch { /* ignora */ }
-  let insertTeste: { ok: boolean; erro?: string } | null = null;
+  let insertTeste: { ok: boolean; erro?: string; modo?: string } | null = null;
   try {
     const url = String(process.env.SUPABASE_URL || "");
     const resp = await fetch(`${url}/rest/v1/cupons`, {
@@ -1327,7 +1327,7 @@ app.get("/api/diag/supabase", async (_req, res) => {
         apikey: key,
         Authorization: `Bearer ${key}`,
         "Content-Type": "application/json",
-        Prefer: "return=minimal",
+        Prefer: "return=representation,resolution=merge-duplicates",
       },
       body: JSON.stringify({
         codigo: `DIAG${Math.floor(Math.random() * 9999)}`,
@@ -1339,10 +1339,10 @@ app.get("/api/diag/supabase", async (_req, res) => {
         usos: 0,
       }),
     });
-    if (resp.ok) insertTeste = { ok: true };
-    else insertTeste = { ok: false, erro: (await resp.text()).slice(0, 120) };
+    if (resp.ok) insertTeste = { ok: true, modo: "representation" };
+    else insertTeste = { ok: false, erro: (await resp.text()).slice(0, 200), modo: "representation" };
   } catch (e: any) {
-    insertTeste = { ok: false, erro: String(e?.message || e).slice(0, 120) };
+    insertTeste = { ok: false, erro: String(e?.message || e).slice(0, 200), modo: "representation" };
   }
   return res.json({
     url: String(process.env.SUPABASE_URL || "").slice(0, 40),
