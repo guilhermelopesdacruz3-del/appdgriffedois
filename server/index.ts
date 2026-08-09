@@ -1322,7 +1322,7 @@ app.get("/api/diag/supabase", async (_req, res) => {
     url: String(process.env.SUPABASE_URL || "").slice(0, 40),
     keyPrefix: key.slice(0, 14),
     keyClaims: keyClaims
-      ? { role: keyClaims.role, hasExp: typeof keyClaims.exp === "number" }
+      ? { role: keyClaims.role, exp: keyClaims.exp ?? null, agora: Math.floor(Date.now() / 1000), expirada: typeof keyClaims.exp === "number" && keyClaims.exp < Date.now() / 1000 }
       : "nao-jwt",
     role,
     users: count,
