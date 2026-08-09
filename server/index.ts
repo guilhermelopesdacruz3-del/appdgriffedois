@@ -1311,9 +1311,19 @@ app.get("/api/diag/supabase", async (_req, res) => {
     }
   }
   const key = String(process.env.SUPABASE_SERVICE_ROLE || "");
+  let keyClaims: { role?: string; exp?: number } | null = null;
+  try {
+    const pay = key.split(".")[1];
+    if (pay) {
+      keyClaims = JSON.parse(Buffer.from(pay.replace(/-/g, "+").replace(/_/g, "/"), "base64").toString("utf8"));
+    }
+  } catch { /* ignora */ }
   return res.json({
     url: String(process.env.SUPABASE_URL || "").slice(0, 40),
     keyPrefix: key.slice(0, 14),
+    keyClaims: keyClaims
+      ? { role: keyClaims.role, hasExp: typeof keyClaims.exp === "number" }
+      : "nao-jwt",
     role,
     users: count,
   });
