@@ -1321,17 +1321,24 @@ app.get("/api/diag/supabase", async (_req, res) => {
   let insertTeste: { ok: boolean; erro?: string; modo?: string } | null = null;
   if (sb) {
     try {
-      const { error } = await sb.from("cupons").insert({
-        codigo: `DIAG${Math.floor(Math.random() * 9999)}`,
-        tipo: "percentual",
-        valor: 1,
-        data_inicio: new Date().toISOString(),
-        data_fim: new Date(Date.now() + 86400000).toISOString(),
-      });
-      if (!error) insertTeste = { ok: true, modo: "supabase-js" };
-      else insertTeste = { ok: false, erro: String(error.message).slice(0, 200), modo: "supabase-js" };
+      const { data, error } = await sb
+        .from("cupons")
+        .insert({
+          codigo: `DIAG${Math.floor(Math.random() * 9999)}`,
+          tipo: "percentual",
+          valor: 1,
+          valor_minimo: null,
+          max_usos: null,
+          data_inicio: new Date().toISOString(),
+          data_fim: new Date(Date.now() + 86400000).toISOString(),
+          created_by: null,
+        })
+        .select("*")
+        .single();
+      if (!error) insertTeste = { ok: true, modo: "supabase-js+select+single", id: data?.id };
+      else insertTeste = { ok: false, erro: String(error.message).slice(0, 200), modo: "supabase-js+select+single" };
     } catch (e: any) {
-      insertTeste = { ok: false, erro: String(e?.message || e).slice(0, 200), modo: "supabase-js" };
+      insertTeste = { ok: false, erro: String(e?.message || e).slice(0, 200), modo: "supabase-js+select+single" };
     }
   }
   return res.json({
