@@ -371,7 +371,19 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get("/health", (_req, res) => res.json({ ok: true, sync: syncState.progresso }));
+app.get("/health", (_req, res) =>
+  res.json({
+    ok: true,
+    sync: syncState.progresso,
+    syncOffsets: syncState.offsets,
+    paginasVazias: syncState.paginasVazias,
+    rodando: syncState.rodando,
+    ultimoOk: syncState.ultimoOk,
+    uptimeS: Math.floor(process.uptime()),
+    rssMB: Math.round(process.memoryUsage().rss / 1024 / 1024),
+    heapMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+  })
+);
 
 // Vídeos mais recentes do canal D'Griffe (YouTube RSS, sem API key).
 // Usado pela seção "D'Griffe no YouTube" do app — sempre os últimos vídeos.
@@ -1489,16 +1501,24 @@ const estoqueSync = new Map(); // produtoId -> { quantidade, disponivel, gerenci
 // o catálogo em memória e filtra/pagina localmente — permitindo total correto e
 // busca/filtro rápidos sem chamadas extras à LI.
 const produtosSync = new Map();
-let syncState = { rodando: false, ultimoOk: 0, progresso: "" };
+// progresso: string legível; offsets: onde cada recurso parou (0 = nenhum sync
+// desse recurso ainda; null = recurso 100% sincronizado).
+let syncState = { rodando: false, ultimoOk: 0, progresso: "", offsets: {}, paginasVazias: 0 };
 
 function extrairIdDaUri(uri) {
   const m = String(uri || "").match(/(\d+)\/?$/);
   return m ? Number(m[1]) : null;
 }
 
-async function paginarRecurso(recurso, processaItem, queryExtra = {}) {
-  let offset = 0;
+// Pausa entre páginas para não bater na proteção anti-rajada da LI (que devolve
+// páginas vazias/parciais silenciosamente quando o volume dispara, fazendo o
+// catálogo "terminar" prematuramente — era assim que o sync parava em ~2600).
+const PAUSA_ENTRE_PAGINAS_MS = Number(process.env.LI_PAUSA_MS || 120);
+
+async function paginarRecurso(recurso, processaItem, queryExtra = {}, offsetInicial = 0, estadoPendencia = null) {
+  let offset = Math.max(offsetInicial || 0, 0);
   const limit = 100;
+  let vaziasConsecutivas = 0;
   for (;;) {
     let resp = null;
     // Retry com backoff exponencial: a LI derruba chamadas em rajada (429/5xx).
@@ -1510,12 +1530,38 @@ async function paginarRecurso(recurso, processaItem, queryExtra = {}) {
     }
     if (!resp || resp.status !== 200) {
       console.error(`[sync-${recurso}] desistindo no offset ${offset} após retries`);
-      return;
+      if (estadoPendencia) estadoPendencia[recurso] = offset;
+      return offset;
     }
     const objetos = resp.payload.objects || [];
+    const totalLi = Number(resp.payload?.meta?.total_count) || 0;
     for (const item of objetos) processaItem(item);
-    if (objetos.length < limit) return;
+
+    // Fim REAL: página parcial e já cobrimos todo o total informado pela LI.
+    if (objetos.length < limit && (!totalLi || offset + objetos.length >= totalLi)) {
+      if (estadoPendencia) estadoPendencia[recurso] = null;
+      return offset + objetos.length;
+    }
+
+    // Página vazia/parcial prematura: a LI devolveu menos itens que o total que
+    // ela mesma informa (anti-rajada). Não tratar como fim: pausa mais longa e
+    // tenta a próxima página. Se isso se repetir demais, para e retoma depois.
+    if (objetos.length < limit) {
+      vaziasConsecutivas++;
+      syncState.paginasVazias++;
+      console.warn(`[sync-${recurso}] pagina prematura (${objetos.length}/100) offset ${offset} de ${totalLi} (${vaziasConsecutivas}x)`);
+      if (vaziasConsecutivas >= 10) {
+        console.error(`[sync-${recurso}] muitas paginas prematuras; retomando depois do offset ${offset}`);
+        if (estadoPendencia) estadoPendencia[recurso] = offset;
+        return offset;
+      }
+      await new Promise((r) => setTimeout(r, 2500));
+    } else {
+      vaziasConsecutivas = 0;
+    }
+
     offset += limit;
+    if (PAUSA_ENTRE_PAGINAS_MS > 0) await new Promise((r) => setTimeout(r, PAUSA_ENTRE_PAGINAS_MS));
   }
 }
 
@@ -1525,54 +1571,90 @@ async function sincronizarDadosLoja() {
   syncState.progresso = "iniciando";
   const t0 = Date.now();
   try {
+    // Pendências pendentes de um ciclo anterior (recurso mid-way): retoma de
+    // onde parou SEM limpar os mapas (fonte de verdade parcial já guardada).
+    const pendencias = syncState.offsets || {};
+    const retomar = Object.values(pendencias).some((o) => typeof o === "number");
+    if (!retomar) {
+      // Ciclo completo: zera tudo (fonte da verdade fresca da LI) e pagina do 0.
+      imagemSync.clear();
+      precoSync.clear();
+      estoqueSync.clear();
+      produtosSync.clear();
+      syncState.offsets = { produto_imagem: 0, produto_preco: 0, produto_estoque: 0, produto: 0 };
+      syncState.paginasVazias = 0;
+      console.log("[loja-integrada-proxy] sync completo do zero");
+    } else {
+      console.log("[loja-integrada-proxy] retomando sync parcial:", JSON.stringify(pendencias));
+    }
+
     // Imagens: caminho -> https://cdn.awsli.com.br/800x800/{caminho}
-    await paginarRecurso("produto_imagem", (img) => {
-      const produtoId = extrairIdDaUri(img.produto);
-      if (!produtoId) return;
-      const url = img.caminho ? `${CDN_PREFIX}/800x800/${img.caminho}` : null;
-      let registro = imagemSync.get(produtoId);
-      if (!registro) {
-        registro = { principal: null, todas: [] };
-        imagemSync.set(produtoId, registro);
-      }
-      if (url) registro.todas.push(url);
-      if (img.principal && !registro.principal) registro.principal = url;
-    });
+    await paginarRecurso(
+      "produto_imagem",
+      (img) => {
+        const produtoId = extrairIdDaUri(img.produto);
+        if (!produtoId) return;
+        const url = img.caminho ? `${CDN_PREFIX}/800x800/${img.caminho}` : null;
+        let registro = imagemSync.get(produtoId);
+        if (!registro) {
+          registro = { principal: null, todas: [] };
+          imagemSync.set(produtoId, registro);
+        }
+        if (url) registro.todas.push(url);
+        if (img.principal && !registro.principal) registro.principal = url;
+      },
+      {},
+      syncState.offsets.produto_imagem || 0,
+      syncState.offsets
+    );
 
     // Preços
-    await paginarRecurso("produto_preco", (preco) => {
-      const produtoId = extrairIdDaUri(preco.produto);
-      if (!produtoId) return;
-      precoSync.set(produtoId, {
-        cheio: preco.cheio ?? null,
-        promocional: preco.promocional ?? null,
-        sob_consulta: preco.sob_consulta ?? false,
-      });
-    });
+    await paginarRecurso(
+      "produto_preco",
+      (preco) => {
+        const produtoId = extrairIdDaUri(preco.produto);
+        if (!produtoId) return;
+        precoSync.set(produtoId, {
+          cheio: preco.cheio ?? null,
+          promocional: preco.promocional ?? null,
+          sob_consulta: preco.sob_consulta ?? false,
+        });
+      },
+      {},
+      syncState.offsets.produto_preco || 0,
+      syncState.offsets
+    );
 
     // Estoque
-    await paginarRecurso("produto_estoque", (est) => {
-      const produtoId = extrairIdDaUri(est.produto);
-      if (!produtoId) return;
-      estoqueSync.set(produtoId, {
-        quantidade: est.quantidade ?? 0,
-        disponivel: est.quantidade_disponivel ?? est.quantidade ?? 0,
-        gerenciado: est.gerenciado ?? false,
-        em_estoque: est.situacao_em_estoque ?? null,
-        sem_estoque: est.situacao_sem_estoque ?? null,
-      });
-    });
+    await paginarRecurso(
+      "produto_estoque",
+      (est) => {
+        const produtoId = extrairIdDaUri(est.produto);
+        if (!produtoId) return;
+        estoqueSync.set(produtoId, {
+          quantidade: est.quantidade ?? 0,
+          disponivel: est.quantidade_disponivel ?? est.quantidade ?? 0,
+          gerenciado: est.gerenciado ?? false,
+          em_estoque: est.situacao_em_estoque ?? null,
+          sem_estoque: est.situacao_sem_estoque ?? null,
+        });
+      },
+      {},
+      syncState.offsets.produto_estoque || 0,
+      syncState.offsets
+    );
 
     // Catálogo (listagem completa, sem variações) — usado para filtros locais
     // (marca/categoria/busca) e total real, já que a LI ignora filtros na listagem.
-    produtosSync.clear();
     await paginarRecurso(
       "produto",
       (p) => {
         if (!p?.id || p?.tipo === "atributo_opcao") return;
         produtosSync.set(p.id, p);
       },
-      { ativo: "true", removido: "false" }
+      { ativo: "true", removido: "false" },
+      syncState.offsets.produto || 0,
+      syncState.offsets
     );
 
     syncState.ultimoOk = Date.now();
