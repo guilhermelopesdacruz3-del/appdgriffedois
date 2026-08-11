@@ -39,7 +39,7 @@ import { processarCheckout } from "./pagamento.ts";
 import { processarWebhookMP } from "./webhook.ts";
 import { atualizarPedidoLISituacao } from "./liClient.ts";
 import { listarVideosRecentes } from "./youtube.ts";
-import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade, salvarNotificacao, listarNotificacoes, marcarNotificacaoLida, salvarPerfil, buscarPerfil, listarEnderecos, salvarEndereco, excluirEndereco, salvarPreferencias, buscarPreferencias, getNiveis, NIVEIS_PADRAO, calcularNivel, calcularCashback, BENEFICIO_BASE, TETO_BENEFICIOS_PERC, CASHBACK_BASE, gerarCodigoIndicacao, registrarIndicacao, creditarIndicacao, getIndicacoes, getClubeFamilia, adicionarFamiliar, creditarFamilia, getCreditosFamilia, MISSOES, VALIDADE_PONTOS_MESES_SEM_MOV, VALIDADE_PONTOS_MESES_EXPIRACAO, VALIDADE_CASHBACK_MESES_SEM_MOV, VALIDADE_CASHBACK_DIAS_ADICIONAIS, getSecret, invalidarCacheChave, salvarPushSubscription, removerPushSubscription, listarPushSubscriptions } from "./db.ts";
+import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade, salvarNotificacao, listarNotificacoes, marcarNotificacaoLida, limparNotificacoesAntigas, salvarPerfil, buscarPerfil, listarEnderecos, salvarEndereco, excluirEndereco, salvarPreferencias, buscarPreferencias, getNiveis, NIVEIS_PADRAO, calcularNivel, calcularCashback, BENEFICIO_BASE, TETO_BENEFICIOS_PERC, CASHBACK_BASE, gerarCodigoIndicacao, registrarIndicacao, creditarIndicacao, getIndicacoes, getClubeFamilia, adicionarFamiliar, creditarFamilia, getCreditosFamilia, MISSOES, VALIDADE_PONTOS_MESES_SEM_MOV, VALIDADE_PONTOS_MESES_EXPIRACAO, VALIDADE_CASHBACK_MESES_SEM_MOV, VALIDADE_CASHBACK_DIAS_ADICIONAIS, getSecret, invalidarCacheChave, salvarPushSubscription, removerPushSubscription, listarPushSubscriptions } from "./db.ts";
 import cupomApp from "./cupom.ts";
 import { receitasApp } from "./receitas";
 import { favoritosApp } from "./favoritos";
@@ -2649,6 +2649,21 @@ async function limparCuponsVencidos() {
 }
 void limparCuponsVencidos();
 setInterval(limparCuponsVencidos, 6 * 3600 * 1000);
+
+// ---------------------------------------------------------------------------
+// Limpeza automática de notificações antigas do cliente (evita acúmulo).
+// Roda no boot e a cada 6h; remove notificações com mais de 24h de idade.
+// ---------------------------------------------------------------------------
+async function limparNotificacoesAntigasJob() {
+  try {
+    const removidas = await limparNotificacoesAntigas(24 * 3600 * 1000);
+    if (removidas > 0) console.log(`[notificacoes] limpeza: ${removidas} notificação(ões) com mais de 24h removida(s)`);
+  } catch (e) {
+    console.warn("[notificacoes] limpeza:", (e as Error)?.message);
+  }
+}
+void limparNotificacoesAntigasJob();
+setInterval(limparNotificacoesAntigasJob, 6 * 3600 * 1000);
 
 app.listen(PORT, () => {
   console.log(`[loja-integrada-proxy] rodando em http://localhost:${PORT}`);

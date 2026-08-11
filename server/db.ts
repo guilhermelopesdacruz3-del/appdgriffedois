@@ -740,6 +740,34 @@ export async function marcarNotificacaoLida(email: string, id: string): Promise<
   if (n) { n.lida = true; salvarNotificacoesLocal(lista); }
 }
 
+// Limpa notificações antigas (> idadeMs) do Supabase e do JSON local.
+// Retorna quantas foram removidas. Usado no boot + intervalo (como cupons).
+export async function limparNotificacoesAntigas(idadeMs: number = 24 * 3600 * 1000): Promise<number> {
+  const corte = new Date(Date.now() - idadeMs);
+  let removidas = 0;
+  if (sb) {
+    try {
+      const { data, error } = await sb.from("notificacoes").select("id").lt("created_at", corte.toISOString());
+      if (!error && data && data.length > 0) {
+        const { error: delErr } = await sb.from("notificacoes").delete().in("id", data.map((n: any) => n.id));
+        if (!delErr) removidas += data.length;
+        else console.warn("[notificacoes] limpeza no Supabase falhou:", delErr.message);
+      }
+    } catch (e) {
+      console.warn("[notificacoes] limpeza no Supabase:", (e as Error)?.message);
+    }
+  }
+  const local = lerNotificacoesLocal();
+  if (local.length > 0) {
+    const restantes = local.filter((n) => new Date(n.created_at) >= corte);
+    if (restantes.length !== local.length) {
+      salvarNotificacoesLocal(restantes);
+      removidas += local.length - restantes.length;
+    }
+  }
+  return removidas;
+}
+
 export function supabaseClient(): SupabaseClient | null {
   return sb;
 }
