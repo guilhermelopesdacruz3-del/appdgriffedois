@@ -1,9 +1,13 @@
 const BASE = "/api";
 
 async function req<T>(path: string, opts: { method?: string; body?: unknown } = {}): Promise<T> {
+  const headers: Record<string, string> = {};
+  if (opts.body !== undefined) headers["Content-Type"] = "application/json";
+  const tokenAdmin = (await import("./admin")).getAdminToken?.();
+  if (tokenAdmin) headers["Authorization"] = `Bearer ${tokenAdmin}`;
   const res = await fetch(`${BASE}${path}`, {
     method: opts.method || "GET",
-    headers: opts.body !== undefined ? { "Content-Type": "application/json" } : undefined,
+    headers,
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
   });
   if (!res.ok) {
