@@ -34,17 +34,19 @@ alter table public.cupons enable row level security;
 alter table public.cupons_usuarios enable row level security;
 
 -- Admin GERencia cupons
+-- ATENÇÃO: as políticas precisam cobrir service_role (chave antiga) E
+-- supabase_secret (chaves novas sb_secret_*, que NÃO ignoram RLS).
 drop policy if exists "cupons_admin_all" on public.cupons;
 create policy "cupons_admin_all"
   on public.cupons for all
-  to service_role
+  to service_role, supabase_secret
   using (true)
   with check (true);
 
 drop policy if exists "cupons_usuarios_admin_all" on public.cupons_usuarios;
 create policy "cupons_usuarios_admin_all"
   on public.cupons_usuarios for all
-  to service_role
+  to service_role, supabase_secret
   using (true)
   with check (true);
 

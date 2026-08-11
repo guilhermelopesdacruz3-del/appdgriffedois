@@ -2622,6 +2622,34 @@ app.use("/api/cliente/favoritos", favoritosApp);
 // /api/cupons/meus), por isso montamos na raiz e não em /api/loja-integrada.
 app.use(cupomApp);
 
+// ---------------------------------------------------------------------------
+// Limpeza automática de cupons vencidos (evita acúmulo no banco).
+// Roda no boot e a cada 6h; remove cupons vencidos há mais de 24h.
+// A listagem de cupons já oculta vencidos — aqui eliminamos de vez.
+// ---------------------------------------------------------------------------
+async function limparCuponsVencidos() {
+  try {
+    const sb = supabaseClient();
+    if (!sb) return;
+    const limite = new Date(Date.now() - 24 * 3600 * 1000).toISOString();
+    const { data, error } = await sb.from("cupons").select("id").lt("data_fim", limite);
+    if (error) return console.warn("[cupons] limpeza falhou:", error.message);
+    if (!data || data.length === 0) return;
+    const { error: delErr } = await sb
+      .from("cupons")
+      .delete()
+      .in("id", data.map((c: any) => c.id));
+    console.log(
+      `[cupons] limpeza: ${data.length} cupom(ns) vencido(s) removido(s)` +
+        (delErr ? ` | erro parcial: ${delErr.message}` : "")
+    );
+  } catch (e) {
+    console.warn("[cupons] limpeza:", (e as Error)?.message);
+  }
+}
+void limparCuponsVencidos();
+setInterval(limparCuponsVencidos, 6 * 3600 * 1000);
+
 app.listen(PORT, () => {
   console.log(`[loja-integrada-proxy] rodando em http://localhost:${PORT}`);
   console.log(`[loja-integrada-proxy] endpoint: http://localhost:${PORT}/api/loja-integrada/produto/`);

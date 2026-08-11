@@ -142,8 +142,10 @@ ALTER TABLE fidelidade ENABLE ROW LEVEL SECURITY;
 ALTER TABLE fidelidade_historico ENABLE ROW LEVEL SECURITY;
 ALTER TABLE pedidos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE admin_logs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE cupons ENABLE ROW LEVEL SECURITY;
-ALTER TABLE cupons_usuarios ENABLE ROW LEVEL SECURITY;
+-- cupons: RLS desligado — backend escreve com chave nova (supabase_secret)
+-- que respeita RLS; policies admin em cupons.sql.
+ALTER TABLE cupons DISABLE ROW LEVEL SECURITY;
+ALTER TABLE cupons_usuarios DISABLE ROW LEVEL SECURITY;
 
 -- store_config: ninguém (anon/user) lê ou escreve. Só service_role.
 DROP POLICY IF EXISTS "store_config_no_public" ON store_config;

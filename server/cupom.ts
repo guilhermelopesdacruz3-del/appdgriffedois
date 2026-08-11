@@ -108,12 +108,13 @@ function app() {
     }
   });
 
-  // Admin: listar cupons
+  // Admin: listar cupons (apenas os ainda válidos — vencidos somem sozinhos)
   r.get("/api/admin/cupons", requireAdmin, async (_req: any, res: any) => {
     try {
       const { data, error } = await sb
         .from("cupons")
         .select("*, cupons_usuarios(count)")
+        .gt("data_fim", new Date().toISOString())
         .order("created_at", { ascending: false });
       if (error) return res.status(500).json({ erro: error.message });
       const lista = (data || []).map((c: any) => ({
@@ -216,8 +217,9 @@ function app() {
 
       const { data, error } = await sb
         .from("cupons_usuarios")
-        .select("*, cupons(*)")
+        .select("*, cupons!inner(*)")
         .eq("user_id", user.id)
+        .gt("cupons.data_fim", new Date().toISOString())
         .order("created_at", { ascending: false });
       if (error) return res.status(500).json({ erro: error.message });
       return res.json((data || []).map((r: any) => ({ ...r.cupons, atribuicao_id: r.id, usado: r.usado, usado_em: r.usado_em })));

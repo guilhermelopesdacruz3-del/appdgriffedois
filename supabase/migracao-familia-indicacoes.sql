@@ -11,8 +11,10 @@ ALTER TABLE public.fidelidade_historico ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pedidos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.admin_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notificacoes ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.cupons ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.cupons_usuarios ENABLE ROW LEVEL SECURITY;
+-- cupons/cupons_usuarios: NÃO reativar RLS (quebra envio de cupons com a
+-- chave sb_secret_*. Policies admin para as 2 roles ficam em cupons.sql).
+ALTER TABLE public.cupons DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cupons_usuarios DISABLE ROW LEVEL SECURITY;
 
 -- Permissão broad p/ admin/service_role mexer em tudo (usado pelo backend com service_role).
 -- Clientes autenticados só seguem as policies específicas abaixo.

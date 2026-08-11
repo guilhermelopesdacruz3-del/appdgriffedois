@@ -30,8 +30,11 @@ ALTER TABLE public.fidelidade ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fidelidade_historico ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.pedidos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.admin_logs ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.cupons ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.cupons_usuarios ENABLE ROW LEVEL SECURITY;
+-- cupons/cupons_usuarios: RLS fica DESLIGADO por segurança operacional
+-- (backend escreve com chave nova supabase_secret, que respeita RLS;
+-- reativar aqui quebra o envio de cupons). Policies admin em cupons.sql.
+ALTER TABLE public.cupons DISABLE ROW LEVEL SECURITY;
+ALTER TABLE public.cupons_usuarios DISABLE ROW LEVEL SECURITY;
 ALTER TABLE public.notificacoes ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.enderecos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.receitas ENABLE ROW LEVEL SECURITY;
