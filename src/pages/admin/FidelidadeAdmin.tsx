@@ -8,11 +8,11 @@ import {
 } from "../../services/fidelidadeAdmin";
 
 const inputCls =
-  "h-10 px-3 rounded-xl border border-white/15 bg-black/40 text-white text-xs placeholder:text-white/30 focus:outline-none focus:border-gold focus:ring-2 focus:ring-gold/20 transition-all";
+  "h-10 px-3 rounded-xl border border-slate-300 bg-white text-slate-900 text-xs placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all";
 const cardCls =
-  "bg-gradient-to-b from-white/[0.07] to-white/[0.02] border border-white/10 rounded-2xl";
+  "bg-white border border-slate-200 rounded-2xl shadow-sm";
 const btnPrimary =
-  "bg-gradient-to-r from-gold to-gold-dark text-black font-bold rounded-xl active:scale-[0.98] transition-all hover:brightness-110 disabled:opacity-50";
+  "bg-gradient-to-r from-violet-600 to-purple-500 text-white font-bold rounded-xl active:scale-[0.98] transition-all hover:brightness-110 disabled:opacity-50";
 
 export default function FidelidadeAdmin() {
   const [clientes, setClientes] = useState<{ email: string; nome: string }[]>([]);
@@ -76,7 +76,7 @@ export default function FidelidadeAdmin() {
     <div className="space-y-4">
       {/* Ajuste de pontos */}
       <form onSubmit={ajustar} className={`${cardCls} p-4 space-y-3`}>
-        <p className="text-xs font-bold text-white flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-gold inline-block" />Ajustar pontos de um cliente</p>
+        <p className="text-xs font-bold text-slate-800 flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-violet-600 inline-block" />Ajustar pontos de um cliente</p>
         <input
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -119,10 +119,10 @@ export default function FidelidadeAdmin() {
 
       {/* Regras */}
       <form onSubmit={salvarRegras} className={`${cardCls} p-4 space-y-3`}>
-        <p className="text-xs font-bold text-white flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-gold inline-block" />Regras do programa</p>
+        <p className="text-xs font-bold text-slate-800 flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-violet-600 inline-block" />Regras do programa</p>
         <div className="grid grid-cols-2 gap-2">
           <div>
-            <label className="block text-[9px] text-gold/60 mb-0.5 px-1 uppercase tracking-wider font-bold">Pontos por R$</label>
+            <label className="block text-[9px] text-violet-600/60 mb-0.5 px-1 uppercase tracking-wider font-bold">Pontos por R$</label>
             <input
               value={regras.pontosPorReal}
               onChange={(e) => setRegras((r) => ({ ...r, pontosPorReal: Number(e.target.value) }))}
@@ -132,7 +132,7 @@ export default function FidelidadeAdmin() {
             />
           </div>
           <div>
-            <label className="block text-[9px] text-gold/60 mb-0.5 px-1 uppercase tracking-wider font-bold">Pontos = R$ (desconto)</label>
+            <label className="block text-[9px] text-violet-600/60 mb-0.5 px-1 uppercase tracking-wider font-bold">Pontos = R$ (desconto)</label>
             <input
               value={regras.pontosPorDesconto}
               onChange={(e) => setRegras((r) => ({ ...r, pontosPorDesconto: Number(e.target.value) }))}
@@ -141,7 +141,7 @@ export default function FidelidadeAdmin() {
             />
           </div>
         </div>
-        <p className="text-[10px] text-white/50">
+        <p className="text-[10px] text-slate-400">
           Ex.: 1 ponto por R$1 e 100 pontos = R$10 de desconto.
         </p>
         <button type="submit" className={`${btnPrimary} w-full h-10 text-[11px]`}>
@@ -151,29 +151,29 @@ export default function FidelidadeAdmin() {
 
       {/* Clientes */}
       <div className={`${cardCls} p-4 space-y-2`}>
-        <p className="text-xs font-bold text-white flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-gold inline-block" />Clientes ({clientes.length})</p>
-        <p className="text-[10px] text-white/50">Clique para preencher o e-mail no ajuste acima.</p>
+        <p className="text-xs font-bold text-slate-800 flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-violet-600 inline-block" />Clientes ({clientes.length})</p>
+        <p className="text-[10px] text-slate-400">Clique para preencher o e-mail no ajuste acima.</p>
         <div className="max-h-64 overflow-y-auto space-y-1">
           {clientes.map((cl) => (
             <button
               key={cl.email}
               onClick={() => setEmail(cl.email)}
-              className="w-full flex items-center gap-2 py-1.5 px-2 rounded-xl hover:bg-gold/[0.06] text-left transition-colors"
+              className="w-full flex items-center gap-2 py-1.5 px-2 rounded-xl hover:bg-violet-50 text-left transition-colors"
             >
-              <span className="w-6 h-6 rounded-full bg-gradient-to-br from-gold/30 to-gold/10 border border-gold/20 flex items-center justify-center text-[10px] font-bold text-gold flex-shrink-0">
+              <span className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-600/30 to-violet-600/10 border border-violet-200 flex items-center justify-center text-[10px] font-bold text-violet-600 flex-shrink-0">
                 {(cl.nome || "?").charAt(0).toUpperCase()}
               </span>
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-semibold text-white truncate">{cl.nome}</p>
-                <p className="text-[9px] text-white/40 truncate">{cl.email}</p>
+                <p className="text-[11px] font-semibold text-slate-800 truncate">{cl.nome}</p>
+                <p className="text-[9px] text-slate-400 truncate">{cl.email}</p>
               </div>
             </button>
           ))}
-          {clientes.length === 0 && <p className="text-[10px] text-white/50">Nenhum cliente encontrado.</p>}
+          {clientes.length === 0 && <p className="text-[10px] text-slate-400">Nenhum cliente encontrado.</p>}
         </div>
       </div>
 
-      {loading && <p className="text-xs text-white/50 text-center">Carregando…</p>}
+      {loading && <p className="text-xs text-slate-400 text-center">Carregando…</p>}
     </div>
   );
 }
