@@ -66,22 +66,28 @@ function salvarLocal(obj: Record<string, unknown>) {
 export async function listConfig(): Promise<
   { key: string; is_secret: boolean; updated_at: string | null; set: boolean }[]
 > {
+  let lista: { key: string; is_secret: boolean; updated_at: string | null; set: boolean }[];
   if (sb) {
     const { data, error } = await sb.from("store_config").select("key,value,updated_at").in("key", CONFIG_KEYS);
     if (error) throw new Error(`Supabase: ${error.message}`);
     const mapa = new Map((data || []).map((r) => [r.key, r]));
-    return CONFIG_KEYS.map((key) => {
+    lista = CONFIG_KEYS.map((key) => {
       const r = mapa.get(key);
       return { key, is_secret: true, updated_at: r?.updated_at ?? null, set: Boolean(r?.value) };
     });
+  } else {
+    const store = lerLocal();
+    lista = CONFIG_KEYS.map((key) => ({
+      key,
+      is_secret: true,
+      updated_at: store[key]?.updated_at ?? null,
+      set: Boolean(store[key]?.value),
+    }));
   }
-  const store = lerLocal();
-  return CONFIG_KEYS.map((key) => ({
-    key,
-    is_secret: true,
-    updated_at: store[key]?.updated_at ?? null,
-    set: Boolean(store[key]?.value),
-  }));
+  // Integração vinculada a variável de ambiente (não fica na store_config),
+  // reportada para o painel saber se o banco está conectado.
+  lista.push({ key: "SUPABASE_SERVICE_ROLE", is_secret: true, updated_at: null, set: usingSupabase });
+  return lista;
 }
 
 // Salva uma ou mais chaves. Retorna quantas foram alteradas.
