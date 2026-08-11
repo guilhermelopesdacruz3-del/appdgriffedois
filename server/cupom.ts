@@ -77,28 +77,49 @@ function app() {
       if (!codigo || !tipo || valor == null || !data_inicio || !data_fim) {
         return res.status(400).json({ erro: "Campos obrigatórios: codigo, tipo, valor, data_inicio, data_fim." });
       }
+      const valorNum = Number(valor);
+      if (!Number.isFinite(valorNum)) {
+        return res.status(400).json({ erro: "Valor inválido — use número sem vírgula (ex: 10 ou 10.5)." });
+      }
+      const inicio = new Date(data_inicio);
+      const fim = new Date(data_fim);
+      if (isNaN(inicio.getTime()) || isNaN(fim.getTime())) {
+        return res.status(400).json({ erro: "Data inválida — confira o início e o término." });
+      }
+      if (fim <= inicio) {
+        return res.status(400).json({ erro: "O término deve ser depois do início." });
+      }
+      const minimoNum = valor_minimo != null ? Number(valor_minimo) : null;
+      const maxUsosNum = max_usos != null ? Number(max_usos) : null;
       const { data: cupom, error: e1 } = await sb
         .from("cupons")
         .insert({
           codigo: String(codigo).trim().toUpperCase(),
           tipo,
-          valor: Number(valor),
-          valor_minimo: valor_minimo != null ? Number(valor_minimo) : null,
-          max_usos: max_usos != null ? Number(max_usos) : null,
-          data_inicio: new Date(data_inicio).toISOString(),
-          data_fim: new Date(data_fim).toISOString(),
+          valor: valorNum,
+          valor_minimo: minimoNum,
+          max_usos: maxUsosNum,
+          data_inicio: inicio.toISOString(),
+          data_fim: fim.toISOString(),
           created_by: creator,
         })
         .select("*")
         .single();
-      if (e1) return res.status(500).json({ erro: e1.message });
+      if (e1) {
+        console.error("[cupons] criar (insert):", e1.message);
+        const jaExiste = /duplicate key|already exists/i.test(e1.message);
+        return res.status(500).json({ erro: jaExiste ? "Já existe um cupom com esse código." : `Falha ao criar o cupom: ${e1.message}` });
+      }
 
       // Atribui a destinatários (se houver)
       const usuarios: string[] = Array.isArray(destinatarios) ? destinatarios : [];
       if (usuarios.length > 0) {
         const rows = usuarios.map((uid) => ({ cupom_id: cupom.id, user_id: uid }));
         const { error: e2 } = await sb.from("cupons_usuarios").insert(rows);
-        if (e2) return res.status(500).json({ erro: e2.message });
+        if (e2) {
+          console.error("[cupons] criar (atribuir):", e2.message);
+          return res.status(400).json({ erro: "Cupom criado, mas um ou mais destinatários não existem." });
+        }
       }
 
       return res.json({ cupom, atribuidos: usuarios.length });

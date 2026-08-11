@@ -51,12 +51,20 @@ export default function CuponsAdmin() {
     e.preventDefault();
     setErro(null);
     try {
+      const num = (v: string) => Number(String(v).trim().replace(",", "."));
+      const valorNum = num(valor);
+      const minimoNum = minimo ? num(minimo) : undefined;
+      const maxUsosNum = maxUsos ? num(maxUsos) : undefined;
+      if (!Number.isFinite(valorNum)) {
+        setErro("Valor inválido — use ponto ou vírgula (ex: 10,50).");
+        return;
+      }
       await criarCupom({
         codigo: codigo.trim().toUpperCase(),
         tipo,
-        valor: Number(valor),
-        valor_minimo: minimo ? Number(minimo) : undefined,
-        max_usos: maxUsos ? Number(maxUsos) : undefined,
+        valor: valorNum,
+        valor_minimo: minimoNum,
+        max_usos: maxUsosNum,
         data_inicio: inicio || new Date().toISOString(),
         data_fim: fim,
         destinatarios: destinatarios ? destinatarios.split(",").map((s) => s.trim()).filter(Boolean) : undefined,
@@ -125,7 +133,7 @@ export default function CuponsAdmin() {
         <button type="submit" className={`${btnPrimary} w-full h-10 text-[11px]`}>Criar cupom</button>
       </form>
 
-      {erro && <p className="text-[11px] text-red-400 px-1">{erro}</p>}
+      {erro && <p className="text-[11px] text-red-600 px-1">{erro}</p>}
 
       <div className="space-y-2">
         <p className="text-xs font-bold text-slate-800 px-1 flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-violet-600 inline-block" />Cupons ({cupons.length})</p>
