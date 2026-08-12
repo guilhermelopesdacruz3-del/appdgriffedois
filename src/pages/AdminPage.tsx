@@ -675,10 +675,12 @@ return (
           {aba === "relatorios" && (() => {
             const serie = relatorio?.serieDiaria || [];
             const somaTot = (arr: any[]) => arr.reduce((s, d) => s + (d.totalAprovado || 0), 0);
+            const somaTotBruto = (arr: any[]) => arr.reduce((s, d) => s + (d.total || 0), 0);
             const somaCnt = (arr: any[]) => arr.reduce((s, d) => s + (d.count || 0), 0);
             const mesAtual = serie.slice(-30);
             const mesAnterior = serie.slice(-60, -30);
             const deltaF = somaTot(mesAnterior) > 0 ? Math.round(((somaTot(mesAtual) - somaTot(mesAnterior)) / somaTot(mesAnterior)) * 100) : null;
+            const deltaFBruto = somaTotBruto(mesAnterior) > 0 ? Math.round(((somaTotBruto(mesAtual) - somaTotBruto(mesAnterior)) / somaTotBruto(mesAnterior)) * 100) : null;
             const deltaP = somaCnt(mesAnterior) > 0 ? Math.round(((somaCnt(mesAtual) - somaCnt(mesAnterior)) / somaCnt(mesAnterior)) * 100) : null;
             const statusList = Object.entries(relatorio?.porStatus || {}).sort((a, b) => b[1] - a[1]);
             const maxStatus = Math.max(...statusList.map(([, v]) => v), 1);
@@ -688,7 +690,7 @@ return (
             const faturamentoConfirmado = relatorio?.faturamentoAprovado || 0;
             return (
               <div className="space-y-3">
-                <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+                <div className="grid grid-cols-2 xl:grid-cols-5 gap-3">
                   <KpiCard
                     label="Faturamento confirmado"
                     value={formatPrice(faturamentoConfirmado)}
@@ -697,6 +699,15 @@ return (
                     trend={deltaF == null ? undefined : (deltaF >= 0 ? "up" : "down")}
                     delta={deltaF == null ? undefined : `${deltaF >= 0 ? "+" : ""}${deltaF}% (mês)`}
                     spark={serie15.map((d: any) => d.totalAprovado || 0)}
+                  />
+                  <KpiCard
+                    label="Faturamento bruto"
+                    value={formatPrice(relatorio?.faturamentoTotal || 0)}
+                    sub="inclui cancelados/estornados"
+                    accent="#0EA5E9"
+                    trend={deltaFBruto == null ? undefined : (deltaFBruto >= 0 ? "up" : "down")}
+                    delta={deltaFBruto == null ? undefined : `${deltaFBruto >= 0 ? "+" : ""}${deltaFBruto}% (mês)`}
+                    spark={serie15.map((d: any) => d.total || 0)}
                   />
                   <KpiCard
                     label="Ticket médio"
