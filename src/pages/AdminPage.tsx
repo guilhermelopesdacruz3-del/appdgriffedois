@@ -674,7 +674,7 @@ return (
 
           {aba === "relatorios" && (() => {
             const serie = relatorio?.serieDiaria || [];
-            const somaTot = (arr: any[]) => arr.reduce((s, d) => s + (d.total || 0), 0);
+            const somaTot = (arr: any[]) => arr.reduce((s, d) => s + (d.totalAprovado || 0), 0);
             const somaCnt = (arr: any[]) => arr.reduce((s, d) => s + (d.count || 0), 0);
             const mesAtual = serie.slice(-30);
             const mesAnterior = serie.slice(-60, -30);
@@ -685,17 +685,18 @@ return (
             const serie15 = serie.slice(-15);
             const fmtDia = (dia: string) => (dia || "").slice(5).replace("-", "/");
             const totalClientes = clientes.length;
+            const faturamentoConfirmado = relatorio?.faturamentoAprovado || 0;
             return (
               <div className="space-y-3">
                 <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
                   <KpiCard
-                    label="Faturamento total"
-                    value={formatPrice(relatorio?.faturamentoTotal || 0)}
-                    sub="acumulado"
+                    label="Faturamento confirmado"
+                    value={formatPrice(faturamentoConfirmado)}
+                    sub="pagamentos aprovados"
                     accent="#7C3AED"
                     trend={deltaF == null ? undefined : (deltaF >= 0 ? "up" : "down")}
                     delta={deltaF == null ? undefined : `${deltaF >= 0 ? "+" : ""}${deltaF}% (mês)`}
-                    spark={serie15.map((d: any) => d.total)}
+                    spark={serie15.map((d: any) => d.totalAprovado || 0)}
                   />
                   <KpiCard
                     label="Ticket médio"
@@ -723,7 +724,7 @@ return (
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
                   <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
                     <p className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-violet-600 inline-block" />Faturamento por dia</p>
-                    <BarChart data={serie15.map((d: any) => ({ label: fmtDia(d.dia), value: d.total }))} />
+                    <BarChart data={serie15.map((d: any) => ({ label: fmtDia(d.dia), value: d.totalAprovado || 0 }))} />
                   </div>
                   <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
                     <p className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-violet-600 inline-block" />Origem (app vs site)</p>

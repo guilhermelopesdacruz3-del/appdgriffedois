@@ -662,13 +662,15 @@ function agregarPedidos(objects) {
     const valor = Number(p.valor_total || p.valor_subtotal || 0) || 0;
     total += valor;
     const cod = p.situacao?.codigo || "";
-    if (aprovados.has(cod)) totalAprovado += valor;
+    const aprovado = aprovados.has(cod);
+    if (aprovado) totalAprovado += valor;
 
     const dia = (p.data_criacao || "").slice(0, 10);
     if (dia) {
-      porDia[dia] = porDia[dia] || { count: 0, total: 0 };
+      porDia[dia] = porDia[dia] || { count: 0, total: 0, totalAprovado: 0 };
       porDia[dia].count += 1;
       porDia[dia].total += valor;
+      if (aprovado) porDia[dia].totalAprovado += valor;
     }
   }
 
@@ -681,7 +683,10 @@ function agregarPedidos(objects) {
     faturamentoAprovado: Number(totalAprovado.toFixed(2)),
     ticketMedio: Number(TicketMedio.toFixed(2)),
     porStatus,
-    serieDiaria: dias.map((d) => ({ dia: d, count: porDia[d].count, total: Number(porDia[d].total.toFixed(2)) })),
+    serieDiaria: dias.map((d) => {
+      const item = porDia[d];
+      return { dia: d, count: item.count, total: Number(item.total.toFixed(2)), totalAprovado: Number(item.totalAprovado.toFixed(2)) };
+    }),
   };
 }
 
@@ -755,11 +760,18 @@ app.get("/api/admin/relatorio", requireAdmin, async (req, res) => {
     const objects = await buscarTodosPedidos();
     const agreg = agregarPedidos(objects);
 
-    // Canal (app vs site): a LI não expõe distinção direta de forma padronizada.
-    // Usamos o campo `plataforma_pedido` / `origem` se existir; senão marcamos "site".
+    // Canal (app vs site): pedidos criados pelo nosso checkout são enviados à
+    // API de Vendas da LI com integration_data.marketplace = "app"|"site".
+    // Pedidos antigos/criados direto na loja não trazem isso → "site".
     let porCanal = { site: 0, app: 0 };
     for (const p of objects) {
-      const canal = (p.plataforma_pedido || p.origem || p.canal || "").toString().toLowerCase();
+      const integ = p.integration_data && typeof p.integration_data === "object" ? p.integration_data : {};
+      const marketplace = String(integ.marketplace || "").toLowerCase();
+      const integrator = String(integ.integrator || "").toLowerCase();
+      let canal = "";
+      if (marketplace === "app" || marketplace === "site") canal = marketplace;
+      else if (integrator === "dgriffe-app") canal = "app";
+      else canal = String(p.plataforma_pedido || p.origem || p.canal || "").toLowerCase();
       if (canal.includes("app") || canal.includes("mobile") || canal.includes("aplicativo")) porCanal.app += 1;
       else porCanal.site += 1;
     }
@@ -1374,6 +1386,7 @@ async function criarPedidoLI(email, items, total) {
 app.post("/api/checkout", async (req, res) => {
   const body = req.body || {};
   const { items, meio, email, card_token, pontosResgate, cupom, cliente } = body;
+  const origem = body.origem === "app" || body.origem === "site" ? body.origem : "site";
   const dadosCliente = (cliente && typeof cliente === "object" ? cliente : {}) as {
     nome?: string;
     telefone?: string;
@@ -1457,6 +1470,7 @@ app.post("/api/checkout", async (req, res) => {
       cupom: cupom || undefined,
       observacoes: dadosCliente.observacoes || undefined,
       formaEntrega: dadosCliente.forma_entrega || "retirada",
+      origem,
     });
     return res.json(resultado);
   } catch (e: any) {

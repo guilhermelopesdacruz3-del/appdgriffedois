@@ -62,12 +62,14 @@ export default function CheckoutOtica({ produto, isOpen, onClose }: Props) {
 
     setPasso("processando");
     try {
+      const origem = window.matchMedia("(display-mode: standalone)").matches ? "app" : "site";
       const res = await fetch("/api/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email,
           meio: "pix",
+          origem,
           items: [{ price: totalFinal, qty: 1, sku: String(produto.code), li_uri: produto.li_uri, nome: produto.name }],
         }),
       });

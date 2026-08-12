@@ -120,7 +120,13 @@ export async function iniciarCheckout(payload: {
   email?: string;
   pontosResgate?: number;
   cupom?: { codigo: string; tipo: string; valor: number; id: string };
+  /** "app" (TWA/standalone) ou "site" (navegador). */
+  origem?: "app" | "site";
 }) {
   // Rota pública do cliente (server/index.ts:742, sem requireAdmin).
-  return clientCall<CheckoutResult>("checkout", { method: "POST", body: payload });
+  const payloadFinal = { ...payload };
+  if (!payloadFinal.origem) {
+    payloadFinal.origem = window.matchMedia("(display-mode: standalone)").matches ? "app" : "site";
+  }
+  return clientCall<CheckoutResult>("checkout", { method: "POST", body: payloadFinal });
 }

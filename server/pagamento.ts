@@ -159,8 +159,9 @@ export async function processarCheckout(params: {
   cupom?: { codigo: string; tipo: string; valor: number; id: string };
   observacoes?: string;
   formaEntrega?: "retirada" | "entrega";
+  origem?: "app" | "site";
 }): Promise<CheckoutResult> {
-  const { items, meio, email, card_token, pontosResgate, cupom, observacoes, formaEntrega = "retirada" } = params;
+  const { items, meio, email, card_token, pontosResgate, cupom, observacoes, formaEntrega = "retirada", origem = "site" } = params;
 
   const autorizado = await obterValorAutorizado(items);
   if (!autorizado.ok) throw new Error(autorizado.erro || "Valor inválido.");
@@ -229,6 +230,7 @@ export async function processarCheckout(params: {
         meio,
         observacoes,
         formaEntrega,
+        origem,
       });
       if (criado) {
         liPedido = criado.id;
@@ -293,6 +295,7 @@ export async function processarCheckout(params: {
       meio,
       observacoes,
       formaEntrega,
+      origem,
     });
     if (criado) {
       resultado.li_pedido = criado.id;

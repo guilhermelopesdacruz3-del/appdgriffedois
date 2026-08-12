@@ -211,7 +211,7 @@ export interface RelatorioAdmin {
   faturamentoAprovado: number;
   ticketMedio: number;
   porStatus: Record<string, number>;
-  serieDiaria: { dia: string; count: number; total: number }[];
+  serieDiaria: { dia: string; count: number; total: number; totalAprovado?: number }[];
   porCanal: { site: number; app: number };
 }
 

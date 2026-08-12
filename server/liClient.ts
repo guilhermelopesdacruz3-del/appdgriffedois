@@ -210,6 +210,7 @@ export async function criarPedidoLI(opts: {
   meio: "pix" | "cartao";
   observacoes?: string;
   formaEntrega?: "retirada" | "entrega";
+  origem?: "app" | "site";
 }): Promise<PedidoLICriado | null> {
   const itens = opts.itens
     .map((i) => {
@@ -285,7 +286,7 @@ export async function criarPedidoLI(opts: {
     },
     integration_data: {
       integrator: "dgriffe-app",
-      marketplace: "app",
+      marketplace: opts.origem === "site" ? "site" : "app",
       external_id: timestamp,
       unique_id: null,
     },
