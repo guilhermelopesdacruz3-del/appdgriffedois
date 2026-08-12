@@ -54,44 +54,58 @@ interface Slice {
   color: string;
 }
 
-export function PieChart({ data, size = 132 }: { data: Slice[]; size?: number }) {
+export function PieChart({
+  data,
+  size = 148,
+  centerLabel = "total",
+}: {
+  data: Slice[];
+  size?: number;
+  centerLabel?: string;
+}) {
   const total = data.reduce((s, d) => s + d.value, 0);
   if (total === 0) return <p className="text-[11px] text-slate-400">Sem dados.</p>;
-  const r = size / 2;
+  const r = size / 2 - 8;
   const c = 2 * Math.PI * r;
   let offset = 0;
   return (
-    <div className="flex items-center gap-3">
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="flex-shrink-0">
-        <circle cx={r} cy={r} r={r} fill="#F1F5F9" />
-        {data.map((d, i) => {
-          const frac = d.value / total;
-          const dash = frac * c;
-          const el = (
-            <circle
-              key={i}
-              cx={r}
-              cy={r}
-              r={r}
-              fill="transparent"
-              stroke={d.color}
-              strokeWidth={r}
-              strokeDasharray={`${dash} ${c - dash}`}
-              strokeDashoffset={-offset}
-              transform={`rotate(-90 ${r} ${r})`}
-            />
-          );
-          offset += dash;
-          return el;
-        })}
-      </svg>
-      <div className="flex-1 space-y-1">
+    <div className="flex items-center justify-center gap-5 flex-wrap">
+      <div className="relative flex-shrink-0">
+        <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+          <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="#F1F5F9" strokeWidth={15} />
+          {data.map((d, i) => {
+            const frac = d.value / total;
+            const dash = frac * c;
+            const el = (
+              <circle
+                key={i}
+                cx={size / 2}
+                cy={size / 2}
+                r={r}
+                fill="none"
+                stroke={d.color}
+                strokeWidth={15}
+                strokeDasharray={`${dash} ${c - dash}`}
+                strokeDashoffset={-offset}
+                transform={`rotate(-90 ${size / 2} ${size / 2})`}
+              />
+            );
+            offset += dash;
+            return el;
+          })}
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+          <p className="text-lg font-bold text-slate-800">{total}</p>
+          <p className="text-[8px] uppercase tracking-wide text-slate-400">{centerLabel}</p>
+        </div>
+      </div>
+      <div className="space-y-1.5">
         {data.map((d, i) => {
           const pct = ((d.value / total) * 100).toFixed(d.value / total < 0.1 ? 1 : 0);
           return (
             <div key={i} className="flex items-center gap-2 text-[11px]">
               <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }} />
-              <span className="text-slate-600 flex-1 truncate">{d.label}</span>
+              <span className="text-slate-600 flex-1">{d.label}</span>
               <span className="font-semibold text-slate-800">{d.value}</span>
               <span className="text-slate-400 w-7 text-right">{pct}%</span>
             </div>

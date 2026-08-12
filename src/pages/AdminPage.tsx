@@ -18,7 +18,7 @@ import {
   type RelatorioAdmin,
   type SituacaoPedido,
 } from "../services/admin";
-import { PieChart } from "../components/admin/AdminCharts";
+import { BarChart, KpiCard, PieChart } from "../components/admin/AdminCharts";
 import { StatusBadge, ehHoje } from "../components/admin/statusBadge";
 import { ApiConfigPanel } from "../components/admin/ApiConfigPanel";
 import CuponsAdmin from "./admin/CuponsAdmin";
@@ -672,42 +672,121 @@ return (
           {aba === "fidelidade" && <FidelidadeAdmin />}
           {aba === "notificacoes" && <NotificacoesAdmin />}
 
-          {aba === "relatorios" && (
-            <div className="space-y-3">
-              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
-                <p className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-violet-600 inline-block" />Origem (app vs site)</p>
-                <div className="h-40">
-                  <PieChart data={[{ label: "Site", value: relatorio?.porCanal.site || 0, color: "#6366F1" }, { label: "App", value: relatorio?.porCanal.app || 0, color: "#D4A853" }]} size={140} />
+          {aba === "relatorios" && (() => {
+            const serie = relatorio?.serieDiaria || [];
+            const somaTot = (arr: any[]) => arr.reduce((s, d) => s + (d.total || 0), 0);
+            const somaCnt = (arr: any[]) => arr.reduce((s, d) => s + (d.count || 0), 0);
+            const mesAtual = serie.slice(-30);
+            const mesAnterior = serie.slice(-60, -30);
+            const deltaF = somaTot(mesAnterior) > 0 ? Math.round(((somaTot(mesAtual) - somaTot(mesAnterior)) / somaTot(mesAnterior)) * 100) : null;
+            const deltaP = somaCnt(mesAnterior) > 0 ? Math.round(((somaCnt(mesAtual) - somaCnt(mesAnterior)) / somaCnt(mesAnterior)) * 100) : null;
+            const statusList = Object.entries(relatorio?.porStatus || {}).sort((a, b) => b[1] - a[1]);
+            const maxStatus = Math.max(...statusList.map(([, v]) => v), 1);
+            const serie15 = serie.slice(-15);
+            const fmtDia = (dia: string) => (dia || "").slice(5).replace("-", "/");
+            const totalClientes = clientes.length;
+            return (
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+                  <KpiCard
+                    label="Faturamento total"
+                    value={formatPrice(relatorio?.faturamentoTotal || 0)}
+                    sub="acumulado"
+                    accent="#7C3AED"
+                    trend={deltaF == null ? undefined : (deltaF >= 0 ? "up" : "down")}
+                    delta={deltaF == null ? undefined : `${deltaF >= 0 ? "+" : ""}${deltaF}% (mês)`}
+                    spark={serie15.map((d: any) => d.total)}
+                  />
+                  <KpiCard
+                    label="Ticket médio"
+                    value={relatorio ? formatPrice(relatorio.ticketMedio) : "—"}
+                    sub="valor por pedido"
+                    accent="#0EA5E9"
+                  />
+                  <KpiCard
+                    label="Pedidos"
+                    value={String(relatorio?.totalPedidos || 0)}
+                    sub="todos os tempos"
+                    accent="#F59E0B"
+                    trend={deltaP == null ? undefined : (deltaP >= 0 ? "up" : "down")}
+                    delta={deltaP == null ? undefined : `${deltaP >= 0 ? "+" : ""}${deltaP}% (mês)`}
+                    spark={serie15.map((d: any) => d.count)}
+                  />
+                  <KpiCard
+                    label="Clientes únicos"
+                    value={String(totalClientes)}
+                    sub="base de clientes"
+                    accent="#059669"
+                  />
                 </div>
-              </div>
-              <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
-                <p className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-violet-600 inline-block" />Clientes</p>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="text-[9px] uppercase tracking-wide text-violet-600/70 border-b border-slate-200 bg-slate-50">
-                        <th className="p-3 font-semibold">Cliente</th>
-                        <th className="p-3 font-semibold text-right">Pedidos</th>
-                        <th className="p-3 font-semibold text-right">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {clientes.map((c) => (
-                        <tr key={c.email} className="border-b border-slate-100 last:border-0 hover:bg-violet-50 transition-colors">
-                          <td className="p-3">
-                            <p className="text-xs font-semibold text-slate-800">{c.nome}</p>
-                            <p className="text-[9px] text-slate-400">{c.email}</p>
-                          </td>
-                          <td className="p-3 text-right text-[11px] text-slate-800/70">{c.pedidos ?? 0}</td>
-                          <td className="p-3 text-right text-xs font-bold text-slate-800 whitespace-nowrap">{formatPrice(Number(c.total || 0))}</td>
-                        </tr>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                  <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+                    <p className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-violet-600 inline-block" />Faturamento por dia</p>
+                    <BarChart data={serie15.map((d: any) => ({ label: fmtDia(d.dia), value: d.total }))} />
+                  </div>
+                  <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+                    <p className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-violet-600 inline-block" />Origem (app vs site)</p>
+                    <PieChart
+                      centerLabel="pedidos"
+                      data={[
+                        { label: "Site", value: relatorio?.porCanal.site || 0, color: "#6366F1" },
+                        { label: "App", value: relatorio?.porCanal.app || 0, color: "#D4A853" },
+                      ]}
+                      size={148}
+                    />
+                  </div>
+                </div>
+
+                {statusList.length > 0 && (
+                  <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+                    <p className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-violet-600 inline-block" />Pedidos por status</p>
+                    <div className="space-y-2.5">
+                      {statusList.map(([nome, valor]) => (
+                        <div key={nome} className="flex items-center gap-3">
+                          <span className="w-32 flex-shrink-0 text-[11px] font-semibold text-slate-600 truncate">{nome}</span>
+                          <div className="flex-1 h-2 rounded-full bg-slate-100 overflow-hidden">
+                            <div className="h-full rounded-full bg-gradient-to-r from-violet-500 to-purple-500" style={{ width: `${Math.max((valor / maxStatus) * 100, 2)}%` }} />
+                          </div>
+                          <span className="w-10 flex-shrink-0 text-right text-[11px] font-bold text-slate-700">{valor}</span>
+                        </div>
                       ))}
-                    </tbody>
-                  </table>
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-xs font-bold text-slate-800 flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-violet-600 inline-block" />Clientes</p>
+                    <span className="text-[10px] text-slate-400">{totalClientes} cliente(s)</span>
+                  </div>
+                  <div className="overflow-x-auto max-h-80 overflow-y-auto">
+                    <table className="w-full text-left">
+                      <thead className="sticky top-0 bg-white">
+                        <tr className="text-[9px] uppercase tracking-wide text-violet-600/70 border-b border-slate-200 bg-slate-50">
+                          <th className="p-3 font-semibold">Cliente</th>
+                          <th className="p-3 font-semibold text-right">Pedidos</th>
+                          <th className="p-3 font-semibold text-right">Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {clientes.map((c) => (
+                          <tr key={c.email} className="border-b border-slate-100 last:border-0 hover:bg-violet-50 transition-colors">
+                            <td className="p-3">
+                              <p className="text-xs font-semibold text-slate-800">{c.nome}</p>
+                              <p className="text-[9px] text-slate-400">{c.email}</p>
+                            </td>
+                            <td className="p-3 text-right text-[11px] text-slate-800/70">{c.pedidos ?? 0}</td>
+                            <td className="p-3 text-right text-xs font-bold text-slate-800 whitespace-nowrap">{formatPrice(Number(c.total || 0))}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {aba === "logs" && (
             <div className="space-y-3">
