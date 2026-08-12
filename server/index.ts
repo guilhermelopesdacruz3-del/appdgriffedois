@@ -285,8 +285,10 @@ async function chamarLI(method, resource, id, query, body) {
       if (value !== undefined && value !== "") upstreamUrl.searchParams.set(key, String(value));
     });
   }
-  upstreamUrl.searchParams.set("chave_aplicacao", LOJA_INTEGRADA_APP_KEY ?? "");
-  upstreamUrl.searchParams.set("chave_api", LOJA_INTEGRADA_API_KEY ?? "");
+  const liAppKey = (await getSecret("LI_APP_KEY").catch(() => null)) || process.env.LOJA_INTEGRADA_APP_KEY || "";
+  const liApiKey = (await getSecret("LI_API_KEY").catch(() => null)) || process.env.LOJA_INTEGRADA_API_KEY || "";
+  upstreamUrl.searchParams.set("chave_aplicacao", liAppKey);
+  upstreamUrl.searchParams.set("chave_api", liApiKey);
   upstreamUrl.searchParams.set("format", "json");
 
   const controller = new AbortController();
