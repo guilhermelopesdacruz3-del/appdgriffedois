@@ -877,6 +877,17 @@ app.put("/api/config", requireAdmin, async (req, res) => {
   return res.json({ ok: true, alteradas: alterou });
 });
 
+// Diagnóstico temporário: mostra o que a LI respondeu a partir do Render (rede + chaves salvas).
+app.get("/api/admin/diag-li", requireAdmin, async (_req, res) => {
+  const appKey = ((await getSecret("LI_APP_KEY").catch(() => null)) || process.env.LOJA_INTEGRADA_APP_KEY || "").slice(0, 8) + "…";
+  try {
+    const r = await chamarLI("GET", "pedido", null, { limite: "1" });
+    return res.json({ status: r.status, body: r.payload && typeof r.payload === "object" ? r.payload : String(r.payload).slice(0, 500), appKey });
+  } catch (e) {
+    return res.json({ erro: String(e?.message || e) });
+  }
+});
+
 // Chave PÚBLICA do Mercado Pago (segura para o front — usada pelo SDK de cartão).
 // NUNCA devolve o access_token.
 app.get("/api/mp-public-key", async (_req, res) => {
