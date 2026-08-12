@@ -17,34 +17,34 @@ export function BarChart({
 }) {
   if (data.length === 0) return <p className="text-[11px] text-slate-400">Sem dados.</p>;
   const max = Math.max(...data.map((d) => d.value), 1);
-  const width = 100; // viewBox percentual
-  const gap = 5;
-  const barW = (width - gap * (data.length - 1)) / data.length;
   const fmt = (v: number) =>
     v >= 1000 ? `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k` : String(v);
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full" preserveAspectRatio="none" style={{ height }}>
-      {/* linha de base */}
-      <line x1={0} y1={height - 12} x2={width} y2={height - 12} stroke="#E2E8F0" strokeWidth={0.4} />
-      {data.map((d, i) => {
-        const h = Math.max((d.value / max) * (height - 26), 2);
-        const x = i * (barW + gap);
-        const y = height - 12 - h;
-        return (
-          <g key={i}>
-            <rect x={x} y={y} width={barW} height={h} rx={1.5} fill={color} opacity={0.9} />
-            {/* valor no topo da barra */}
-            <text x={x + barW / 2} y={y - 2} fontSize={3.4} textAnchor="middle" fill="#7C3AED" fontWeight={600}>
-              {fmt(d.value)}
-            </text>
-            {/* label legível (abrevia só se muito longo) */}
-            <text x={x + barW / 2} y={height - 4} fontSize={3.6} textAnchor="middle" fill="#94A3B8">
-              {d.label.length > 7 ? d.label.slice(0, 5) + "…" : d.label}
-            </text>
-          </g>
-        );
-      })}
-    </svg>
+    <div>
+      <div className="flex items-end gap-2" style={{ height }}>
+        {data.map((d, i) => {
+          const pct = Math.max((d.value / max) * 100, 2);
+          return (
+            <div key={i} className="flex-1 h-full min-w-0 flex flex-col justify-end">
+              <p className="text-[9px] font-semibold text-center mb-1" style={{ color }}>
+                {fmt(d.value)}
+              </p>
+              <div
+                className="w-full rounded-t-md"
+                style={{ height: `${pct}%`, backgroundColor: color, opacity: 0.9 }}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div className="flex gap-2 mt-1">
+        {data.map((d, i) => (
+          <p key={i} className="flex-1 min-w-0 text-center text-[9px] text-slate-400 truncate">
+            {d.label}
+          </p>
+        ))}
+      </div>
+    </div>
   );
 }
 

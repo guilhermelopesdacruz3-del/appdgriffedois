@@ -190,6 +190,12 @@ function AppInner() {
     setTimeout(() => setShowCartNotification(false), 2000);
   }, []);
 
+  // "Comprar" na página do produto: adiciona ao carrinho e abre o pagamento direto.
+  const handleComprarAgora = useCallback((product: Product) => {
+    handleConfirmAddToCart(product, 0, 1);
+    setCheckoutOpen(true);
+  }, [handleConfirmAddToCart]);
+
   const handleUpdateCartQuantity = useCallback((productId: number, colorIndex: number, delta: number) => {
     setCartItems((prev) => prev.map((item) => item.product.id === productId && item.colorIndex === colorIndex ? { ...item, quantity: Math.max(0, item.quantity + delta) } : item).filter((item) => item.quantity > 0));
   }, []);
@@ -259,7 +265,7 @@ function AppInner() {
           <CatalogPage products={products} onSelectProduct={handleSelectProduct} onAddToCart={handleAddToCart} onTryOn={handleTryOn} searchQuery={searchQuery} isFavorite={isFavorite} onToggleFavorite={toggleFavorite} hasMore={hasMore} onLoadMore={loadMoreProducts} loadingMore={loadingMore} total={total} categorias={filtrosCatalogo.categorias} marcas={filtrosCatalogo.marcas} filtroMarcaId={filtroMarcaId} filtroCategoriaId={filtroCategoriaId} onFiltroMarca={setFiltroMarcaId} onFiltroCategoria={setFiltroCategoriaId} />
         )}
         {currentPage === "product" && selectedProduct && (
-          <ProductPage product={selectedProduct} onBack={handleBackFromProduct} onTryOn={handleTryOn} />
+          <ProductPage product={selectedProduct} onBack={handleBackFromProduct} onTryOn={handleTryOn} onComprar={handleComprarAgora} />
         )}
         {currentPage === "loyalty" && <LoyaltyPage fidelidade={fid.info} historicoFidelidade={fid.historico} fidelidadeLoading={fid.loading} />}
         {currentPage === "profile" && (

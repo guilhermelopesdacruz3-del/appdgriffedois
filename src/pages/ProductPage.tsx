@@ -1,18 +1,20 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Product } from "../data";
 import { getProductImage, formatPrice, formatInstallment } from "../utils";
 import ImageViewer from "../components/ui/ImageViewer";
-import CheckoutOtica from "../components/features/CheckoutOtica";
+import { buscarProduto } from "../services/lojaIntegrada/produtos";
 
 interface ProductPageProps {
   product: Product;
   onBack: () => void;
   onTryOn: (product: Product) => void;
+  /** Abre o checkout de pagamento direto (carrinho + pagamento). */
+  onComprar: (product: Product) => void;
 }
 
-export default function ProductPage({ product, onBack, onTryOn }: ProductPageProps) {
-  const [selectedColor, setSelectedColor] = useState(0);
+export default function ProductPage({ product, onBack, onTryOn, onComprar }: ProductPageProps) {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [selectedColor, setSelectedColor] = useState(0);
   const [show3D, setShow3D] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [isFavorite, setIsFavorite] = useState(false);
@@ -20,11 +22,44 @@ export default function ProductPage({ product, onBack, onTryOn }: ProductPagePro
   const [rotation, setRotation] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStartX, setDragStartX] = useState(0);
-  const [checkoutAberto, setCheckoutAberto] = useState(false);
+  const [descAberta, setDescAberta] = useState(false);
+  const [imagensExtras, setImagensExtras] = useState<string[]>([]);
+  const [descricaoFresca, setDescricaoFresca] = useState<string | null>(null);
 
   const discount = product.originalPrice
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
+
+  // Galeria: principal + imagens extras conhecidas (ou buscadas do produto individual).
+  const images = useMemo(() => {
+    const todas = [product.image, ...(product.imagens ?? []), ...imagensExtras].filter(Boolean);
+    return [...new Set(todas)];
+  }, [product.image, product.imagens, imagensExtras]);
+
+  // Busca dados frescos do produto (todas as imagens e descrição completa).
+  useEffect(() => {
+    let ativo = true;
+    setImagensExtras([]);
+    setActiveImageIndex(0);
+    buscarProduto(product.id)
+      .then((fresco) => {
+        if (!ativo) return;
+        if (fresco.imagens && fresco.imagens.length > 0) setImagensExtras(fresco.imagens);
+        if (fresco.description) setDescricaoFresca(fresco.description);
+      })
+      .catch(() => {});
+    return () => { ativo = false; };
+  }, [product.id]);
+
+  const descricao = useMemo(() => {
+    const texto = (descricaoFresca || product.description || "").replace(/\s+/g, " ").trim();
+    return texto;
+  }, [descricaoFresca, product.description]);
+
+  const descricaoCurta = useMemo(
+    () => (descricao.length > 320 ? `${descricao.slice(0, 320).trim()}…` : descricao),
+    [descricao]
+  );
 
   useEffect(() => {
     if (!show3D) { setRotation(0); return; }
@@ -44,6 +79,8 @@ export default function ProductPage({ product, onBack, onTryOn }: ProductPagePro
   const handleDragMove = (clientX: number) => { if (!isDragging || !show3D) return; const delta = clientX - dragStartX; setRotation((prev) => prev + delta * 0.5); setDragStartX(clientX); };
   const handleDragEnd = () => { setIsDragging(false); };
 
+  const imagemAtual = images[activeImageIndex] || product.image;
+
   return (
     <div className="pb-28">
       {/* Image Gallery */}
@@ -59,7 +96,7 @@ export default function ProductPage({ product, onBack, onTryOn }: ProductPagePro
           onMouseLeave={handleDragEnd}
         >
           <img
-            src={getProductImage(product.image)}
+            src={getProductImage(imagemAtual)}
             alt={product.name}
             className={`w-full h-full object-cover transition-all duration-300 ${enhanced ? "contrast-110 brightness-105 saturate-110" : ""}`}
             style={show3D ? { transform: `perspective(800px) rotateY(${rotation}deg)`, transition: isDragging ? "none" : "transform 0.1s ease-out" } : undefined}
@@ -100,11 +137,13 @@ export default function ProductPage({ product, onBack, onTryOn }: ProductPagePro
         </button>
 
         {/* Image indicators */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
-          {[0, 1, 2].map((i) => (
-            <button key={i} onClick={() => setActiveImageIndex(i)} className={`transition-all duration-200 rounded-full ${activeImageIndex === i ? "w-6 h-1.5 bg-gold" : "w-1.5 h-1.5 bg-white/60"}`} />
-          ))}
-        </div>
+        {images.length > 1 && (
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+            {images.map((_, i) => (
+              <button key={i} onClick={() => setActiveImageIndex(i)} className={`transition-all duration-200 rounded-full ${activeImageIndex === i ? "w-6 h-1.5 bg-gold" : "w-1.5 h-1.5 bg-white/60"}`} />
+            ))}
+          </div>
+        )}
 
         {/* Badges */}
         <div className="absolute bottom-4 left-4 flex gap-1.5 z-10">
@@ -112,6 +151,21 @@ export default function ProductPage({ product, onBack, onTryOn }: ProductPagePro
           {discount > 0 && <span className="px-2.5 py-1 bg-gold text-luxury-black text-[9px] font-bold rounded-full">-{discount}%</span>}
         </div>
       </div>
+
+      {/* Thumbnails */}
+      {images.length > 1 && (
+        <div className="flex gap-2 px-5 pt-3 overflow-x-auto no-scrollbar">
+          {images.map((img, i) => (
+            <button
+              key={i}
+              onClick={() => setActiveImageIndex(i)}
+              className={`w-16 h-16 rounded-xl overflow-hidden bg-ice flex-shrink-0 transition-all ${activeImageIndex === i ? "ring-2 ring-gold ring-offset-1" : "opacity-70 hover:opacity-100"}`}
+            >
+              <img src={getProductImage(img)} alt={`${product.name} ${i + 1}`} className="w-full h-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Product Info */}
       <div className="px-5 pt-5">
@@ -125,11 +179,13 @@ export default function ProductPage({ product, onBack, onTryOn }: ProductPagePro
         <h1 className="text-xl font-bold text-luxury-black leading-tight mb-2">{product.name}</h1>
 
         {/* Rating */}
-        <div className="flex items-center gap-1 mb-3">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--color-gold)" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
-          <span className="text-xs font-semibold text-luxury-black">{product.rating}</span>
-          <span className="text-[10px] text-gray-400">({product.reviews} reviews)</span>
-        </div>
+        {product.reviews > 0 && (
+          <div className="flex items-center gap-1 mb-3">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="var(--color-gold)" stroke="none"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>
+            <span className="text-xs font-semibold text-luxury-black">{product.rating}</span>
+            <span className="text-[10px] text-gray-400">({product.reviews} reviews)</span>
+          </div>
+        )}
 
         {/* Price */}
         <div className="bg-ice rounded-2xl p-4 mb-4">
@@ -169,7 +225,23 @@ export default function ProductPage({ product, onBack, onTryOn }: ProductPagePro
         </div>
 
         {/* Description */}
-        <p className="text-sm text-gray-500 leading-relaxed mb-5">{product.description}</p>
+        {descricao && (
+          <div className="mb-5">
+            <h4 className="text-xs font-bold text-luxury-black mb-2 flex items-center gap-2">
+              <span className="w-1 h-3.5 rounded-full bg-gold inline-block" />
+              Sobre este produto
+            </h4>
+            <p className="text-[13px] text-gray-600 leading-relaxed whitespace-pre-line">{descAberta ? descricao : descricaoCurta}</p>
+            {descricao.length > 320 && (
+              <button
+                onClick={() => setDescAberta(!descAberta)}
+                className="mt-1 text-[11px] font-bold text-gold hover:underline"
+              >
+                {descAberta ? "Ver menos" : "Ver mais"}
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Color Selection */}
         {product.colors.length > 0 && (
@@ -240,7 +312,10 @@ export default function ProductPage({ product, onBack, onTryOn }: ProductPagePro
 
         {/* Features List */}
         <div className="bg-ice rounded-2xl p-4 mb-5">
-          <h4 className="text-xs font-bold text-luxury-black mb-3">Características</h4>
+          <h4 className="text-xs font-bold text-luxury-black mb-3 flex items-center gap-2">
+            <span className="w-1 h-3.5 rounded-full bg-gold inline-block" />
+            Características
+          </h4>
           <div className="space-y-2">
             {[
               { label: "Marca", value: product.brand },
@@ -257,48 +332,43 @@ export default function ProductPage({ product, onBack, onTryOn }: ProductPagePro
             ))}
           </div>
         </div>
-
-        {/* Checkout ótica */}
-        <button
-          onClick={() => setCheckoutAberto(true)}
-          className="w-full h-12 bg-luxury-black text-white font-bold rounded-xl hover:bg-luxury-dark active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-sm"
-        >
-          Montar meu pedido
-        </button>
       </div>
 
       {/* Fixed Bottom CTA */}
       <div className="fixed bottom-0 left-0 right-0 z-40 px-4 pb-4 max-w-lg mx-auto">
         <div className="glass rounded-2xl p-3 shadow-lg">
-          <div className="flex items-center gap-3">
-            <div className="flex-1 min-w-0">
-              {product.sobConsulta ? (
-                <span className="text-lg font-bold text-luxury-black">Sob consulta</span>
-              ) : (
-                <>
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-lg font-bold text-luxury-black">{formatPrice(product.price)}</span>
-                    <span className="text-[10px] text-green-600 font-semibold">{formatPrice(product.pixPrice)} Pix</span>
-                  </div>
-                  <p className="text-[9px] text-gray-400">{formatInstallment(product.installmentCount, product.installmentValue)} s/ juros</p>
-                </>
-              )}
+          {product.sobConsulta ? (
+            <button
+              disabled
+              className="w-full py-3.5 bg-gray-300 text-gray-600 font-bold rounded-xl text-sm cursor-not-allowed"
+            >
+              Sob consulta — consulte-nos
+            </button>
+          ) : (
+            <div className="flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-baseline gap-2">
+                  <span className="text-lg font-bold text-luxury-black">{formatPrice(product.price)}</span>
+                  <span className="text-[10px] text-green-600 font-semibold">{formatPrice(product.pixPrice)} Pix</span>
+                </div>
+                <p className="text-[9px] text-gray-400">{formatInstallment(product.installmentCount, product.installmentValue)} s/ juros</p>
+              </div>
+              <button
+                onClick={() => onComprar(product)}
+                className="flex-shrink-0 px-7 py-3.5 bg-gradient-to-r from-gold to-gold-dark text-luxury-black font-bold rounded-xl active:scale-[0.98] transition-all hover:brightness-110 flex items-center justify-center gap-2 text-sm"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" /></svg>
+                Comprar
+              </button>
             </div>
-          </div>
+          )}
         </div>
       </div>
-
-      {/* Checkout detalhado da ótica */}
-      <CheckoutOtica
-        produto={product}
-        isOpen={checkoutAberto}
-        onClose={() => setCheckoutAberto(false)}
-      />
 
       {/* Fullscreen Image Viewer */}
       <ImageViewer
         isOpen={viewerOpen}
-        imageUrl={getProductImage(product.image)}
+        imageUrl={getProductImage(imagemAtual)}
         title={product.name}
         brand={product.brand}
         onClose={() => setViewerOpen(false)}

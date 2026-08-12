@@ -13,6 +13,8 @@ export interface Product {
   has3D: boolean;
   hasTryOn: boolean;
   image: string;
+  /** URLs adicionais de imagens do produto (galeria). undefined = só a principal. */
+  imagens?: string[];
   badge?: string;
   rating: number;
   reviews: number;

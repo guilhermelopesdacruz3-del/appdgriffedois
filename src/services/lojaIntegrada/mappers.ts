@@ -160,6 +160,13 @@ export function mapProdutoParaProduct(
     produto.imagens?.[0]?.grande ||
     "";
 
+  // Galeria: todas as imagens do produto (se a resposta trouxer), sempre com a
+  // principal na frente e sem duplicatas.
+  const imagensExtras = Array.isArray(produto.imagens)
+    ? produto.imagens.map((i) => i.grande || i.media || "").filter(Boolean)
+    : [];
+  const imagens = [...new Set([imagem, ...imagensExtras].filter(Boolean))];
+
   const { colors, colorNames } = extrairCoresDasTags(produto.tags);
 
   // produto.marca vem como resource_uri (ex.: "/api/v1/marca/12/") — resolvemos
@@ -188,6 +195,7 @@ export function mapProdutoParaProduct(
     // A fonte do true/false será definida no app quando o módulo for integrado.
     hasTryOn: false,
     image: imagem,
+    imagens: imagens.length > 0 ? imagens : undefined,
     badge: produto.destaque ? "Destaque" : undefined,
     rating: 0,
     reviews: 0,

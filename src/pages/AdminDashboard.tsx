@@ -115,21 +115,29 @@ export default function AdminDashboard({ token, onAbrirPedido, onIrPedidos, onIr
   const faturamentoTotal = relatorio?.faturamentoAprovado || 0;
   const pedidosTotal = relatorio?.totalPedidos || 0;
 
+  const serieAnterior = serie[serie.length - 2];
+  const serieAtual = serie[serie.length - 1];
+  const deltaFaturamento =
+    serieAnterior && serieAtual && serieAnterior.total > 0
+      ? Math.round(((serieAtual.total - serieAnterior.total) / serieAnterior.total) * 100)
+      : null;
+  const fmtDia = (dia: string) => (dia || "").slice(5).replace("-", "/");
+
   const metricas = [
     {
       label: "Faturamento hoje",
       value: formatPrice(faturamentoHoje),
       sub: `${hoje.length} pedido(s) hoje`,
       accent: "#7C3AED",
-      trend: "up" as const,
-      delta: "+área",
+      trend: deltaFaturamento == null ? undefined : (deltaFaturamento >= 0 ? "up" : "down"),
+      delta: deltaFaturamento == null ? undefined : `${deltaFaturamento >= 0 ? "+" : ""}${deltaFaturamento}%`,
       spark: serie.map((d: any) => d.total),
     },
     {
       label: "Pedidos (total)",
       value: String(pedidosTotal),
       sub: "todos os tempos",
-      spark: serie.map((d: any) => d.pedidos ?? d.total),
+      spark: serie.map((d: any) => d.count),
     },
     {
       label: "Ticket médio",
@@ -284,7 +292,7 @@ export default function AdminDashboard({ token, onAbrirPedido, onIrPedidos, onIr
         <p className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-2">
           <span className="w-1 h-3.5 rounded-full bg-violet-600 inline-block" />Faturamento por dia
         </p>
-        <BarChart data={serie.map((d: any) => ({ label: d.dia, value: d.total }))} />
+        <BarChart data={serie.map((d: any) => ({ label: fmtDia(d.dia), value: d.total }))} />
       </div>
 
       {statusComContagem.length > 0 && (
