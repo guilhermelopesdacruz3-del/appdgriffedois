@@ -72,7 +72,12 @@ async function criarPixMP(accessToken: string, valor: number, descricao: string,
   });
   const json = await r.json().catch(() => ({}));
   if (!r.ok) {
-    const msg = json?.message || `Mercado Pago ${r.status}`;
+    const raw = json?.message || `Mercado Pago ${r.status}`;
+    let msg = String(raw);
+    if (/communication_error|fill and validate/i.test(msg)) {
+      msg =
+        "O Mercado Pago recusou a cobrança PIX. Confira se o access_token de PRODUÇÃO está correto no painel (APIs) e se a conta tem uma chave PIX cadastrada.";
+    }
     throw Object.assign(new Error(msg), { status: r.status, idem });
   }
   // PIX: o MP devolve point_of_interaction.transaction_data com QR + copia-e-cola.
