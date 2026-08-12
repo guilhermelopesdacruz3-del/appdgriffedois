@@ -662,7 +662,9 @@ function agregarPedidos(objects) {
     const valor = Number(p.valor_total || p.valor_subtotal || 0) || 0;
     total += valor;
     const cod = p.situacao?.codigo || "";
-    const aprovado = aprovados.has(cod);
+    // A LI sinaliza "aprovado" no próprio objeto situacao do pedido; os códigos
+    // variam ("pedido_pago", "pedido_enviado"...), então usamos o flag primeiro.
+    const aprovado = p.situacao?.aprovado === true || aprovados.has(cod);
     if (aprovado) totalAprovado += valor;
 
     const dia = (p.data_criacao || "").slice(0, 10);
