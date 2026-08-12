@@ -652,6 +652,7 @@ function agregarPedidos(objects) {
   const porDia = {};
   let total = 0;
   let totalAprovado = 0;
+  let aprovadosCount = 0;
   let TicketMedio = 0;
   const aprovados = new Set(["aprovado", "em_separacao", "enviado", "entregue"]);
 
@@ -665,7 +666,10 @@ function agregarPedidos(objects) {
     // A LI sinaliza "aprovado" no próprio objeto situacao do pedido; os códigos
     // variam ("pedido_pago", "pedido_enviado"...), então usamos o flag primeiro.
     const aprovado = p.situacao?.aprovado === true || aprovados.has(cod);
-    if (aprovado) totalAprovado += valor;
+    if (aprovado) {
+      totalAprovado += valor;
+      aprovadosCount += 1;
+    }
 
     const dia = (p.data_criacao || "").slice(0, 10);
     if (dia) {
@@ -677,7 +681,8 @@ function agregarPedidos(objects) {
   }
 
   const dias = Object.keys(porDia).sort();
-  TicketMedio = objects.length ? total / objects.length : 0;
+  // Ticket médio: só sobre pedidos confirmados (mesma base do faturamento).
+  TicketMedio = aprovadosCount ? totalAprovado / aprovadosCount : 0;
 
   return {
     totalPedidos: objects.length,
