@@ -39,12 +39,14 @@ async function chamarLI(method: string, resource: string, id?: string | number, 
   }
   const upstream = new URL(`${LI_API_BASE}/${resource}/${id ? `${id}/` : ""}`);
   if (query) Object.entries(query).forEach(([k, v]) => upstream.searchParams.set(k, v));
-  upstream.searchParams.set("chave_aplicacao", APP_KEY);
-  upstream.searchParams.set("chave_api", API_KEY);
   upstream.searchParams.set("format", "json");
   const r = await fetch(upstream.toString(), {
     method,
-    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    headers: {
+      Accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: `chave_api ${API_KEY} aplicacao ${APP_KEY}`,
+    },
     body: method === "POST" || method === "PUT" ? JSON.stringify(body) : undefined,
     signal: AbortSignal.timeout(15000),
   });

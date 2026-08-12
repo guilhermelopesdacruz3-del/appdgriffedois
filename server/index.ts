@@ -287,8 +287,16 @@ async function chamarLI(method, resource, id, query, body) {
   }
   const liAppKey = (await getSecret("LI_APP_KEY").catch(() => null)) || process.env.LOJA_INTEGRADA_APP_KEY || "";
   const liApiKey = (await getSecret("LI_API_KEY").catch(() => null)) || process.env.LOJA_INTEGRADA_API_KEY || "";
-  upstreamUrl.searchParams.set("chave_aplicacao", liAppKey);
-  upstreamUrl.searchParams.set("chave_api", liApiKey);
+  const liHeaders = {
+    Accept: "application/json",
+    "Content-Type": "application/json",
+    Authorization: `chave_api ${liApiKey} aplicacao ${liAppKey}`,
+  };
+  if (query) {
+    Object.entries(query).forEach(([key, value]) => {
+      if (value !== undefined && value !== "") upstreamUrl.searchParams.set(key, String(value));
+    });
+  }
   upstreamUrl.searchParams.set("format", "json");
 
   const controller = new AbortController();
@@ -297,7 +305,7 @@ async function chamarLI(method, resource, id, query, body) {
   try {
     upstreamResponse = await fetch(upstreamUrl.toString(), {
       method,
-      headers: { Accept: "application/json", "Content-Type": "application/json" },
+      headers: liHeaders,
       body: method === "POST" || method === "PUT" ? JSON.stringify(body) : undefined,
       signal: controller.signal,
     });
