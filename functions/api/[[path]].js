@@ -20,7 +20,10 @@ export async function onRequest(context) {
     method: request.method,
     headers,
     redirect: "follow",
-    signal: AbortSignal.timeout(55000),
+    // Pages Functions free: limite de execução ~30s (a função é morta pelo
+    // Cloudflare e devolve 502 genérico). Timeout de 25s garante que o nosso
+    // catch rode e devolva um JSON tratável antes disso.
+    signal: AbortSignal.timeout(25000),
   };
 
   if (request.method !== "GET" && request.method !== "HEAD") {
