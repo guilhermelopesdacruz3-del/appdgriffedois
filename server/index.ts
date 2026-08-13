@@ -342,7 +342,12 @@ app.use(express.json({ limit: "512kb", verify: (req, _res, buf) => { req.rawBody
 app.disable("x-powered-by");
 
 // CORS restrito à origem do front (ou '*' só em dev).
-const originsPermitidas = FRONTEND_ORIGIN === "*" ? true : FRONTEND_ORIGIN.split(",").map((s) => s.trim());
+// Inclui também o domínio antigo (dgriffe-app.pages.dev) que ainda está no ar
+// com um build que chama o backend direto — sem isso o navegador bloqueia e o
+// app cai no catálogo de demonstração (8 produtos fake).
+const originsPermitidas = FRONTEND_ORIGIN === "*"
+  ? true
+  : [...new Set([...FRONTEND_ORIGIN.split(",").map((s) => s.trim()), "https://dgriffe-app.pages.dev"])];
 app.use(
   cors({
     origin: originsPermitidas,
