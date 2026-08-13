@@ -129,7 +129,7 @@ export default function AdminDashboard({ token, onAbrirPedido, onIrPedidos, onIr
       value: formatPrice(faturamentoHoje),
       sub: `${hoje.length} pedido(s) hoje`,
       accent: "#7C3AED",
-      trend: deltaFaturamento == null ? undefined : (deltaFaturamento >= 0 ? "up" : "down"),
+      trend: deltaFaturamento == null ? undefined : (deltaFaturamento >= 0 ? "up" : "down") as "up" | "down",
       delta: deltaFaturamento == null ? undefined : `${deltaFaturamento >= 0 ? "+" : ""}${deltaFaturamento}%`,
       spark: serie.map((d: any) => d.total),
     },
