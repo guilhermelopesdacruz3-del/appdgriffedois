@@ -3,7 +3,7 @@
 //  - / e assets estáticos (ícones, manifest): cache-first (app funciona offline)
 //  - /api/* (proxy → Render): SEMPRE network (dados dinâmicos, nunca cachear)
 //  - push: mostra notificação nativa (web push) e abre o app ao clicar
-const CACHE = "dgriffe-v1";
+const CACHE = "dgriffe-v2";
 const STATIC = ["/", "/index.html", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png", "/maskable-192.png", "/maskable-512.png"];
 
 self.addEventListener("install", (event) => {
