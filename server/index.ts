@@ -1563,12 +1563,13 @@ app.get("/api/admin/estoque/movimentos", requireAdmin, async (req, res) => {
 // Entrada manual de estoque (admin).
 app.post("/api/admin/estoque/entrada", requireAdmin, async (req, res) => {
   try {
-    const { produto_id, quantidade, nome, sku, observacao } = req.body || {};
+    const { produto_id, quantidade, nome, sku, observacao, limite_baixo } = req.body || {};
     if (!produto_id || !quantidade || quantidade <= 0) {
       return res.status(400).json({ erro: "Informe produto_id e quantidade (maior que zero)." });
     }
     const nomeFinal = typeof nome === "string" ? nome : `Produto ${produto_id}`;
     const qtdFinal = Math.round(Number(quantidade));
+    const limiteFinal = limite_baixo !== undefined && limite_baixo !== "" ? Math.max(0, Math.round(Number(limite_baixo))) : undefined;
     await registrarMovimentoEstoque({
       produto_id: Number(produto_id),
       sku: sku || null,
@@ -1577,6 +1578,7 @@ app.post("/api/admin/estoque/entrada", requireAdmin, async (req, res) => {
       motivo: "entrada_manual",
       admin_id: req.adminEmail || "admin",
       observacao: observacao || null,
+      limite_baixo: limiteFinal,
     });
     return res.json({ ok: true, produto_id, quantidade: qtdFinal });
   } catch (err) {

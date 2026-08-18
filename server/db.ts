@@ -981,15 +981,21 @@ export type EstoqueMov = {
   motivo: "entrada_manual" | "saida_manual" | "venda" | "ajuste" | "inicial";
   admin_id?: string | null;
   observacao?: string | null;
+  limite_baixo?: number;
 };
 
-export async function upsertEstoque(produto_id: number, quantidade: number): Promise<void> {
+export async function upsertEstoque(
+  produto_id: number,
+  quantidade: number,
+  opts?: { nome?: string; sku?: string | null; limite_baixo?: number }
+): Promise<void> {
   const sb = supabaseClient();
   if (!sb) return;
-  await sb.from("estoque").upsert(
-    { produto_id, quantidade, updated_at: new Date().toISOString() },
-    { onConflict: "produto_id" }
-  );
+  const row: any = { produto_id, quantidade, updated_at: new Date().toISOString() };
+  if (opts?.nome) row.nome = opts.nome;
+  if (opts?.sku !== undefined) row.sku = opts.sku;
+  if (opts?.limite_baixo !== undefined) row.limite_baixo = opts.limite_baixo;
+  await sb.from("estoque").upsert(row, { onConflict: "produto_id" });
 }
 
 export async function registrarMovimentoEstoque(mov: EstoqueMov): Promise<void> {
@@ -1004,7 +1010,11 @@ export async function registrarMovimentoEstoque(mov: EstoqueMov): Promise<void> 
     admin_id: mov.admin_id || null,
     observacao: mov.observacao || null,
   });
-  await upsertEstoque(mov.produto_id, mov.quantidade);
+  await upsertEstoque(mov.produto_id, mov.quantidade, {
+    nome: mov.nome,
+    sku: mov.sku,
+    limite_baixo: mov.limite_baixo,
+  });
 }
 
 export async function getEstoque(produto_id: number): Promise<{ produto_id: number; quantidade: number; limite_baixo: number } | null> {
