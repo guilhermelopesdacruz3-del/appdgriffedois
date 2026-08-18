@@ -969,3 +969,81 @@ export async function listarPushSubscriptions(emails: string[]): Promise<Map<str
   }
   return mapa;
 }
+
+// ============================================================================
+// CONTROLE DE ESTOQUE
+// ============================================================================
+export type EstoqueMov = {
+  produto_id: number;
+  sku?: string | null;
+  nome: string;
+  quantidade: number;
+  motivo: "entrada_manual" | "saida_manual" | "venda" | "ajuste" | "inicial";
+  admin_id?: string | null;
+  observacao?: string | null;
+};
+
+export async function upsertEstoque(produto_id: number, quantidade: number): Promise<void> {
+  const sb = supabaseClient();
+  if (!sb) return;
+  await sb.from("estoque").upsert(
+    { produto_id, quantidade, updated_at: new Date().toISOString() },
+    { onConflict: "produto_id" }
+  );
+}
+
+export async function registrarMovimentoEstoque(mov: EstoqueMov): Promise<void> {
+  const sb = supabaseClient();
+  if (!sb) return;
+  await sb.from("estoque_movimentos").insert({
+    produto_id: mov.produto_id,
+    sku: mov.sku || null,
+    nome: mov.nome,
+    quantidade: mov.quantidade,
+    motivo: mov.motivo,
+    admin_id: mov.admin_id || null,
+    observacao: mov.observacao || null,
+  });
+  await upsertEstoque(mov.produto_id, mov.quantidade);
+}
+
+export async function getEstoque(produto_id: number): Promise<{ produto_id: number; quantidade: number; limite_baixo: number } | null> {
+  const sb = supabaseClient();
+  if (!sb) return null;
+  const { data } = await sb.from("estoque").select("*").eq("produto_id", produto_id).single();
+  return data as any;
+}
+
+export async function listarEstoqueBaixo(): Promise<
+  { produto_id: number; nome: string; quantidade: number; limite_baixo: number }[]
+> {
+  const sb = supabaseClient();
+  if (!sb) return [];
+  const { data } = await sb
+    .from("estoque")
+    .select("produto_id,nome,quantidade,limite_baixo")
+    .lte("quantidade", "limite_baixo");
+  return (data || []) as any[];
+}
+
+export async function listarMovimentosEstoque(
+  produto_id?: number,
+  limit = 100
+): Promise<EstoqueMov[]> {
+  const sb = supabaseClient();
+  if (!sb) return [];
+  let q = sb.from("estoque_movimentos").select("*").order("created_at", { ascending: false }).limit(limit);
+  if (produto_id) q = q.eq("produto_id", produto_id);
+  const { data } = await q;
+  return (data || []) as any[];
+}
+
+export async function initEstoqueSchema(): Promise<void> {
+  const sb = supabaseClient();
+  if (!sb) return;
+  try {
+    await sb.from("estoque").select("produto_id").limit(1).maybeSingle();
+  } catch {
+    console.warn("[estoque] tabela estoque não encontrada — execute o SQL de inicialização no Supabase");
+  }
+}

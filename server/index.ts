@@ -39,7 +39,7 @@ import { processarCheckout } from "./pagamento.ts";
 import { processarWebhookMP } from "./webhook.ts";
 import { atualizarPedidoLISituacao } from "./liClient.ts";
 import { listarVideosRecentes } from "./youtube.ts";
-import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade, salvarNotificacao, listarNotificacoes, marcarNotificacaoLida, limparNotificacoesAntigas, salvarPerfil, buscarPerfil, listarEnderecos, salvarEndereco, excluirEndereco, salvarPreferencias, buscarPreferencias, getNiveis, NIVEIS_PADRAO, calcularNivel, calcularCashback, BENEFICIO_BASE, TETO_BENEFICIOS_PERC, CASHBACK_BASE, gerarCodigoIndicacao, registrarIndicacao, creditarIndicacao, getIndicacoes, getClubeFamilia, adicionarFamiliar, creditarFamilia, getCreditosFamilia, MISSOES, VALIDADE_PONTOS_MESES_SEM_MOV, VALIDADE_PONTOS_MESES_EXPIRACAO, VALIDADE_CASHBACK_MESES_SEM_MOV, VALIDADE_CASHBACK_DIAS_ADICIONAIS, getSecret, invalidarCacheChave, salvarPushSubscription, removerPushSubscription, listarPushSubscriptions } from "./db.ts";
+import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade, salvarNotificacao, listarNotificacoes, marcarNotificacaoLida, limparNotificacoesAntigas, salvarPerfil, buscarPerfil, listarEnderecos, salvarEndereco, excluirEndereco, salvarPreferencias, buscarPreferencias, getNiveis, NIVEIS_PADRAO, calcularNivel, calcularCashback, BENEFICIO_BASE, TETO_BENEFICIOS_PERC, CASHBACK_BASE, gerarCodigoIndicacao, registrarIndicacao, creditarIndicacao, getIndicacoes, getClubeFamilia, adicionarFamiliar, creditarFamilia, getCreditosFamilia, MISSOES, VALIDADE_PONTOS_MESES_SEM_MOV, VALIDADE_PONTOS_MESES_EXPIRACAO, VALIDADE_CASHBACK_MESES_SEM_MOV, VALIDADE_CASHBACK_DIAS_ADICIONAIS, getSecret, invalidarCacheChave, salvarPushSubscription, removerPushSubscription, listarPushSubscriptions, upsertEstoque, registrarMovimentoEstoque, getEstoque, listarEstoqueBaixo, listarMovimentosEstoque } from "./db.ts";
 import cupomApp from "./cupom.ts";
 import { receitasApp } from "./receitas";
 import { favoritosApp } from "./favoritos";
@@ -1484,12 +1484,133 @@ app.post("/api/checkout", async (req, res) => {
       formaEntrega: dadosCliente.forma_entrega || "retirada",
       origem,
     });
+
+    // Baixa automática de estoque conforme os itens vendidos.
+    try {
+      const sb = supabaseClient();
+      if (sb) {
+        for (const it of items) {
+          const pid = Number(it.product_id || it.sku || 0);
+          if (!pid) continue;
+          const qtd = Math.max(1, Math.round(Number(it.qty || it.quantity || 1)));
+          const atual = await getEstoque(pid);
+          const novaQtd = atual ? Math.max(0, atual.quantidade - qtd) : 0;
+          await registrarMovimentoEstoque({
+            produto_id: pid,
+            sku: String(it.sku || ""),
+            nome: it.nome || `Produto ${pid}`,
+            quantidade: -qtd,
+            motivo: "venda",
+            admin_id: null,
+            observacao: `Venda via checkout (${meio}) - pedido ${resultado?.numero || "n/a"}`,
+          });
+        }
+      }
+    } catch (estErr: any) {
+      console.warn("[checkout] falha ao dar baixa no estoque (não crítica):", estErr?.message);
+    }
+
     return res.json(resultado);
   } catch (e: any) {
     const msg = e?.message || "Falha ao processar o pagamento.";
     const status = typeof e?.status === "number" ? e.status : 502;
     console.error(`[checkout] falha (${meio}) ip=${req.ip}:`, msg);
     return res.status(status).json({ erro: msg });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// CONTROLE DE ESTOQUE
+// ---------------------------------------------------------------------------
+
+// Lista produtos com estoque baixo (alerta).
+app.get("/api/admin/estoque/baixo", requireAdmin, async (_req, res) => {
+  try {
+    const baixo = await listarEstoqueBaixo();
+    return res.json({ baixo });
+  } catch (err) {
+    console.error("[estoque admin] falha ao listar baixo:", err);
+    return res.status(500).json({ erro: "Falha ao listar estoque baixo." });
+  }
+});
+
+// Lista todos os produtos com quantidade atual (inclui os sem registro = 0).
+app.get("/api/admin/estoque", requireAdmin, async (req, res) => {
+  try {
+    const sb = supabaseClient();
+    if (!sb) return res.json({ estoque: [] });
+    const { data } = await sb.from("estoque").select("*").order("quantidade", { ascending: true });
+    return res.json({ estoque: data || [] });
+  } catch (err) {
+    console.error("[estoque admin] falha ao listar:", err);
+    return res.status(500).json({ erro: "Falha ao listar estoque." });
+  }
+});
+
+// Movimentações de estoque (histórico).
+app.get("/api/admin/estoque/movimentos", requireAdmin, async (req, res) => {
+  try {
+    const produto_id = req.query.produto_id ? Number(req.query.produto_id) : undefined;
+    const limit = req.query.limit ? Number(req.query.limit) : 100;
+    const movs = await listarMovimentosEstoque(produto_id, limit);
+    return res.json({ movimentos: movs });
+  } catch (err) {
+    console.error("[estoque admin] falha ao listar movimentos:", err);
+    return res.status(500).json({ erro: "Falha ao listar movimentos." });
+  }
+});
+
+// Entrada manual de estoque (admin).
+app.post("/api/admin/estoque/entrada", requireAdmin, async (req, res) => {
+  try {
+    const { produto_id, quantidade, nome, sku, observacao } = req.body || {};
+    if (!produto_id || !quantidade || quantidade <= 0) {
+      return res.status(400).json({ erro: "Informe produto_id e quantidade (maior que zero)." });
+    }
+    const nomeFinal = typeof nome === "string" ? nome : `Produto ${produto_id}`;
+    const qtdFinal = Math.round(Number(quantidade));
+    await registrarMovimentoEstoque({
+      produto_id: Number(produto_id),
+      sku: sku || null,
+      nome: nomeFinal,
+      quantidade: qtdFinal,
+      motivo: "entrada_manual",
+      admin_id: req.adminEmail || "admin",
+      observacao: observacao || null,
+    });
+    return res.json({ ok: true, produto_id, quantidade: qtdFinal });
+  } catch (err) {
+    console.error("[estoque admin] falha entrada:", err);
+    return res.status(500).json({ erro: "Falha ao registrar entrada." });
+  }
+});
+
+// Saída manual de estoque (admin).
+app.post("/api/admin/estoque/saida", requireAdmin, async (req, res) => {
+  try {
+    const { produto_id, quantidade, nome, sku, observacao } = req.body || {};
+    if (!produto_id || !quantidade || quantidade <= 0) {
+      return res.status(400).json({ erro: "Informe produto_id e quantidade (maior que zero)." });
+    }
+    const nomeFinal = typeof nome === "string" ? nome : `Produto ${produto_id}`;
+    const qtdFinal = Math.round(Number(quantidade));
+    const atual = await getEstoque(Number(produto_id));
+    if (atual && atual.quantidade < qtdFinal) {
+      return res.status(400).json({ erro: `Estoque insuficiente (disponível: ${atual.quantidade}).` });
+    }
+    await registrarMovimentoEstoque({
+      produto_id: Number(produto_id),
+      sku: sku || null,
+      nome: nomeFinal,
+      quantidade: -qtdFinal,
+      motivo: "saida_manual",
+      admin_id: req.adminEmail || "admin",
+      observacao: observacao || null,
+    });
+    return res.json({ ok: true, produto_id, quantidade: qtdFinal });
+  } catch (err) {
+    console.error("[estoque admin] falha saída:", err);
+    return res.status(500).json({ erro: "Falha ao registrar saída." });
   }
 });
 
