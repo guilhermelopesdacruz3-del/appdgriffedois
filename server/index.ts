@@ -44,6 +44,8 @@ import cupomApp from "./cupom.ts";
 import { receitasApp } from "./receitas";
 import { favoritosApp } from "./favoritos";
 import webpush from "web-push";
+import { extrairEmailDoToken } from "./tokenEmail";
+import { log } from "./logger";
 
 const {
   LOJA_INTEGRADA_APP_KEY,
@@ -442,12 +444,12 @@ app.post("/api/admin/login", async (req, res) => {
   }
   if (senha !== ADMIN_PASSWORD) {
     registrarTentativaFalha(ip);
-    console.warn(`[seguranca] Falha de login para ${ip}.`);
+    log.warn("Falha de login admin", { ip });
     return res.status(401).json({ erro: "Senha inválida." });
   }
 
   registrarTentativaSucesso(ip);
-  console.log(`[auditoria] Login admin OK — IP ${ip} em ${new Date().toISOString()}`);
+  log.audit("Login admin OK", { ip });
   return res.json({ token: await signAdminToken() });
 });
 
@@ -1514,7 +1516,7 @@ app.post("/api/checkout", async (req, res) => {
   } catch (e: any) {
     const msg = e?.message || "Falha ao processar o pagamento.";
     const status = typeof e?.status === "number" ? e.status : 502;
-    console.error(`[checkout] falha (${meio}) ip=${req.ip}:`, msg);
+    log.error("Falha no checkout", { meio, ip: req.ip, msg });
     return res.status(status).json({ erro: msg });
   }
 });
@@ -2712,16 +2714,9 @@ app.post("/api/cliente/excluir-confirmar", async (req, res) => {
 // ---------------------------------------------------------------------------
 function emailDoToken(req: express.Request): string | null {
   const auth = (req.headers.authorization || "").replace("Bearer ", "").trim();
-  if (!auth) return null;
-  try {
-    // JWT não assinado: só decodifica o payload (não valida — o Supabase já
-    // validou ao emitir; aqui só extraímos o email para isolamento de dados).
-    const payload = JSON.parse(Buffer.from(auth.split(".")[1], "base64").toString("utf8"));
-    const email = (payload.email || "").toString().trim().toLowerCase();
-    return /@/.test(email) ? email : null;
-  } catch {
-    return null;
-  }
+  // JWT não assinado: só decodifica o payload (não valida — o Supabase já
+  // validou ao emitir; aqui só extraímos o email para isolamento de dados).
+  return extrairEmailDoToken(auth);
 }
 
 function requireCliente(req: express.Request, res: express.Response): string | null {

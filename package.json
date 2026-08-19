@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "start": "tsx server/index.ts",
     "server": "tsx server/index.ts",
+    "test": "vitest run",
     "deploy": "npx wrangler pages deploy dist --project-name appdgriffedois --commit-dirty=true",
     "deploy:all": "npm run build && npx wrangler pages deploy dist --project-name appdgriffedois --commit-dirty=true"
   },
@@ -39,6 +40,7 @@
     "typescript": "5.9.3",
     "vite": "7.3.2",
     "vite-plugin-singlefile": "2.3.0",
+    "vitest": "^2.1.9",
     "wrangler": "^4.115.0"
   }
 }

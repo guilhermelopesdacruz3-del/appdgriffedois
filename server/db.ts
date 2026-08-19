@@ -15,6 +15,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { calcularNovoSaldo } from "./estoqueMath";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const CONFIG_STORE_PATH = path.join(__dirname, ".store-config.json");
@@ -1014,7 +1015,7 @@ export async function registrarMovimentoEstoque(mov: EstoqueMov): Promise<void> 
   const atual = await getEstoque(mov.produto_id);
   const saldoAtual = atual ? atual.quantidade : 0;
   // mov.quantidade é positivo para entradas e negativo para saídas/vendas.
-  const novoSaldo = Math.max(0, saldoAtual + mov.quantidade);
+  const novoSaldo = calcularNovoSaldo(saldoAtual, mov.quantidade);
   await upsertEstoque(mov.produto_id, novoSaldo, {
     nome: mov.nome,
     sku: mov.sku,
