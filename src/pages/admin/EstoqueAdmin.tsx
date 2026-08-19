@@ -37,6 +37,7 @@ export default function EstoqueAdmin() {
   const [erro, setErro] = useState<string | null>(null);
   const [excluindo, setExcluindo] = useState<number | null>(null);
   const [confirmarExclusao, setConfirmarExclusao] = useState<number | null>(null);
+  const [busca, setBusca] = useState("");
 
   const [produtoId, setProdutoId] = useState("");
   const [nome, setNome] = useState("");
@@ -257,17 +258,31 @@ export default function EstoqueAdmin() {
 
       {/* Tabela de estoque */}
       <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-4">
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 gap-3 flex-wrap">
           <p className="text-xs font-bold text-slate-800 flex items-center gap-2">
             <span className="w-1 h-3.5 rounded-full bg-violet-600 inline-block" />
             Estoque Atual ({itens.length})
           </p>
-          <button
-            onClick={carregar}
-            className="text-[10px] font-semibold text-violet-600 hover:text-violet-800"
-          >
-            Atualizar
-          </button>
+          <div className="flex items-center gap-2">
+            <div className="relative">
+              <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+              </svg>
+              <input
+                type="text"
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar por ID ou nome..."
+                className="w-56 pl-8 pr-3 py-1.5 text-xs border border-slate-300 rounded-lg focus:ring-2 focus:ring-violet-400 outline-none"
+              />
+            </div>
+            <button
+              onClick={carregar}
+              className="text-[10px] font-semibold text-violet-600 hover:text-violet-800"
+            >
+              Atualizar
+            </button>
+          </div>
         </div>
         {carregando ? (
           <p className="text-xs text-slate-400">Carregando...</p>
@@ -276,6 +291,19 @@ export default function EstoqueAdmin() {
         ) : itens.length === 0 ? (
           <p className="text-xs text-slate-400">Nenhum produto com estoque registrado ainda.</p>
         ) : (
+          (() => {
+            const termo = busca.trim().toLowerCase();
+            const filtrados = termo
+              ? itens.filter(
+                  (i) =>
+                    String(i.produto_id).includes(termo) ||
+                    (i.nome || "").toLowerCase().includes(termo)
+                )
+              : itens;
+            if (filtrados.length === 0) {
+              return <p className="text-xs text-slate-400">Nenhum resultado para "{busca}".</p>;
+            }
+            return (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
               <thead>
@@ -289,7 +317,7 @@ export default function EstoqueAdmin() {
                 </tr>
               </thead>
               <tbody>
-                {itens.map((i) => (
+                {filtrados.map((i) => (
                   <tr key={i.produto_id} className="border-b border-slate-100">
                     <td className="py-2 px-2 text-slate-400">#{i.produto_id}</td>
                     <td className="py-2 px-2 font-medium text-slate-800">{i.nome}</td>
@@ -325,6 +353,8 @@ export default function EstoqueAdmin() {
               </tbody>
             </table>
           </div>
+            );
+          })()
         )}
       </div>
 
