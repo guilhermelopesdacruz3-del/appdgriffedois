@@ -35,6 +35,8 @@ export default function EstoqueAdmin() {
   const [movimentos, setMovimentos] = useState<Movimento[]>([]);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
+  const [excluindo, setExcluindo] = useState<number | null>(null);
+  const [confirmarExclusao, setConfirmarExclusao] = useState<number | null>(null);
 
   const [produtoId, setProdutoId] = useState("");
   const [nome, setNome] = useState("");
@@ -115,6 +117,25 @@ export default function EstoqueAdmin() {
       setMsg(e?.message || "Erro ao salvar");
     } finally {
       setSalvando(false);
+    }
+  };
+
+  const excluir = async (pid: number) => {
+    setExcluindo(pid);
+    try {
+      const token = getAdminToken();
+      const resp = await fetch(`/api/admin/estoque/${pid}`, {
+        method: "DELETE",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.erro || "Falha ao excluir");
+      setConfirmarExclusao(null);
+      await carregar();
+    } catch (e: any) {
+      setMsg(e?.message || "Erro ao excluir");
+    } finally {
+      setExcluindo(null);
     }
   };
 
@@ -264,6 +285,7 @@ export default function EstoqueAdmin() {
                   <th className="text-right py-2 px-2">Qtd</th>
                   <th className="text-right py-2 px-2">Limite</th>
                   <th className="text-left py-2 px-2">Status</th>
+                  <th className="text-right py-2 px-2">Ação</th>
                 </tr>
               </thead>
               <tbody>
@@ -278,6 +300,24 @@ export default function EstoqueAdmin() {
                         <span className="text-[10px] font-bold text-amber-700 bg-amber-100 rounded-full px-2 py-0.5">Baixo</span>
                       ) : (
                         <span className="text-[10px] font-bold text-green-700 bg-green-100 rounded-full px-2 py-0.5">OK</span>
+                      )}
+                    </td>
+                    <td className="py-2 px-2 text-right">
+                      {confirmarExclusao === i.produto_id ? (
+                        <div className="flex items-center justify-end gap-1">
+                          <button onClick={() => excluir(i.produto_id)} disabled={excluindo === i.produto_id} className="text-[10px] font-bold text-white bg-red-600 rounded px-2 py-1 disabled:opacity-50">
+                            {excluindo === i.produto_id ? "..." : "Confirmar"}
+                          </button>
+                          <button onClick={() => setConfirmarExclusao(null)} className="text-[10px] font-bold text-slate-500 bg-slate-100 rounded px-2 py-1">
+                            Cancelar
+                          </button>
+                        </div>
+                      ) : (
+                        <button onClick={() => setConfirmarExclusao(i.produto_id)} className="text-slate-400 hover:text-red-600" title="Excluir item">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" />
+                          </svg>
+                        </button>
                       )}
                     </td>
                   </tr>

@@ -1616,6 +1616,35 @@ app.post("/api/admin/estoque/saida", requireAdmin, async (req, res) => {
   }
 });
 
+// Excluir item do estoque (admin).
+app.delete("/api/admin/estoque/:produto_id", requireAdmin, async (req, res) => {
+  try {
+    const produto_id = Number(req.params.produto_id);
+    if (!produto_id) return res.status(400).json({ erro: "produto_id inválido." });
+    const sb = supabaseClient();
+    if (!sb) return res.status(500).json({ erro: "Supabase indisponível." });
+    // Registra movimento de exclusão no histórico.
+    const atual = await getEstoque(produto_id);
+    if (atual) {
+      await sb.from("estoque_movimentos").insert({
+        produto_id,
+        nome: atual.nome || `Produto ${produto_id}`,
+        sku: atual.sku || null,
+        quantidade: -atual.quantidade,
+        motivo: "ajuste",
+        admin_id: req.adminEmail || "admin",
+        observacao: "Exclusão do item de estoque",
+      });
+    }
+    const { error } = await sb.from("estoque").delete().eq("produto_id", produto_id);
+    if (error) throw new Error(error.message);
+    return res.json({ ok: true, produto_id });
+  } catch (err: any) {
+    console.error("[estoque admin] falha ao excluir:", err);
+    return res.status(500).json({ erro: "Falha ao excluir item." });
+  }
+});
+
 // ---------------------------------------------------------------------------
 // WEBHOOK DO MERCADO PAGO — confirmação automática de pagamento.
 // O MP POSTa aqui quando o status de um pagamento muda. Validamos a assinatura
