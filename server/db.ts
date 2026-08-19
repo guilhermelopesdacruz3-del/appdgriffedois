@@ -1010,7 +1010,12 @@ export async function registrarMovimentoEstoque(mov: EstoqueMov): Promise<void> 
     admin_id: mov.admin_id || null,
     observacao: mov.observacao || null,
   });
-  await upsertEstoque(mov.produto_id, mov.quantidade, {
+  // Calcula o novo saldo somando/subtraindo do atual.
+  const atual = await getEstoque(mov.produto_id);
+  const saldoAtual = atual ? atual.quantidade : 0;
+  // mov.quantidade é positivo para entradas e negativo para saídas/vendas.
+  const novoSaldo = Math.max(0, saldoAtual + mov.quantidade);
+  await upsertEstoque(mov.produto_id, novoSaldo, {
     nome: mov.nome,
     sku: mov.sku,
     limite_baixo: mov.limite_baixo,
