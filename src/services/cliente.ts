@@ -1,51 +1,21 @@
-// API de cadastro/OTP do cliente + perfil/endereços/preferências (C2, C3, C7).
+// API de cadastro/login com senha do cliente + perfil/endereços/preferências (C2, C3, C7).
 
-// ---------------------------------------------------------------------------
-// Cadastro + Login OTP (Supabase Auth) — C5
-// ---------------------------------------------------------------------------
 function sbUrl(): string {
   return (import.meta.env.VITE_SUPABASE_URL as string | undefined) || "";
 }
 
-export async function cadastrarCliente(dados: {
-  email: string;
-  nome?: string;
-  telefone?: string;
-  cpf?: string;
-  aceiteLgpd?: boolean;
-}): Promise<{ ok: boolean; mensagem?: string }> {
-  const r = await fetch(`/api/cliente/cadastro`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(dados),
-  });
-  const json = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(json.erro || `Falha ao cadastrar (${r.status})`);
-  return json;
-}
-
-export async function verificarOtp(
+export async function registrarComSenha(
   email: string,
-  token: string
-): Promise<{ ok: boolean; session?: unknown; user?: unknown }> {
-  const r = await fetch(`/api/cliente/verificar`, {
+  senha: string,
+  nome?: string
+): Promise<{ ok: boolean; mensagem?: string; session?: unknown; user?: unknown }> {
+  const r = await fetch(`/api/cliente/login-password`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, token }),
+    body: JSON.stringify({ email, senha, nome }),
   });
   const json = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(json.erro || `Código inválido (${r.status})`);
-  return json;
-}
-
-export async function loginComMagicLink(email: string): Promise<{ ok: boolean; mensagem?: string }> {
-  const r = await fetch(`/api/cliente/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
-  });
-  const json = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(json.erro || `Falha ao enviar link (${r.status})`);
+  if (!r.ok) throw new Error(json.erro || `Falha no cadastro (${r.status})`);
   return json;
 }
 
@@ -60,23 +30,6 @@ export async function loginComSenha(
   });
   const json = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(json.erro || `Falha no login (${r.status})`);
-  return json;
-}
-
-export async function registrarComSenha(
-  email: string,
-  senha: string,
-  nome?: string,
-  telefone?: string,
-  cpf?: string
-): Promise<{ ok: boolean; mensagem?: string; session?: unknown; user?: unknown }> {
-  const r = await fetch(`/api/cliente/login-password`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, senha, nome, telefone, cpf }),
-  });
-  const json = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(json.erro || `Falha no cadastro (${r.status})`);
   return json;
 }
 
