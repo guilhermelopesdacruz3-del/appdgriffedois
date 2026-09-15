@@ -213,7 +213,7 @@ export function mapProdutoParaProduct(
           produto.estoque_situacao_em_estoque !== null &&
           produto.estoque_situacao_em_estoque !== 0 &&
           produto.estoque_situacao_em_estoque !== 20,
-    sobConsulta: produto.preco_sob_consulta === true || (price <= 0 && !produto.preco_sob_consulta),
+    sobConsulta: false,
   };
 }
 
