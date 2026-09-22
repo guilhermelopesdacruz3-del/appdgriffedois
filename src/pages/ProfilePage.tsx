@@ -682,12 +682,6 @@ export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNav
     setEtapaLogin("senha");
   };
 
-  const confirmarLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim()) return;
-    setEtapaLogin("senha");
-  };
-
   const enviarLoginSenha = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email.trim()) return setErroLogin("Digite seu e-mail.");

@@ -3,10 +3,8 @@ import { formatPrice } from "../utils";
 import {
   adminLogin,
   adminLogout,
-  atualizarStatusPedido,
   buscarPedidoAdmin,
   clearAdminToken,
-  definirVerificadoPedido,
   getAdminToken,
   listarClientesAdmin,
   listarPedidosAdmin,
@@ -18,7 +16,7 @@ import {
   type RelatorioAdmin,
   type SituacaoPedido,
 } from "../services/admin";
-import { BarChart, PieChart, KpiCard } from "../components/admin/AdminCharts";
+import { PieChart } from "../components/admin/AdminCharts";
 import { ApiConfigPanel } from "../components/admin/ApiConfigPanel";
 import CuponsAdmin from "./admin/CuponsAdmin";
 import FidelidadeAdmin from "./admin/FidelidadeAdmin";
@@ -58,11 +56,10 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
   const [situacoes, setSituacoes] = useState<SituacaoPedido[]>([]);
   const [mostrarApi, setMostrarApi] = useState(false);
 
-  const [selecionado, setSelecionado] = useState<number | string | null>(null);
-  const [detalhe, setDetalhe] = useState<AdminPedido | null>(null);
-  const [detalheLoading, setDetalheLoading] = useState(false);
-  const [salvandoStatus, setSalvandoStatus] = useState(false);
-  const [statusSelecionado, setStatusSelecionado] = useState("");
+  const [, setSelecionado] = useState<number | string | null>(null);
+  const [, setDetalhe] = useState<AdminPedido | null>(null);
+  const [, setDetalheLoading] = useState(false);
+  const [, setStatusSelecionado] = useState("");
 
   const [relatorio, setRelatorio] = useState<RelatorioAdmin | null>(null);
   const [clientes, setClientes] = useState<ClienteRelatorio[]>([]);
@@ -179,7 +176,6 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
     clearAdminToken();
     setToken(null);
     setPedidos([]);
-    setSelecionado(null);
     setDetalhe(null);
     setRelatorio(null);
     setClientes([]);
@@ -191,11 +187,14 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
     setDetalheLoading(true);
     try {
       const p = await buscarPedidoAdmin(id);
-      const mapeado: AdminPedido = {
+      const mapeado = {
         id: p.id,
         numero: p.numero,
         cliente_nome: p.cliente_nome,
         cliente_email: p.cliente_email,
+        cliente_cpf: p.cliente_cpf,
+        cliente_telefone: p.cliente_telefone,
+        cliente_endereco: p.cliente_endereco,
         status: p.situacao?.nome || "—",
         status_id: p.situacao?.id,
         status_uri: p.situacao?.resource_uri,
@@ -204,40 +203,13 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
         items: (p.itens || []).reduce((s, i) => s + (i.quantidade || 0), 0),
         verificado: Boolean((p as any).verificado),
         verificado_em: (p as any).verificado_em || null,
-      };
+      } as AdminPedido;
       setDetalhe(mapeado);
       setStatusSelecionado(String((p.situacao?.id ?? "") as any));
     } catch (e) {
       setErro((e as Error).message);
     } finally {
       setDetalheLoading(false);
-    }
-  };
-
-  const salvarStatus = async () => {
-    if (!detalhe || !statusSelecionado) return;
-    setSalvandoStatus(true);
-    try {
-      const sit = situacoes.find((s) => String(s.id) === statusSelecionado);
-      await atualizarStatusPedido(detalhe.id, sit?.resource_uri || sit?.id || statusSelecionado);
-      await carregarPedidos();
-      setDetalhe({ ...detalhe, status: sit?.nome || detalhe.status, status_id: sit?.id, status_uri: sit?.resource_uri });
-    } catch (e) {
-      setErro((e as Error).message);
-    } finally {
-      setSalvandoStatus(false);
-    }
-  };
-
-  const alternarVerificado = async () => {
-    if (!detalhe) return;
-    const novo = !detalhe.verificado;
-    try {
-      await definirVerificadoPedido(detalhe.id, novo);
-      setDetalhe({ ...detalhe, verificado: novo, verificado_em: novo ? new Date().toISOString() : null });
-      setPedidos((prev) => prev.map((p) => (p.id === detalhe.id ? { ...p, verificado: novo } : p)));
-    } catch (e) {
-      setErro((e as Error).message);
     }
   };
 
@@ -355,7 +327,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
             <p className="text-[11px] text-slate-400">{total} pedidos no total</p>
           </div>
           <div className="flex items-center gap-2">
-            <button className="h-9 px-4 rounded-xl border border-violet-200 bg-violet-50 text-violet-600 text-[11px] font-bold hover:bg-violet-100 active:scale-95 transition-all flex items-center gap-1.5">
+            <button onClick={() => setMostrarApi((v) => !v)} className={`h-9 px-4 rounded-xl border text-[11px] font-bold active:scale-95 transition-all flex items-center gap-1.5 ${mostrarApi ? "bg-violet-600 text-white border-violet-600" : "border-violet-200 bg-violet-50 text-violet-600 hover:bg-violet-100"}`}>
               <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 6V4m0 16v-2m6-6h2M4 12h2m10.5-4.5l1.5-1.5M6 18l1.5-1.5M16.5 16.5L18 18M6 6l1.5 1.5" /><circle cx="12" cy="12" r="3" /></svg>
               APIs
             </button>

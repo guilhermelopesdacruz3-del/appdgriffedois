@@ -51,7 +51,7 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
         setMensagem(r.mensagem || "Conta criada! Redirecionando...");
         setTimeout(() => onVoltar(), 1200);
       } else {
-        setErro(r.erro || "Falha ao criar conta.");
+        setErro((r as any).erro || "Falha ao criar conta.");
       }
     } catch (err) {
       setErro((err as Error).message);
@@ -88,7 +88,7 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
         setMensagem(r.mensagem || "Login OK!");
         setTimeout(() => onVoltar(), 1200);
       } else {
-        setErro(r.erro || "Falha no login.");
+        setErro((r as any).erro || "Falha no login.");
       }
     } catch (err) {
       setErro((err as Error).message);

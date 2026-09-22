@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Product } from "../data";
 import { listarProdutos, type ListarProdutosOpts } from "../services/lojaIntegrada";
-import { demoProducts } from "../demoProducts";
+
+// ------------------------------------------------------------------
+// Removido fallback para catálogo estático — a API da Loja Integrada
+// é obrigatória. Se falhar, mostra erro em vez de produtos errados.
+// ------------------------------------------------------------------
 
 export const PAGE_SIZE = 100;
 
@@ -18,7 +22,7 @@ interface UseProdutosResult {
 }
 
 /** Carrega produtos da Loja Integrada com paginação incremental (PAGE_SIZE por página).
- *  Se a LI não devolver nada (ex.: chaves ausentes), usa catálogo de demonstração temporário. */
+ *  Se a LI não devolver nada, mostra erro (sem fallback para catálogo estático). */
 export function useProdutos(opts: ListarProdutosOpts = {}): UseProdutosResult {
   const [produtos, setProdutos] = useState<Product[]>([]);
   const [total, setTotal] = useState(0);
@@ -45,19 +49,14 @@ export function useProdutos(opts: ListarProdutosOpts = {}): UseProdutosResult {
           setDemo(false);
           offsetRef.current = PAGE_SIZE;
         } else {
-          // Sem produtos da LI (provável: chaves ausentes) -> catálogo demo temporário.
-          setProdutos(demoProducts);
-          setTotal(demoProducts.length);
-          setDemo(true);
+          // Sem produtos da LI — mostra erro em vez de fallback
+          setError("Nenhum produto retornado pela Loja Integrada. Verifique as chaves de API.");
         }
       })
       .catch(() => {
         if (cancelado) return;
-        // Falha ao contatar a LI -> demo, sem quebrar a tela.
-        setProdutos(demoProducts);
-        setTotal(demoProducts.length);
-        setDemo(true);
-        setError(null);
+        // Falha ao contatar a LI — mostra erro em vez de fallback
+        setError("Não foi possível carregar os produtos da loja. Verifique as chaves da Loja Integrada.");
       })
       .finally(() => {
         if (!cancelado) setLoading(false);
@@ -70,7 +69,7 @@ export function useProdutos(opts: ListarProdutosOpts = {}): UseProdutosResult {
   }, [optsKey, reloadKey]);
 
   const loadMore = useCallback(() => {
-    if (loadingMore) return;
+    if (loadingMore || demo) return;
     const offset = offsetRef.current;
     if (produtos.length >= total) return;
     setLoadingMore(true);
