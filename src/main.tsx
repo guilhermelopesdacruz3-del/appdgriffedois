@@ -12,7 +12,9 @@ createRoot(document.getElementById("root")!).render(
 // Registro do Service Worker (PWA/TWA). Só em produção (https) e fora do dev.
 if ("serviceWorker" in navigator && import.meta.env.PROD && window.location.protocol === "https") {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").then((registration) => {
+    // Cache-busting: força o browser a buscar o SW novo a cada deploy
+    const swUrl = "/sw.js?v=" + Date.now();
+    navigator.serviceWorker.register(swUrl).then((registration) => {
       // Forçar atualização do service worker quando houver nova versão
       registration.update();
     }).catch(() => {
