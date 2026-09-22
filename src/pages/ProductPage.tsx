@@ -246,28 +246,51 @@ export default function ProductPage({ product, onBack, onTryOn, onComprar }: Pro
           </div>
         )}
 
-        {/* Color Selection */}
-        {product.colors.length > 0 && (
-          <div className="mb-5">
-            <p className="text-xs font-semibold text-luxury-black mb-3">
-              Cor: <span className="text-gold">{product.colorNames[selectedColor] ?? product.colorNames[0]}</span>
-            </p>
-            <div className="flex gap-3">
-              {product.colors.map((color, index) => (
-              <button
-                key={index}
-                onClick={() => setSelectedColor(index)}
-                className={`relative w-12 h-12 rounded-full transition-all duration-200 ${selectedColor === index ? "ring-2 ring-gold ring-offset-2 scale-110" : "ring-1 ring-gray-200 hover:ring-gray-400"}`}
-                style={{ backgroundColor: color }}
-              >
-                {selectedColor === index && (
-                  <svg className="absolute inset-0 m-auto" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
-                )}
-              </button>
-            ))}
+        {/* Color or Variation Selection */}
+        <div className="mb-5">
+          {productAtual.variacoes && productAtual.variacoes.length > 0 ? (
+            <div className="mb-5">
+              <p className="text-xs font-semibold text-luxury-black mb-3">
+                Variação: <span className="text-gold">{productAtual.variacoes[selectedColor] ?? productAtual.variacoes[0]}</span>
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {productAtual.variacoes.map((variacao, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setSelectedColor(index)}
+                    className={`h-12 px-5 rounded-xl border transition-all duration-200 ${
+                      selectedColor === index
+                        ? "border-gold bg-gold/10 text-gold font-semibold"
+                        : "border-ice-dark text-gray-600 hover:border-gold/30"
+                    }`}
+                  >
+                    {variacao}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="mb-5">
+              <p className="text-xs font-semibold text-luxury-black mb-3">
+                Cor: <span className="text-gold">{product.colorNames[selectedColor] ?? product.colorNames[0]}</span>
+              </p>
+              <div className="flex gap-3">
+                {product.colors.map((color, index) => (
+                <button
+                  key={index}
+                  onClick={() => setSelectedColor(index)}
+                  className={`relative w-12 h-12 rounded-full transition-all duration-200 ${selectedColor === index ? "ring-2 ring-gold ring-offset-2 scale-110" : "ring-1 ring-gray-200 hover:ring-gray-400"}`}
+                  style={{ backgroundColor: color }}
+                >
+                  {selectedColor === index && (
+                    <svg className="absolute inset-0 m-auto" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+                  )}
+                </button>
+              ))}
+              </div>
+            </div>
+          )}
+        </div>
 
         {/* Divider */}
         <div className="h-px bg-ice-dark mb-5" />

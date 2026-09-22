@@ -157,6 +157,19 @@ export default function ProductCard({ product, onSelect, onAddToCart, onTryOn, i
               <span className="text-[10px] text-gray-400 line-through ml-1">{formatPrice(product.originalPrice)}</span>
             )}
           </div>
+          {/* Variações (grades) do produto */}
+          {product.variacoes && product.variacoes.length > 0 && (
+            <div className="mt-1 flex flex-wrap gap-0.5">
+              {product.variacoes.slice(0, 4).map((v, i) => (
+                <span key={i} className="text-[7px] text-gray-500 bg-ice px-1 py-0.5 rounded">
+                  {v}
+                </span>
+              ))}
+              {product.variacoes.length > 4 && (
+                <span className="text-[7px] text-gray-400">+{product.variacoes.length - 4}</span>
+              )}
+            </div>
+          )}
           {product.sobConsulta || product.price <= 0 ? null : (
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="text-[9px] text-green-600 font-medium">{formatPrice(product.pixPrice)} Pix</span>

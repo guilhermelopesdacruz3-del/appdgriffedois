@@ -213,7 +213,11 @@ export function mapProdutoParaProduct(
           produto.estoque_situacao_em_estoque !== null &&
           produto.estoque_situacao_em_estoque !== 0 &&
           produto.estoque_situacao_em_estoque !== 20,
+    // Produtos com variações (grades) não devem ser marcados como "sob consulta"
+    // apenas pelo estoque do produto principal. O estoque real está nas variações.
     sobConsulta: false,
+    // Nomes das variações (grades) — ex.: ["Preto", "Dourado", "Azul"]
+    variacoes: Array.isArray(produto.variacoes) && produto.variacoes.length > 0 ? produto.variacoes : undefined,
   };
 }
 

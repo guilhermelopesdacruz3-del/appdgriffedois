@@ -117,16 +117,35 @@ export async function listarProdutos(opts: ListarProdutosOpts = {}): Promise<{
 
       if ((p.variacoes && p.variacoes.length > 0) || precoCheio === 0) {
         try {
-          const grades = await listResource<any>("produtos_grade", { produto: p.id });
-          if (grades.objects && grades.objects.length > 0) {
-            variacoes = grades.objects.map((g: any) => g.nome || g.nome_visivel || "").filter(Boolean);
-            // Extrai o menor preço entre as varações
+          // Busca as grades (variações) do produto - a LI retorna as grades
+          // como URIs no campo `grades` do produto. Buscamos cada grade
+          // individualmente para obter nome e preço.
+          const gradesUris: string[] = p.grades || [];
+          if (gradesUris.length > 0) {
+            const variacoesNomes: string[] = [];
             const precos: number[] = [];
-            for (const g of grades.objects) {
-              const pCheio = toNumber(g.preco_cheio || g.preco);
-              const pPromo = toNumber(g.preco_promocional || g.preco_promocional);
-              if (pPromo > 0) precos.push(pPromo);
-              if (pCheio > 0) precos.push(pCheio);
+            
+            for (const gradeUri of gradesUris) {
+              try {
+                // gradeUri vem como "/api/v1/grades/834130/" - extrair o ID
+                const parts = gradeUri.split("/").filter(Boolean);
+                const gradeId = parts[parts.length - 1];
+                const grade = await getResource<any>("grades", Number(gradeId));
+                
+                const nome = grade.nome || grade.nome_visivel || "";
+                if (nome) variacoesNomes.push(nome);
+                
+                const pCheio = toNumber(grade.preco_cheio || grade.preco);
+                const pPromo = toNumber(grade.preco_promocional || grade.preco_promocional);
+                if (pPromo > 0) precos.push(pPromo);
+                if (pCheio > 0) precos.push(pCheio);
+              } catch {
+                /* silencioso - se não achar a grade, segue com a próxima */
+              }
+            }
+            
+            if (variacoesNomes.length > 0) {
+              variacoes = variacoesNomes;
             }
             if (precos.length > 0) {
               precoCheio = Math.min(...precos);
@@ -134,7 +153,7 @@ export async function listarProdutos(opts: ListarProdutosOpts = {}): Promise<{
             }
           }
         } catch {
-          /* silencioso — se não achar varações, segue com o preço do produto */
+          /* silencioso — se não achar variações, segue com o preço do produto */
         }
       }
 
@@ -194,7 +213,57 @@ export async function buscarProduto(id: number | string): Promise<Product> {
     getCategoriasLookup(),
     getMarcasLookup(),
   ]);
-  return mapProdutoParaProduct(produto, categoriasLookup, marcasLookup);
+
+  // Se o produto tem grades (variações) mas não tem preços no produto principal,
+  // busca as grades para obter os nomes e preços das variações.
+  let precoCheio = toNumber(produto.preco_cheio);
+  let precoPromocional = toNumber(produto.preco_promocional);
+  let variacoes: string[] = produto.variacoes || [];
+
+  if ((produto.grades && produto.grades.length > 0) || precoCheio === 0) {
+    try {
+      const gradesUris: string[] = produto.grades || [];
+      const variacoesNomes: string[] = [];
+      const precos: number[] = [];
+
+      for (const gradeUri of gradesUris) {
+        try {
+          const parts = gradeUri.split("/").filter(Boolean);
+          const gradeId = parts[parts.length - 1];
+          const grade = await getResource<any>("grades", Number(gradeId));
+          
+          const nome = grade.nome || grade.nome_visivel || "";
+          if (nome) variacoesNomes.push(nome);
+          
+          const pCheio = toNumber(grade.preco_cheio || grade.preco);
+          const pPromo = toNumber(grade.preco_promocional || grade.preco_promocional);
+          if (pPromo > 0) precos.push(pPromo);
+          if (pCheio > 0) precos.push(pCheio);
+        } catch {
+          /* silencioso - se não achar a grade, segue com a próxima */
+        }
+      }
+
+      if (variacoesNomes.length > 0) {
+        variacoes = variacoesNomes;
+      }
+      if (precos.length > 0) {
+        precoCheio = Math.min(...precos);
+        precoPromocional = precoCheio;
+      }
+    } catch {
+      /* silencioso — se não achar variações, segue com o preço do produto */
+    }
+  }
+
+  const produtoComVariacoes = {
+    ...produto,
+    preco_cheio: precoCheio > 0 ? precoCheio : produto.preco_cheio,
+    preco_promocional: precoPromocional > 0 ? precoPromocional : produto.preco_promocional,
+    variacoes: variacoes.length > 0 ? variacoes : produto.variacoes,
+  } as LIProduto;
+
+  return mapProdutoParaProduct(produtoComVariacoes, categoriasLookup, marcasLookup);
 }
 
 /** Consulta rápida de estoque disponível para um produto (útil antes de confirmar o carrinho). */

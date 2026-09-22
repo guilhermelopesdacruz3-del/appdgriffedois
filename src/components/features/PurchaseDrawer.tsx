@@ -64,41 +64,66 @@ export default function PurchaseDrawer({ product, isOpen, onClose, onConfirm }: 
             {/* Divider */}
             <div className="h-px bg-ice-dark mb-5" />
 
-            {/* Color Selection */}
+            {/* Color or Variation Selection */}
             <div className="mb-5">
-              <p className="text-xs font-semibold text-luxury-black mb-3">
-                Cor: <span className="text-gold">{product.colorNames[selectedColor]}</span>
-              </p>
-              <div className="flex gap-3">
-                {product.colors.map((color, index) => (
-                  <button
-                    key={index}
-                    onClick={() => setSelectedColor(index)}
-                    className={`relative w-10 h-10 rounded-full transition-all duration-200 ${
-                      selectedColor === index
-                        ? "ring-2 ring-gold ring-offset-2 scale-110"
-                        : "ring-1 ring-gray-200 hover:ring-gray-400"
-                    }`}
-                    style={{ backgroundColor: color }}
-                  >
-                    {selectedColor === index && (
-                      <svg
-                        className="absolute inset-0 m-auto"
-                        width="16"
-                        height="16"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="white"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
+              {product.variacoes && product.variacoes.length > 0 ? (
+                <>
+                  <p className="text-xs font-semibold text-luxury-black mb-3">
+                    Variação: <span className="text-gold">{product.variacoes[selectedColor]}</span>
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {product.variacoes.map((variacao, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setSelectedColor(index)}
+                        className={`h-10 px-4 rounded-xl border transition-all duration-200 ${
+                          selectedColor === index
+                            ? "border-gold bg-gold/10 text-gold font-semibold"
+                            : "border-ice-dark text-gray-600 hover:border-gold/30"
+                        }`}
                       >
-                        <polyline points="20 6 9 17 4 12" />
-                      </svg>
-                    )}
-                  </button>
-                ))}
-              </div>
+                        {variacao}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <p className="text-xs font-semibold text-luxury-black mb-3">
+                    Cor: <span className="text-gold">{product.colorNames[selectedColor]}</span>
+                  </p>
+                  <div className="flex gap-3">
+                    {product.colors.map((color, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setSelectedColor(index)}
+                        className={`relative w-10 h-10 rounded-full transition-all duration-200 ${
+                          selectedColor === index
+                            ? "ring-2 ring-gold ring-offset-2 scale-110"
+                            : "ring-1 ring-gray-200 hover:ring-gray-400"
+                        }`}
+                        style={{ backgroundColor: color }}
+                      >
+                        {selectedColor === index && (
+                          <svg
+                            className="absolute inset-0 m-auto"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="white"
+                            strokeWidth="3"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <polyline points="20 6 9 17 4 12" />
+                          </svg>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
 
             {/* Quantity */}

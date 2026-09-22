@@ -33,6 +33,8 @@ export interface Product {
   estoqueSituacao?: number;
   /** true quando a situação indica que o produto está em estoque (situação 7). */
   emEstoque?: boolean;
+  /** Nomes das variações (grades) do produto, ex.: ["Preto", "Dourado", "Azul"]. */
+  variacoes?: string[];
 }
 
 /**
