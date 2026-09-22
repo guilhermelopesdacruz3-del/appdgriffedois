@@ -3,7 +3,6 @@ import { formatPrice } from "../utils";
 import {
   adminLogin,
   adminLogout,
-  buscarPedidoAdmin,
   clearAdminToken,
   getAdminToken,
   listarClientesAdmin,
@@ -11,6 +10,7 @@ import {
   listarSituacoes,
   pedidoParaCSV,
   relatorioAdmin,
+  atualizarStatusPedido,
   type AdminPedido,
   type ClienteRelatorio,
   type RelatorioAdmin,
@@ -22,6 +22,7 @@ import CuponsAdmin from "./admin/CuponsAdmin";
 import FidelidadeAdmin from "./admin/FidelidadeAdmin";
 import NotificacoesAdmin from "./admin/NotificacoesAdmin";
 import AdminDashboard from "./AdminDashboard";
+import PedidoDetalhe from "./admin/PedidoDetalhe";
 
 type Aba = "pedidos" | "dashboard" | "cupons" | "fidelidade" | "notificacoes" | "relatorios" | "logs";
 
@@ -55,11 +56,6 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
   const [filtroDataFim, setFiltroDataFim] = useState("");
   const [situacoes, setSituacoes] = useState<SituacaoPedido[]>([]);
   const [mostrarApi, setMostrarApi] = useState(false);
-
-  const [, setSelecionado] = useState<number | string | null>(null);
-  const [, setDetalhe] = useState<AdminPedido | null>(null);
-  const [, setDetalheLoading] = useState(false);
-  const [, setStatusSelecionado] = useState("");
 
   const [relatorio, setRelatorio] = useState<RelatorioAdmin | null>(null);
   const [clientes, setClientes] = useState<ClienteRelatorio[]>([]);
@@ -176,41 +172,30 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
     clearAdminToken();
     setToken(null);
     setPedidos([]);
-    setDetalhe(null);
+    setPedidoSelecionado(null);
     setRelatorio(null);
     setClientes([]);
     setLogs([]);
   };
 
-  const abrirDetalhe = async (id: number | string) => {
-    setSelecionado(id);
-    setDetalheLoading(true);
-    try {
-      const p = await buscarPedidoAdmin(id);
-      const mapeado = {
-        id: p.id,
-        numero: p.numero,
-        cliente_nome: p.cliente_nome,
-        cliente_email: p.cliente_email,
-        cliente_cpf: p.cliente_cpf,
-        cliente_telefone: p.cliente_telefone,
-        cliente_endereco: p.cliente_endereco,
-        status: p.situacao?.nome || "—",
-        status_id: p.situacao?.id,
-        status_uri: p.situacao?.resource_uri,
-        data: new Date(p.data_criacao).toLocaleDateString("pt-BR", { day: "2-digit", month: "short", year: "numeric" }),
-        total: Number(p.valor_total) || 0,
-        items: (p.itens || []).reduce((s, i) => s + (i.quantidade || 0), 0),
-        verificado: Boolean((p as any).verificado),
-        verificado_em: (p as any).verificado_em || null,
-      } as AdminPedido;
-      setDetalhe(mapeado);
-      setStatusSelecionado(String((p.situacao?.id ?? "") as any));
-    } catch (e) {
-      setErro((e as Error).message);
-    } finally {
-      setDetalheLoading(false);
-    }
+  const [pedidoSelecionado, setPedidoSelecionado] = useState<AdminPedido | null>(null);
+
+  const abrirDetalhePedido = async (p: AdminPedido) => {
+    setPedidoSelecionado(p);
+  };
+
+  const handleStatusChange = async (novoStatus: string) => {
+    if (!pedidoSelecionado) return;
+    const atualizado = (await atualizarStatusPedido(pedidoSelecionado.id, novoStatus)) as any;
+    // Atualiza a lista com o novo status
+    setPedidos((prev) =>
+      prev.map((ped) =>
+        ped.id === pedidoSelecionado.id
+          ? { ...ped, status: atualizado?.situacao?.nome || ped.status, status_id: atualizado?.situacao?.id || ped.status_id }
+          : ped
+      )
+    );
+    return atualizado;
   };
 
   const pedidosFiltrados = pedidos.filter((p) => {
@@ -345,7 +330,10 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
           {aba === "dashboard" && (
             <AdminDashboard
               token={token as string}
-              onAbrirPedido={abrirDetalhe}
+              onAbrirPedido={(id) => {
+                const p = pedidos.find((ped) => ped.id === id);
+                if (p) abrirDetalhePedido(p);
+              }}
               onIrPedidos={() => setAba("pedidos")}
               onIrCupons={() => setAba("cupons")}
               onAbrirApis={() => setMostrarApi(true)}
@@ -422,7 +410,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                             </td>
                             <td className="p-3 text-right text-xs font-bold text-slate-800 whitespace-nowrap">{formatPrice(p.total)}</td>
                             <td className="p-3 text-right">
-                              <button onClick={() => abrirDetalhe(p.id)} className="w-8 h-8 rounded-xl bg-violet-50 text-violet-600 hover:bg-violet-100 text-[10px] font-bold active:scale-95 inline-flex items-center justify-center border border-violet-200 transition-all" title="Ver">
+                              <button onClick={() => abrirDetalhePedido(p)} className="w-8 h-8 rounded-xl bg-violet-50 text-violet-600 hover:bg-violet-100 text-[10px] font-bold active:scale-95 inline-flex items-center justify-center border border-violet-200 transition-all" title="Ver detalhes">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>
                               </button>
                             </td>
@@ -434,6 +422,15 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                 </div>
               )}
             </div>
+          )}
+
+          {/* Modal de detalhes do pedido */}
+          {pedidoSelecionado && (
+            <PedidoDetalhe
+              pedido={pedidoSelecionado}
+              onClose={() => setPedidoSelecionado(null)}
+              onStatusChange={handleStatusChange}
+            />
           )}
 
           {aba === "cupons" && <CuponsAdmin />}
