@@ -16,7 +16,7 @@ import {
   type RelatorioAdmin,
   type SituacaoPedido,
 } from "../services/admin";
-import { PieChart } from "../components/admin/AdminCharts";
+import { BarChart, PieChart } from "../components/admin/AdminCharts";
 import { ApiConfigPanel } from "../components/admin/ApiConfigPanel";
 import CuponsAdmin from "./admin/CuponsAdmin";
 import FidelidadeAdmin from "./admin/FidelidadeAdmin";
@@ -442,12 +442,62 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
 
           {aba === "relatorios" && (
             <div className="space-y-4">
+              {/* KPIs */}
+              <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                  <p className="text-[9px] text-slate-400 uppercase tracking-wider font-bold">Faturamento Total</p>
+                  <p className="text-2xl font-bold text-slate-800 mt-1">{relatorio ? formatPrice(relatorio.faturamentoTotal) : "—"}</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5">{relatorio?.totalPedidos ?? 0} pedidos</p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                  <p className="text-[9px] text-slate-400 uppercase tracking-wider font-bold">Faturamento Aprovado</p>
+                  <p className="text-2xl font-bold text-emerald-600 mt-1">{relatorio ? formatPrice(relatorio.faturamentoAprovado) : "—"}</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5">aprovados</p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                  <p className="text-[9px] text-slate-400 uppercase tracking-wider font-bold">Ticket Médio</p>
+                  <p className="text-2xl font-bold text-violet-600 mt-1">{relatorio ? formatPrice(relatorio.ticketMedio) : "—"}</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5">por pedido</p>
+                </div>
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                  <p className="text-[9px] text-slate-400 uppercase tracking-wider font-bold">Clientes</p>
+                  <p className="text-2xl font-bold text-slate-800 mt-1">{clientes.length}</p>
+                  <p className="text-[9px] text-slate-400 mt-0.5">cadastrados</p>
+                </div>
+              </div>
+
+              {/* Gráfico de faturamento por dia */}
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                <p className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-violet-600 inline-block" />Faturamento por dia</p>
+                <div className="h-48">
+                  <BarChart data={(relatorio?.serieDiaria || []).slice(-14).map((d: any) => ({ label: d.dia, value: d.total }))} />
+                </div>
+              </div>
+
+              {/* Pedidos por status */}
+              {relatorio?.porStatus && Object.keys(relatorio.porStatus).length > 0 && (
+                <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                  <p className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-violet-600 inline-block" />Pedidos por status</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {Object.entries(relatorio.porStatus).map(([status, count]) => (
+                      <div key={status} className="flex items-center justify-between bg-slate-50 border border-slate-100 rounded-xl px-3 py-2">
+                        <span className="text-[11px] font-semibold text-slate-600">{status}</span>
+                        <span className="text-xs font-bold text-violet-600">{count as number}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Origem (app vs site) */}
               <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
                 <p className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-violet-600 inline-block" />Origem (app vs site)</p>
                 <div className="h-40">
                   <PieChart data={[{ label: "Site", value: relatorio?.porCanal.site || 0, color: "#6366F1" }, { label: "App", value: relatorio?.porCanal.app || 0, color: "#7C3AED" }]} size={140} />
                 </div>
               </div>
+
+              {/* Clientes */}
               <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
                 <p className="text-xs font-bold text-slate-800 mb-3 flex items-center gap-2"><span className="w-1 h-3.5 rounded-full bg-violet-600 inline-block" />Clientes</p>
                 <div className="overflow-x-auto">
