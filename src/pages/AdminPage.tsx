@@ -3,6 +3,7 @@ import { formatPrice } from "../utils";
 import {
   adminLogin,
   adminLogout,
+  buscarPedidoAdmin,
   clearAdminToken,
   getAdminToken,
   listarClientesAdmin,
@@ -181,7 +182,32 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
   const [pedidoSelecionado, setPedidoSelecionado] = useState<AdminPedido | null>(null);
 
   const abrirDetalhePedido = async (p: AdminPedido) => {
-    setPedidoSelecionado(p);
+    // Busca o detalhe completo (com itens, endereço, rastreio) antes de abrir o modal
+    try {
+      const detalheCompleto = await buscarPedidoAdmin(p.id);
+      setPedidoSelecionado({
+        ...p,
+        itens: (detalheCompleto.itens || []).map((it: any) => ({
+          nome: it.nome || "",
+          quantidade: Number(it.quantidade) || 0,
+          preco_venda: Number(it.preco_venda) || 0,
+          sku: it.sku || "",
+          variacao: it.variacao || null,
+        })),
+        pagamento: detalheCompleto.pagamentos?.[0]?.forma_pagamento?.nome || null,
+        pagamento_status: detalheCompleto.pagamentos?.[0]?.status || null,
+        envio: detalheCompleto.envios?.[0]?.forma_envio?.nome || null,
+        envio_status: detalheCompleto.envios?.[0]?.status || null,
+        envio_rastreio: detalheCompleto.envios?.[0]?.objeto || null,
+        endereco_entrega: detalheCompleto.endereco_entrega
+          ? `${detalheCompleto.endereco_entrega.endereco || ""}, ${detalheCompleto.endereco_entrega.numero || ""} — ${detalheCompleto.endereco_entrega.bairro || ""}, ${detalheCompleto.endereco_entrega.cidade || ""}/${detalheCompleto.endereco_entrega.estado || ""} ${detalheCompleto.endereco_entrega.cep || ""}`.trim()
+          : null,
+        observacoes: (detalheCompleto as any).cliente_obs || null,
+        forma_entrega: detalheCompleto.endereco_entrega && !/d'griffe/i.test(detalheCompleto.endereco_entrega.nome || "") ? "entrega" : "retirada",
+      });
+    } catch (e) {
+      setErro((e as Error).message);
+    }
   };
 
   const handleStatusChange = async (novoStatus: string) => {
