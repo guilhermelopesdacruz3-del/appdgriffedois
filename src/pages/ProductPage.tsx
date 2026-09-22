@@ -25,27 +25,30 @@ export default function ProductPage({ product, onBack, onTryOn, onComprar }: Pro
   const [descAberta, setDescAberta] = useState(false);
   const [imagensExtras, setImagensExtras] = useState<string[]>([]);
   const [descricaoFresca, setDescricaoFresca] = useState<string | null>(null);
+  const [productAtual, setProductAtual] = useState(product);
 
-  const discount = product.originalPrice
-    ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
+  const discount = productAtual.originalPrice
+    ? Math.round(((productAtual.originalPrice - productAtual.price) / productAtual.originalPrice) * 100)
     : 0;
 
   // Galeria: principal + imagens extras conhecidas (ou buscadas do produto individual).
   const images = useMemo(() => {
-    const todas = [product.image, ...(product.imagens ?? []), ...imagensExtras].filter(Boolean);
+    const todas = [productAtual.image, ...(productAtual.imagens ?? []), ...imagensExtras].filter(Boolean);
     return [...new Set(todas)];
-  }, [product.image, product.imagens, imagensExtras]);
+  }, [productAtual.image, productAtual.imagens, imagensExtras]);
 
   // Busca dados frescos do produto (todas as imagens e descrição completa).
   useEffect(() => {
     let ativo = true;
     setImagensExtras([]);
     setActiveImageIndex(0);
+    setProductAtual(product);
     buscarProduto(product.id)
       .then((fresco) => {
         if (!ativo) return;
         if (fresco.imagens && fresco.imagens.length > 0) setImagensExtras(fresco.imagens);
         if (fresco.description) setDescricaoFresca(fresco.description);
+        setProductAtual(fresco);
       })
       .catch(() => {});
     return () => { ativo = false; };
@@ -189,7 +192,7 @@ export default function ProductPage({ product, onBack, onTryOn, onComprar }: Pro
 
         {/* Price */}
         <div className="bg-ice rounded-2xl p-4 mb-4">
-          {product.sobConsulta ? (
+          {productAtual.sobConsulta ? (
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xl font-bold text-luxury-black">Sob consulta</span>
               <span className="text-[10px] text-gray-400">Consulte-nos pelo WhatsApp</span>
@@ -197,29 +200,29 @@ export default function ProductPage({ product, onBack, onTryOn, onComprar }: Pro
           ) : (
             <>
               <div className="flex items-center gap-3 mb-1">
-                <span className="text-2xl font-bold text-luxury-black">{formatPrice(product.price)}</span>
-                {product.originalPrice && <span className="text-sm text-gray-400 line-through">{formatPrice(product.originalPrice)}</span>}
+                <span className="text-2xl font-bold text-luxury-black">{formatPrice(productAtual.price)}</span>
+                {productAtual.originalPrice && <span className="text-sm text-gray-400 line-through">{formatPrice(productAtual.originalPrice)}</span>}
               </div>
               <div className="flex items-center gap-2 mb-2">
                 <div className="flex items-center gap-1 bg-green-50 rounded-lg px-2 py-1">
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg>
-                  <span className="text-[11px] text-green-700 font-bold">{formatPrice(product.pixPrice)} via Pix</span>
+                  <span className="text-[11px] text-green-700 font-bold">{formatPrice(productAtual.pixPrice)} via Pix</span>
                 </div>
               </div>
               <p className="text-[10px] text-gray-400">
-                {formatInstallment(product.installmentCount, product.installmentValue)} sem juros
+                {formatInstallment(productAtual.installmentCount, productAtual.installmentValue)} sem juros
               </p>
             </>
           )}
-          {product.stock !== undefined && (
-            <p className={`text-[10px] font-semibold mt-2 ${product.stock > 0 ? "text-green-600" : "text-red-500"}`}>
-              {product.stock > 0 ? `${product.stock} em estoque` : "Produto esgotado — avise-me quando voltar"}
+          {productAtual.stock !== undefined && (
+            <p className={`text-[10px] font-semibold mt-2 ${productAtual.stock > 0 ? "text-green-600" : "text-red-500"}`}>
+              {productAtual.stock > 0 ? `${productAtual.stock} em estoque` : "Produto esgotado — avise-me quando voltar"}
             </p>
           )}
-          {product.stock === undefined && product.emEstoque && (
+          {productAtual.stock === undefined && productAtual.emEstoque && (
             <p className="text-[10px] font-semibold mt-2 text-green-600">Em estoque</p>
           )}
-          {product.stock === undefined && !product.emEstoque && product.estoqueSituacao === 20 && (
+          {productAtual.stock === undefined && !productAtual.emEstoque && productAtual.estoqueSituacao === 20 && (
             <p className="text-[10px] font-semibold mt-2 text-amber-600">Sob consulta — consulte-nos pelo WhatsApp</p>
           )}
         </div>
@@ -354,7 +357,7 @@ export default function ProductPage({ product, onBack, onTryOn, onComprar }: Pro
                 <p className="text-[9px] text-gray-400">{formatInstallment(product.installmentCount, product.installmentValue)} s/ juros</p>
               </div>
               <button
-                onClick={() => onComprar(product)}
+                onClick={() => onComprar(productAtual)}
                 className="flex-shrink-0 px-7 py-3.5 bg-gradient-to-r from-gold to-gold-dark text-luxury-black font-bold rounded-xl active:scale-[0.98] transition-all hover:brightness-110 flex items-center justify-center gap-2 text-sm"
               >
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 002 1.61h9.72a2 2 0 002-1.61L23 6H6" /></svg>
