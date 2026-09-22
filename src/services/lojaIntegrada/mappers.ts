@@ -1,8 +1,9 @@
 import type { Product } from "../../data";
 import type { LICategoria, LICliente, LIMarca, LIPedido, LIProduto } from "./types";
+import { getResource, listResource } from "./client";
 
 /** A API retorna preços/números às vezes como string ("199.90"), às vezes como number. */
-function toNumber(value: string | number | null | undefined): number {
+export function toNumber(value: string | number | null | undefined): number {
   if (value === null || value === undefined || value === "") return 0;
   return typeof value === "number" ? value : parseFloat(value);
 }

@@ -1,6 +1,6 @@
 import type { Product } from "../../data";
 import { getResource, listResource } from "./client";
-import { mapProdutoParaProduct } from "./mappers";
+import { mapProdutoParaProduct, toNumber } from "./mappers";
 import type { LICategoria, LIMarca, LIProduto } from "./types";
 
 export interface ListarProdutosOpts {
@@ -107,8 +107,50 @@ export async function listarProdutos(opts: ListarProdutosOpts = {}): Promise<{
     getMarcasLookup(),
   ]);
 
+  const produtos = await Promise.all(
+    resposta.objects.map(async (p) => {
+      // Produtos com varações podem ter preço 0 no produto principal.
+      // Busca as variações (grades) para extrair o menor preço disponível.
+      let precoCheio = toNumber(p.preco_cheio);
+      let precoPromocional = toNumber(p.preco_promocional);
+      let variacoes: string[] = [];
+
+      if ((p.variacoes && p.variacoes.length > 0) || precoCheio === 0) {
+        try {
+          const grades = await listResource<any>("produtos_grade", { produto: p.id });
+          if (grades.objects && grades.objects.length > 0) {
+            variacoes = grades.objects.map((g: any) => g.nome || g.nome_visivel || "").filter(Boolean);
+            // Extrai o menor preço entre as varações
+            const precos: number[] = [];
+            for (const g of grades.objects) {
+              const pCheio = toNumber(g.preco_cheio || g.preco);
+              const pPromo = toNumber(g.preco_promocional || g.preco_promocional);
+              if (pPromo > 0) precos.push(pPromo);
+              if (pCheio > 0) precos.push(pCheio);
+            }
+            if (precos.length > 0) {
+              precoCheio = Math.min(...precos);
+              precoPromocional = precoCheio;
+            }
+          }
+        } catch {
+          /* silencioso — se não achar varações, segue com o preço do produto */
+        }
+      }
+
+      const produtoComPreco = {
+        ...p,
+        preco_cheio: precoCheio > 0 ? precoCheio : p.preco_cheio,
+        preco_promocional: precoPromocional > 0 ? precoPromocional : p.preco_promocional,
+        variacoes: variacoes.length > 0 ? variacoes : p.variacoes,
+      } as LIProduto;
+
+      return mapProdutoParaProduct(produtoComPreco, categoriasLookup, marcasLookup);
+    })
+  );
+
   return {
-    produtos: resposta.objects.map((p) => mapProdutoParaProduct(p, categoriasLookup, marcasLookup)),
+    produtos,
     total: resposta.meta.total_count,
   };
 }
