@@ -151,7 +151,7 @@ export interface CheckoutResult {
 }
 
 export async function processarCheckout(params: {
-  items: { price: number; qty: number; sku?: string; li_uri?: string; nome?: string }[];
+  items: { price: number; qty: number; sku?: string; li_uri?: string; nome?: string; variacao?: string }[];
   meio: "pix" | "cartao";
   email?: string;
   card_token?: string;
@@ -225,7 +225,7 @@ export async function processarCheckout(params: {
     try {
       const criado = await criarPedidoLI({
         email: email || "",
-        itens: items.map((it) => ({ li_uri: it.li_uri, sku: it.sku, nome: it.nome, preco: it.price, quantidade: it.qty })),
+        itens: items.map((it) => ({ li_uri: it.li_uri, sku: it.sku, nome: it.nome, preco: it.price, quantidade: it.qty, variacao: it.variacao })),
         valor: total,
         meio,
         observacoes,

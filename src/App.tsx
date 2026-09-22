@@ -179,12 +179,18 @@ function AppInner() {
   const handleConfirmAddToCart = useCallback((product: Product, colorIndex: number, quantity: number) => {
     setCartItems((prev) => {
       const existing = prev.findIndex((item) => item.product.id === product.id && item.colorIndex === colorIndex);
+      // Determinar o nome da variação/cor selecionada
+      const variacaoNome = (product.variacoes && product.variacoes[colorIndex])
+        ? product.variacoes[colorIndex]
+        : (product.colorNames && product.colorNames[colorIndex])
+          ? product.colorNames[colorIndex]
+          : undefined;
       if (existing >= 0) {
         const updated = [...prev];
-        updated[existing] = { ...updated[existing], quantity: updated[existing].quantity + quantity };
+        updated[existing] = { ...updated[existing], quantity: updated[existing].quantity + quantity, variacao: variacaoNome };
         return updated;
       }
-      return [...prev, { product, colorIndex, quantity }];
+      return [...prev, { product, colorIndex, quantity, variacao: variacaoNome }];
     });
     setShowCartNotification(true);
     setTimeout(() => setShowCartNotification(false), 2000);

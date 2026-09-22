@@ -164,6 +164,8 @@ export interface ItemPedidoLI {
   nome?: string;
   preco: number;
   quantidade: number;
+  /** Variação/cor selecionada (ex.: "Preto", "Dourado", "52-18-145"). */
+  variacao?: string;
 }
 
 // Extrai o ID numérico do produto a partir do li_uri ou sku.
@@ -216,7 +218,15 @@ export async function criarPedidoLI(opts: {
     .map((i) => {
       const product_id = extrairIdProduto(i);
       if (!product_id || !(i.quantidade > 0)) return null;
-      return { product_id, quantity: i.quantidade, unit_value: i.preco, line_value: i.preco * i.quantidade };
+      const item: Record<string, unknown> = { product_id, quantity: i.quantidade, unit_value: i.preco, line_value: i.preco * i.quantidade };
+      // Incluir variação/cor se disponível
+      if (i.variacao) {
+        item.variacao = i.variacao;
+        item.description = i.nome + ' (' + i.variacao + ')';
+      } else {
+        item.description = i.nome;
+      }
+      return item;
     })
     .filter((x): x is NonNullable<typeof x> => x !== null);
 

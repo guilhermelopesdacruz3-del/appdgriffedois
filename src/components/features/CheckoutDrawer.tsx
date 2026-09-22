@@ -9,6 +9,8 @@ interface CartItem {
   product: Product;
   colorIndex: number;
   quantity: number;
+  /** Nome da variação/cor selecionada (ex.: "Preto", "Dourado", "52-18-145"). */
+  variacao?: string;
 }
 
 interface CheckoutDrawerProps {
@@ -111,7 +113,15 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
     setErro(null);
     try {
       const resultado = await iniciarCheckout({
-        items: items.map((it) => ({ price: it.product.price, qty: it.quantity, sku: String(it.product.id), li_uri: it.product.li_uri, nome: it.product.name })),
+        items: items.map((it) => ({
+          price: it.product.price,
+          qty: it.quantity,
+          sku: String(it.product.id),
+          li_uri: it.product.li_uri,
+          nome: it.product.name,
+          // Enviar a variação/cor selecionada como detalhe do item
+          variacao: it.variacao || (it.product.colorNames && it.product.colorNames[it.colorIndex] ? it.product.colorNames[it.colorIndex] : undefined),
+        })),
         cliente: {
           email: email.trim(),
           nome: nome.trim(),
@@ -423,7 +433,14 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
                   setErro(null);
                   try {
                     const resultado = await iniciarCheckout({
-                      items: items.map((it) => ({ price: it.product.price, qty: it.quantity, sku: String(it.product.id), li_uri: it.product.li_uri, nome: it.product.name })),
+                      items: items.map((it) => ({
+                        price: it.product.price,
+                        qty: it.quantity,
+                        sku: String(it.product.id),
+                        li_uri: it.product.li_uri,
+                        nome: it.product.name,
+                        variacao: it.variacao || (it.product.colorNames && it.product.colorNames[it.colorIndex] ? it.product.colorNames[it.colorIndex] : undefined),
+                      })),
                       cliente: {
                         email: email.trim(),
                         nome: nome.trim(),
