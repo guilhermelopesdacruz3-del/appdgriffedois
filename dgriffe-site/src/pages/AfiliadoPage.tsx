@@ -35,26 +35,26 @@ export default function AfiliadoPage() {
   return (
     <div>
       {/* Hero */}
-      <section className="relative bg-gradient-to-br from-violet-900 via-purple-900 to-violet-800 overflow-hidden">
+      <section className="relative bg-luxury-black overflow-hidden">
         <div className="absolute inset-0 opacity-20">
-          <div className="absolute top-10 left-10 w-64 h-64 bg-violet-400 rounded-full blur-3xl" />
-          <div className="absolute bottom-10 right-10 w-96 h-96 bg-purple-400 rounded-full blur-3xl" />
+          <div className="absolute top-10 left-10 w-64 h-64 bg-gold rounded-full blur-3xl" />
+          <div className="absolute bottom-10 right-10 w-96 h-96 bg-gold rounded-full blur-3xl" />
         </div>
         <div className="container-site relative py-20 md:py-28">
           <div className="max-w-2xl">
-            <p className="text-violet-300 font-semibold uppercase tracking-widest text-sm mb-4">Programa Afiliado</p>
+            <p className="text-gold font-semibold uppercase tracking-widest text-sm mb-4">Programa Afiliado</p>
             <h1 className="font-display text-4xl md:text-5xl font-bold text-white mb-6">
               Ganhe comissão vendendo
-              <span className="text-violet-300"> óculos D'Griffe</span>
+              <span className="text-gold"> óculos D'Griffe</span>
             </h1>
-            <p className="text-lg text-violet-200 mb-8">
+            <p className="text-lg text-gray-300 mb-8">
               Cadastre-se como afiliado e ganhe comissão por cada venda realizada através do seu link.
               Use o GoMarketme para rastrear suas vendas e receber seus ganhos.
             </p>
             <div className="flex flex-wrap gap-4">
               <a
                 href="#cadastro"
-                className="bg-white text-violet-700 font-semibold px-6 py-3 rounded-xl hover:bg-violet-50 transition-all"
+                className="btn-gold font-semibold px-6 py-3 rounded-xl transition-all"
               >
                 Cadastre-se Agora
               </a>
@@ -62,7 +62,7 @@ export default function AfiliadoPage() {
                 href="https://gomarketme.com.br"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="border border-white/30 text-white font-semibold px-6 py-3 rounded-xl hover:bg-white/10 transition-all"
+                className="border border-gold/40 text-gold font-semibold px-6 py-3 rounded-xl hover:bg-gold/10 transition-all"
               >
                 Conheça o GoMarketme
               </a>
@@ -77,8 +77,8 @@ export default function AfiliadoPage() {
           <h2 className="section-title text-center mb-10">Como Funciona</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="card p-6 text-center">
-              <div className="w-12 h-12 rounded-full bg-violet-100 flex items-center justify-center mx-auto mb-4">
-                <Users size={24} className="text-violet-600" />
+              <div className="w-12 h-12 rounded-full bg-gold/10 flex items-center justify-center mx-auto mb-4">
+                <Users size={24} className="text-gold" />
               </div>
               <h3 className="text-lg font-bold text-luxury-black mb-2">1. Cadastre-se</h3>
               <p className="text-sm text-gray-600">
@@ -86,8 +86,8 @@ export default function AfiliadoPage() {
               </p>
             </div>
             <div className="card p-6 text-center">
-              <div className="w-12 h-12 rounded-full bg-violet-100 flex items-center justify-center mx-auto mb-4">
-                <TrendingUp size={24} className="text-violet-600" />
+              <div className="w-12 h-12 rounded-full bg-gold/10 flex items-center justify-center mx-auto mb-4">
+                <TrendingUp size={24} className="text-gold" />
               </div>
               <h3 className="text-lg font-bold text-luxury-black mb-2">2. Indique</h3>
               <p className="text-sm text-gray-600">
@@ -95,8 +95,8 @@ export default function AfiliadoPage() {
               </p>
             </div>
             <div className="card p-6 text-center">
-              <div className="w-12 h-12 rounded-full bg-violet-100 flex items-center justify-center mx-auto mb-4">
-                <DollarSign size={24} className="text-violet-600" />
+              <div className="w-12 h-12 rounded-full bg-gold/10 flex items-center justify-center mx-auto mb-4">
+                <DollarSign size={24} className="text-gold" />
               </div>
               <h3 className="text-lg font-bold text-luxury-black mb-2">3. Ganhe</h3>
               <p className="text-sm text-gray-600">
@@ -129,7 +129,7 @@ export default function AfiliadoPage() {
                   Ativar no GoMarketme
                 </a>
                 <p className="text-[10px] text-gray-400 mt-4">
-                  Ou acesse sua área: <a href="/afiliado-area" className="text-violet-600 font-bold">Clique aqui</a>
+                  Ou acesse sua área: <a href="/afiliado-area" className="text-gold font-bold">Clique aqui</a>
                 </p>
               </div>
             ) : (
@@ -141,7 +141,7 @@ export default function AfiliadoPage() {
                     value={nome}
                     onChange={(e) => setNome(e.target.value)}
                     required
-                    className="w-full h-11 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-violet-500"
+                    className="w-full h-11 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-gold"
                   />
                 </div>
                 <div>
@@ -151,7 +151,7 @@ export default function AfiliadoPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="w-full h-11 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-violet-500"
+                    className="w-full h-11 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-gold"
                   />
                 </div>
                 <div>
@@ -162,7 +162,7 @@ export default function AfiliadoPage() {
                     onChange={(e) => setTelefone(e.target.value)}
                     required
                     placeholder="(51) 99999-9999"
-                    className="w-full h-11 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-violet-500"
+                    className="w-full h-11 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-gold"
                   />
                 </div>
 

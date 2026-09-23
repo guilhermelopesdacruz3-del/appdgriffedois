@@ -312,17 +312,23 @@ export default function HomePage() {
       )}
 
       {/* 7. Carrossel de Marcas */}
-      <section className="py-12 bg-ice">
+      <section className="py-12 bg-ice overflow-hidden">
         <div className="container-site">
           <div className="text-center mb-8">
             <h2 className="section-title">Nossas Marcas</h2>
             <p className="text-sm text-gray-500 mt-2">Grifes autorizadas e originais</p>
           </div>
-          <div className="flex flex-wrap justify-center items-center gap-8 md:gap-14">
-            {BRANDS.map((brand) => (
+        </div>
+        <div className="relative">
+          {/* Fade edges */}
+          <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-ice to-transparent z-10" />
+          <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-ice to-transparent z-10" />
+          {/* Scrolling track */}
+          <div className="flex animate-marquee gap-16 items-center py-4">
+            {[...BRANDS, ...BRANDS].map((brand, i) => (
               <div
-                key={brand.name}
-                className="w-28 h-16 flex items-center justify-center opacity-60 hover:opacity-100 transition-opacity grayscale hover:grayscale-0"
+                key={`${brand.name}-${i}`}
+                className="w-32 h-14 flex items-center justify-center opacity-50 hover:opacity-90 transition-opacity grayscale hover:grayscale-0 flex-shrink-0"
               >
                 <img
                   src={brand.logo}

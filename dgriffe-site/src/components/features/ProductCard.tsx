@@ -100,30 +100,30 @@ export default function ProductCard({ product }: ProductCardProps) {
       </div>
 
       {/* Botões de Compra */}
-      <div className="px-3 pb-3 space-y-2">
+      <div className="px-3 pb-3 space-y-1.5">
         {isEyewear(product) ? (
           <>
             <button
               onClick={handleBuyFrame}
-              className="w-full h-9 rounded-xl bg-luxury-black text-white text-[11px] font-semibold hover:bg-luxury-dark transition-colors flex items-center justify-center gap-1"
+              className="w-full h-8 rounded-lg border border-ice-dark text-gray-600 text-[10px] font-medium hover:border-gold/30 hover:text-luxury-black transition-all flex items-center justify-center gap-1"
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 01-8 0" /></svg>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 01-8 0" /></svg>
               COMPRAR APENAS A ARMAÇÃO
             </button>
             <button
               onClick={handleBuyWithLenses}
-              className="w-full h-9 rounded-xl btn-gold text-[11px] font-bold hover:brightness-110 transition-all flex items-center justify-center gap-1"
+              className="w-full h-8 rounded-lg btn-gold text-[10px] font-bold hover:brightness-110 transition-all flex items-center justify-center gap-1"
             >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
               COMPRAR COM LENTES
             </button>
           </>
         ) : (
           <button
             onClick={handleBuyFrame}
-            className="w-full h-9 rounded-xl bg-luxury-black text-white text-[11px] font-semibold hover:bg-luxury-dark transition-colors flex items-center justify-center gap-1"
+            className="w-full h-8 rounded-lg bg-luxury-black text-white text-[10px] font-semibold hover:bg-luxury-dark transition-colors flex items-center justify-center gap-1"
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 01-8 0" /></svg>
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 01-8 0" /></svg>
             ADICIONAR AO CARRINHO
           </button>
         )}

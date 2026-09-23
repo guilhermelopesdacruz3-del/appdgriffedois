@@ -33,9 +33,15 @@ export async function listarProdutos(opts: { limit?: number; offset?: number; ca
     const catNome = p.categorias?.[0]?.nome || p.categoria_nome || '';
     // Determina se é óculos pelo NCM (9004) ou pela categoria
     const isEyewear = ncm.startsWith('9004') || catNome.toLowerCase().includes('sol') || catNome.toLowerCase().includes('grau');
+    // Limpa o nome do produto: remove prefixos de API e códigos brutos
+    let nomeLimpo = p.nome || p.apelido || '';
+    // Remove prefixos como "/API/VMARCA/10725275" ou "/PULSERIA-..."
+    nomeLimpo = nomeLimpo.replace(/^\/API\/VMARCA\/\d+/i, '').replace(/^\/[A-Z]+-/i, '').replace(/^\/+/, '').trim();
+    // Remove códigos de produto no início (ex: "PRV002-A7S4D0OIF")
+    nomeLimpo = nomeLimpo.replace(/^[A-Z0-9]+-[A-Z0-9]+/i, '').trim();
     return {
       id: p.id,
-      name: p.nome || p.apelido || '',
+      name: nomeLimpo,
       brand: p.marca || p.brand || '',
       code: p.sku || String(p.id),
       price: Number(p.preco_cheio || p.preco || 0),
