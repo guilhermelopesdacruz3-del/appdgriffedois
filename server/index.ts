@@ -349,7 +349,7 @@ app.disable("x-powered-by");
 // app cai no catálogo de demonstração (8 produtos fake).
 const originsPermitidas = FRONTEND_ORIGIN === "*"
   ? true
-  : [...new Set([...FRONTEND_ORIGIN.split(",").map((s) => s.trim()), "https://dgriffe-app.pages.dev"])];
+  : [...new Set([...FRONTEND_ORIGIN.split(",").map((s) => s.trim()), "https://dgriffe-app.pages.dev", "https://dgriffe-site.pages.dev"])];
 app.use(
   cors({
     origin: originsPermitidas,
@@ -1566,6 +1566,7 @@ app.get("/api/admin/estoque/movimentos", requireAdmin, async (req, res) => {
 // Listar todos os afiliados (admin).
 app.get("/api/admin/afiliados", requireAdmin, async (_req, res) => {
   try {
+    const sb = supabaseClient();
     if (!sb) return res.status(503).json({ erro: "Supabase não configurado." });
     const { data, error } = await sb.from("afiliados").select("*").order("created_at", { ascending: false });
     if (error) throw error;
@@ -1581,13 +1582,17 @@ app.post("/api/afiliado/registrar", async (req, res) => {
   try {
     const { nome, email, telefone } = req.body || {};
     if (!nome || !email) return res.status(400).json({ erro: "Nome e e-mail são obrigatórios." });
+    const sb = supabaseClient();
     if (!sb) return res.status(503).json({ erro: "Supabase não configurado." });
 
     // Verificar se já existe
     const { data: existente } = await sb.from("afiliados").select("id").eq("email", email).maybeSingle();
     if (existente) return res.json({ ok: true, afiliado: existente, mensagem: "Afiliado já cadastrado." });
 
-    const { data, error } = await sb.from("afiliados").insert({ nome, email, telefone }).select().single();
+    // Gerar cupom único: AFILIADO + 3 letras do nome + 3 dígitos
+    const cupom = 'AFILIADO' + nome.replace(/\s+/g, '').substring(0, 3).toUpperCase() + Math.floor(Math.random() * 900 + 100);
+
+    const { data, error } = await sb.from("afiliados").insert({ nome, email, telefone, cupom }).select().single();
     if (error) throw error;
     return res.json({ ok: true, afiliado: data });
   } catch (err) {
@@ -1599,6 +1604,7 @@ app.post("/api/afiliado/registrar", async (req, res) => {
 // Atualizar status do afiliado (admin).
 app.put("/api/admin/afiliados/:id", requireAdmin, async (req, res) => {
   try {
+    const sb = supabaseClient();
     if (!sb) return res.status(503).json({ erro: "Supabase não configurado." });
     const { ativo, total_vendas, total_comissao } = req.body || {};
     const updates: Record<string, any> = {};
@@ -1611,6 +1617,64 @@ app.put("/api/admin/afiliados/:id", requireAdmin, async (req, res) => {
   } catch (err) {
     console.error("[admin] erro ao atualizar afiliado:", err);
     return res.status(500).json({ erro: "Falha ao atualizar afiliado." });
+  }
+});
+
+// Listar vendas de um afiliado (admin).
+app.get("/api/admin/afiliado/:id/vendas", requireAdmin, async (req, res) => {
+  try {
+    const sb = supabaseClient();
+    if (!sb) return res.status(503).json({ erro: "Supabase não configurado." });
+    const { data, error } = await sb.from("afiliado_vendas").select("*").eq("afiliado_id", req.params.id).order("created_at", { ascending: false });
+    if (error) throw error;
+    return res.json({ vendas: data || [] });
+  } catch (err) {
+    console.error("[admin] erro ao listar vendas do afiliado:", err);
+    return res.status(500).json({ erro: "Falha ao listar vendas." });
+  }
+});
+
+// Registrar venda de afiliado (admin).
+app.post("/api/admin/afiliado/venda", requireAdmin, async (req, res) => {
+  try {
+    const sb = supabaseClient();
+    if (!sb) return res.status(503).json({ erro: "Supabase não configurado." });
+    const { afiliado_id, produto_nome, produto_id, quantidade, valor_total } = req.body || {};
+    if (!afiliado_id || !produto_nome || !valor_total) {
+      return res.status(400).json({ erro: "afiliado_id, produto_nome e valor_total são obrigatórios." });
+    }
+
+    // Buscar afiliado para calcular comissão
+    const { data: afiliado } = await sb.from("afiliados").select("*").eq("id", afiliado_id).single();
+    if (!afiliado) return res.status(404).json({ erro: "Afiliado não encontrado." });
+
+    const qty = quantidade || 1;
+    const valorTotal = Number(valor_total);
+    const ganhoAfiliado = valorTotal * (Number(afiliado.porcentagem_ganho) / 100);
+    const desconto = valorTotal * (Number(afiliado.desconto_usuario) / 100);
+    const valorComDesconto = valorTotal - desconto;
+
+    const { data, error } = await sb.from("afiliado_vendas").insert({
+      afiliado_id,
+      produto_nome,
+      produto_id: produto_id || null,
+      quantidade: qty,
+      valor_total: valorTotal,
+      ganho_afiliado: ganhoAfiliado,
+      valor_com_desconto: valorComDesconto,
+    }).select().single();
+    if (error) throw error;
+
+    // Atualizar totais do afiliado
+    await sb.from("afiliados").update({
+      total_vendas: (afiliado.total_vendas || 0) + 1,
+      total_comissao: Number(afiliado.total_comissao || 0) + ganhoAfiliado,
+    }).eq("id", afiliado_id);
+
+    return res.json({ ok: true, venda: data, ganho_afiliado: ganhoAfiliado, valor_com_desconto: valorComDesconto });
+  } catch (err) {
+    console.error("[admin] erro ao registrar venda:", err);
+    return res.status(500).json({ erro: "Falha ao registrar venda." });
   }
 });
 
