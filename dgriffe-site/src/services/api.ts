@@ -18,9 +18,10 @@ export async function listarProdutos(opts: { limit?: number; offset?: number; ca
   const params = new URLSearchParams();
   if (opts.limit) params.set('limit', String(opts.limit));
   if (opts.offset) params.set('offset', String(opts.offset));
-  if (opts.categoriaId) params.set('categoriaId', String(opts.categoriaId));
-  if (opts.marcaId) params.set('marcaId', String(opts.marcaId));
-  if (opts.busca) params.set('busca', opts.busca);
+  // Backend espera nome dos filtros (não IDs)
+  if (opts.categoriaId) params.set('categorias', String(opts.categoriaId));
+  if (opts.marcaId) params.set('marca', String(opts.marcaId));
+  if (opts.busca) params.set('nome__icontains', opts.busca);
   const qs = params.toString();
   const res = await request<{ objects: any[]; meta: { total_count: number } }>(`/api/loja-integrada/produto/${qs ? `?${qs}` : ''}`, { method: 'GET' });
   const produtos: Product[] = (res.objects || []).map((p: any) => {
@@ -69,16 +70,22 @@ export async function buscarProduto(id: number | string): Promise<Product> {
   const p = await request<any>(`/api/loja-integrada/produto/${id}/`);
   const imagem = p.imagem_principal?.grande || p.imagem_principal?.media || p.imagens?.[0]?.grande || p.imagens?.[0]?.media || '';
   const imagens = (p.imagens || []).map((i: any) => i.grande || i.media || '').filter(Boolean);
+  const ncm = p.ncm || '';
+  const catNome = p.categorias?.[0]?.nome || p.categoria_nome || '';
+  const isEyewear = ncm.startsWith('9004') || catNome.toLowerCase().includes('sol') || catNome.toLowerCase().includes('grau');
+  let nomeLimpo = p.nome || p.apelido || '';
+  nomeLimpo = nomeLimpo.replace(/^\/API\/VMARCA\/\d+/i, '').replace(/^\/[A-Z]+-/i, '').replace(/^\/+/, '').trim();
+  nomeLimpo = nomeLimpo.replace(/^[A-Z0-9]+-[A-Z0-9]+/i, '').trim();
   return {
     id: p.id,
-    name: p.nome || p.apelido || '',
+    name: nomeLimpo,
     brand: p.marca || p.brand || '',
     code: p.sku || String(p.id),
     price: Number(p.preco_cheio || p.preco || 0),
     originalPrice: p.preco_promocional ? Number(p.preco_promocional) : undefined,
     pixPrice: Number(p.preco_pix || p.preco_cheio || 0),
     description: p.descricao_completa || '',
-    category: p.categorias?.[0]?.nome || p.categoria_nome || '',
+    category: isEyewear ? (catNome || 'Óculos') : (catNome || 'Acessórios'),
     colors: [],
     colorNames: [],
     image: imagem,
