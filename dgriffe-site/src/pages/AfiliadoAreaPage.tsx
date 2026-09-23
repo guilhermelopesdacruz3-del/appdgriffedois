@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import type { Afiliado } from '../data/types';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://appdgriffedois.onrender.com';
@@ -18,7 +18,6 @@ async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
 
 export default function AfiliadoAreaPage() {
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const cupomFromUrl = searchParams.get('cupom') || '';
 
   const [email, setEmail] = useState('');
