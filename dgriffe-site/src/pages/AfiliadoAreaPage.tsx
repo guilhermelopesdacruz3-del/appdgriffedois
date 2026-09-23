@@ -121,7 +121,7 @@ export default function AfiliadoAreaPage() {
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className="text-xl font-bold text-luxury-black">Olá, {afiliado.nome}!</h1>
-            <p className="text-xs text-gray-500">Seu cupom: <span className="font-bold text-violet-600">{afiliado.cupom}</span></p>
+            <p className="text-xs text-gray-500">Seu cupom: <span className="font-bold text-violet-600">{(afiliado as any).cupom || ''}</span></p>
           </div>
           <button onClick={() => setToken(null)} className="text-xs text-gray-500 hover:text-red-500">Sair</button>
         </div>
@@ -150,11 +150,11 @@ export default function AfiliadoAreaPage() {
         <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="card p-4 text-center">
             <p className="text-[9px] text-gray-400 uppercase tracking-wider">Vendas</p>
-            <p className="text-2xl font-bold text-luxury-black">{afiliado.total_vendas || 0}</p>
+            <p className="text-2xl font-bold text-luxury-black">{(afiliado as any).totalVendas || 0}</p>
           </div>
           <div className="card p-4 text-center">
             <p className="text-[9px] text-gray-400 uppercase tracking-wider">Comissão</p>
-            <p className="text-2xl font-bold text-violet-600">R$ {Number(afiliado.total_comissao || 0).toFixed(2)}</p>
+            <p className="text-2xl font-bold text-violet-600">R$ {Number((afiliado as any).totalComissao || 0).toFixed(2)}</p>
           </div>
           <div className="card p-4 text-center">
             <p className="text-[9px] text-gray-400 uppercase tracking-wider">Indicações</p>
