@@ -6,6 +6,12 @@ import { formatPrice, formatInstallment, getProductImage } from '../utils/format
 import LensesModal from '../components/features/LensesModal';
 import { addToCart } from '../services/cart';
 
+// Verifica se o produto é um óculos (categorias Sol/Grau)
+function isEyewear(product: Product): boolean {
+  const cat = (product.category || '').toLowerCase();
+  return cat.includes('sol') || cat.includes('grau') || cat.includes('óculos') || cat.includes('oculos');
+}
+
 export default function ProductDetailPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -184,34 +190,52 @@ export default function ProductDetailPage() {
 
           {/* Botões de Compra */}
           <div className="space-y-3 mb-4">
-            {/* Botão 1: Comprar apenas a armação */}
-            <button
-              onClick={() => {
-                if (!product) return;
-                addToCart({
-                  productId: product.id,
-                  productName: product.name,
-                  productImage: product.image,
-                  price: product.price,
-                  quantidade: 1,
-                  frameOnly: true,
-                });
-                navigate('/cart');
-              }}
-              className="w-full h-12 rounded-xl bg-luxury-black text-white text-sm font-semibold hover:bg-luxury-dark transition-colors flex items-center justify-center gap-2"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 01-8 0" /></svg>
-              COMPRAR APENAS A ARMAÇÃO — {formatPrice(product.price)}
-            </button>
-
-            {/* Botão 2: Comprar óculos completo com lentes (destaque) */}
-            <button
-              onClick={() => setShowLensesModal(true)}
-              className="w-full h-12 rounded-xl btn-gold text-sm font-bold hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-lg shadow-gold/20"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
-              COMPRAR ÓCULOS COMPLETO COM AS LENTES
-            </button>
+            {isEyewear(product) ? (
+              <>
+                <button
+                  onClick={() => {
+                    addToCart({
+                      productId: product.id,
+                      productName: product.name,
+                      productImage: product.image,
+                      price: product.price,
+                      quantidade: 1,
+                      frameOnly: true,
+                    });
+                    navigate('/cart');
+                  }}
+                  className="w-full h-12 rounded-xl bg-luxury-black text-white text-sm font-semibold hover:bg-luxury-dark transition-colors flex items-center justify-center gap-2"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 01-8 0" /></svg>
+                  COMPRAR APENAS A ARMAÇÃO — {formatPrice(product.price)}
+                </button>
+                <button
+                  onClick={() => setShowLensesModal(true)}
+                  className="w-full h-12 rounded-xl btn-gold text-sm font-bold hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-lg shadow-gold/20"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
+                  COMPRAR ÓCULOS COMPLETO COM AS LENTES
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={() => {
+                  addToCart({
+                    productId: product.id,
+                    productName: product.name,
+                    productImage: product.image,
+                    price: product.price,
+                    quantidade: 1,
+                    frameOnly: false,
+                  });
+                  navigate('/cart');
+                }}
+                className="w-full h-12 rounded-xl bg-luxury-black text-white text-sm font-semibold hover:bg-luxury-dark transition-colors flex items-center justify-center gap-2"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 01-8 0" /></svg>
+                ADICIONAR AO CARRINHO — {formatPrice(product.price)}
+              </button>
+            )}
           </div>
 
           {/* Descrição */}
@@ -226,8 +250,8 @@ export default function ProductDetailPage() {
         </div>
       </div>
 
-      {/* Modal de Lentes */}
-      {showLensesModal && product && (
+      {/* Modal de Lentes — apenas para óculos */}
+      {showLensesModal && product && isEyewear(product) && (
         <LensesModal
           product={product}
           onClose={() => setShowLensesModal(false)}

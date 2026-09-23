@@ -27,6 +27,12 @@ export async function listarProdutos(opts: { limit?: number; offset?: number; ca
     // Formato da LI: imagens é array de objetos { grande, media, icone, pequena, caminho }
     const imagem = p.imagem_principal?.grande || p.imagem_principal?.media || p.imagens?.[0]?.grande || p.imagens?.[0]?.media || '';
     const imagens = (p.imagens || []).map((i: any) => i.grande || i.media || '').filter(Boolean);
+    // Categoria: a LI retorna URIs, então buscamos o nome via campo ncm ou categorias[0]
+    // NCM 9004 = óculos (sol/grau), NCM 7113 = joias/acessórios
+    const ncm = p.ncm || '';
+    const catNome = p.categorias?.[0]?.nome || p.categoria_nome || '';
+    // Determina se é óculos pelo NCM (9004) ou pela categoria
+    const isEyewear = ncm.startsWith('9004') || catNome.toLowerCase().includes('sol') || catNome.toLowerCase().includes('grau');
     return {
       id: p.id,
       name: p.nome || p.apelido || '',
@@ -36,7 +42,7 @@ export async function listarProdutos(opts: { limit?: number; offset?: number; ca
       originalPrice: p.preco_promocional ? Number(p.preco_promocional) : undefined,
       pixPrice: Number(p.preco_pix || p.preco_cheio || 0),
       description: p.descricao_completa || '',
-      category: p.categorias?.[0]?.nome || p.categoria_nome || '',
+      category: isEyewear ? (catNome || 'Óculos') : (catNome || 'Acessórios'),
       colors: [],
       colorNames: [],
       image: imagem,
