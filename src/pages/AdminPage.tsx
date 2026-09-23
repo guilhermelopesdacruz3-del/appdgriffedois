@@ -22,10 +22,12 @@ import { ApiConfigPanel } from "../components/admin/ApiConfigPanel";
 import CuponsAdmin from "./admin/CuponsAdmin";
 import FidelidadeAdmin from "./admin/FidelidadeAdmin";
 import NotificacoesAdmin from "./admin/NotificacoesAdmin";
+import ReceitasAdmin from "./admin/ReceitasAdmin";
+import EstoqueAdmin from "./admin/EstoqueAdmin";
 import AdminDashboard from "./AdminDashboard";
 import PedidoDetalhe from "./admin/PedidoDetalhe";
 
-type Aba = "pedidos" | "dashboard" | "cupons" | "fidelidade" | "notificacoes" | "relatorios" | "logs" | "site";
+type Aba = "pedidos" | "dashboard" | "cupons" | "fidelidade" | "notificacoes" | "relatorios" | "logs" | "site" | "receitas" | "estoque";
 
 const ABAS: { id: Aba; label: string; grupo: string }[] = [
   { id: "dashboard", label: "Dashboard", grupo: "VISÃO GERAL" },
@@ -36,6 +38,8 @@ const ABAS: { id: Aba; label: string; grupo: string }[] = [
   { id: "relatorios", label: "Relatórios", grupo: "OPERACIONAL" },
   { id: "logs", label: "Logs", grupo: "OPERACIONAL" },
   { id: "site", label: "Site", grupo: "OPERACIONAL" },
+  { id: "receitas", label: "Receitas", grupo: "OPERACIONAL" },
+  { id: "estoque", label: "Estoque", grupo: "OPERACIONAL" },
 ];
 
 const GRUPOS = ["VISÃO GERAL", "COMERCIAL", "RELACIONAMENTO", "OPERACIONAL"];
@@ -702,6 +706,9 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
               </div>
             </div>
           )}
+
+          {aba === "receitas" && <ReceitasAdmin />}
+          {aba === "estoque" && <EstoqueAdmin />}
         </main>
       </div>
     </div>
