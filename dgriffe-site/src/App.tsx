@@ -10,6 +10,7 @@ import AfiliadoPage from './pages/AfiliadoPage';
 import AfiliadoAreaPage from './pages/AfiliadoAreaPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
+import LoginPage from './pages/LoginPage';
 import AdminPage from './pages/AdminPage';
 
 export default function App() {
@@ -28,6 +29,7 @@ export default function App() {
             <Route path="/afiliado-area" element={<AfiliadoAreaPage />} />
             <Route path="/cart" element={<CartPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
+            <Route path="/login" element={<LoginPage />} />
             <Route path="/admin" element={<AdminPage />} />
           </Routes>
         </main>

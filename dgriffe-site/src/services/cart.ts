@@ -70,3 +70,7 @@ export function clearCart(): void {
   const cartId = getCartId();
   localStorage.removeItem(`dgriffe:cart_${cartId}`);
 }
+
+export function isClienteLogado(): boolean {
+  return !!localStorage.getItem('dgriffe:cliente_token');
+}

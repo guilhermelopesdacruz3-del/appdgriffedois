@@ -1620,6 +1620,40 @@ app.put("/api/admin/afiliados/:id", requireAdmin, async (req, res) => {
   }
 });
 
+// --- ÁREA DO CLIENTE (site + app) ---
+// Dados do cliente logado (token no header Authorization)
+app.get("/api/cliente/me", async (req, res) => {
+  const auth = req.headers.authorization || "";
+  const token = auth.startsWith("Bearer ") ? auth.slice(7) : "";
+  if (!token) return res.status(401).json({ erro: "Token não informado." });
+
+  try {
+    const sb = supabaseClient();
+    if (!sb) return res.status(503).json({ erro: "Supabase não configurado." });
+
+    // Verifica o token via Supabase Auth
+    const { data: { user }, error: userErr } = await sb.auth.getUser(token);
+    if (userErr || !user) return res.status(401).json({ erro: "Sessão inválida." });
+
+    // Busca o perfil
+    const { data: profile } = await sb.from("profiles").select("*").eq("id", user.id).single();
+
+    return res.json({
+      ok: true,
+      cliente: {
+        id: user.id,
+        email: user.email || "",
+        nome: profile?.nome || user.user_metadata?.nome || "",
+        telefone: profile?.telefone || user.user_metadata?.telefone || "",
+        cpf: profile?.cpf || user.user_metadata?.cpf || "",
+      },
+    });
+  } catch (err) {
+    console.error("[cliente] erro ao buscar dados:", err);
+    return res.status(500).json({ erro: "Falha ao buscar dados do cliente." });
+  }
+});
+
 // --- ÁREA DO AFILIADO (público) ---
 // Login do afiliado (email + nome → retorna token temporário)
 app.post("/api/afiliado/login", async (req, res) => {

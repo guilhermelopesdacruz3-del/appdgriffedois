@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getCart, clearCart } from '../services/cart';
+import { getCart, clearCart, isClienteLogado } from '../services/cart';
 import { formatPrice } from '../utils/format';
 import { Lock, CreditCard, QrCode } from 'lucide-react';
 import type { CartItem } from '../services/cart';
@@ -14,6 +14,10 @@ export default function CheckoutPage() {
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (!isClienteLogado()) {
+      navigate('/login');
+      return;
+    }
     const c = getCart();
     if (c.length === 0) navigate('/cart');
     setCart(c);
