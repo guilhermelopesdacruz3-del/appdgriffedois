@@ -118,11 +118,8 @@ export default function CatalogPage() {
 
     if (filtroCategorias.length > 0) {
       filtrados = filtrados.filter((p) => {
-        const cat = (p.category || '').toLowerCase();
-        return filtroCategorias.some((id) => {
-          const catEncontrada = categorias.find((c) => c.id === id);
-          return catEncontrada && cat.includes(catEncontrada.nome.toLowerCase());
-        });
+        const ids = p.catIds || [];
+        return filtroCategorias.some((fid) => ids.includes(fid));
       });
     }
 

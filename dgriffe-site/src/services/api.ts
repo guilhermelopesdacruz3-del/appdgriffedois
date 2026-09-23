@@ -31,7 +31,14 @@ export async function listarProdutos(opts: { limit?: number; offset?: number; ca
   ]);
   const categoriasMap = new Map<number, string>();
   for (const c of (catsRes.objects || [])) {
-    categoriasMap.set(c.id, c.nome || '');
+    // A LI retorna descricao, não nome — extrair nome limpo da descricao
+    const nomeLimpo = (c.descricao || c.nome || '')
+      .replace(/<[^>]*>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .split(' ')[0] || '';
+    categoriasMap.set(c.id, nomeLimpo);
   }
   const marcasMap = new Map<number, string>();
   for (const m of (marcasRes.objects || [])) {
@@ -44,8 +51,11 @@ export async function listarProdutos(opts: { limit?: number; offset?: number; ca
     const imagens = (p.imagens || []).map((i: any) => i.grande || i.media || '').filter(Boolean);
 
     // Resolver nome da categoria a partir do ID (LI retorna URIs)
-    const catId = p.categorias?.[0] ? Number(String(p.categorias[0]).split('/').filter(Boolean).pop()) : null;
-    const catNome = catId && categoriasMap.has(catId) ? categoriasMap.get(catId)! : (p.categoria_nome || '');
+    const catIds = Array.isArray(p.categorias)
+      ? p.categorias.map((u: any) => Number(String(u).split('/').filter(Boolean).pop())).filter(Boolean)
+      : [];
+    const catNomes = catIds.map((id: number) => categoriasMap.get(id)).filter(Boolean);
+    const catNome = catNomes.length > 0 ? catNomes.join(', ') : (p.categoria_nome || '');
 
     // Resolver nome da marca a partir do ID (LI retorna URIs)
     const marcaId = p.marca ? Number(String(p.marca).split('/').filter(Boolean).pop()) : null;
@@ -68,6 +78,7 @@ export async function listarProdutos(opts: { limit?: number; offset?: number; ca
       pixPrice: Number(p.preco_pix || p.preco_cheio || 0),
       description: p.descricao_completa || '',
       category: isEyewear ? (catNome || 'Óculos') : (catNome || 'Acessórios'),
+      catIds,
       colors: [],
       colorNames: [],
       image: imagem,
