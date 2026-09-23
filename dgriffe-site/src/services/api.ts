@@ -18,32 +18,50 @@ export async function listarProdutos(opts: { limit?: number; offset?: number; ca
   const params = new URLSearchParams();
   if (opts.limit) params.set('limit', String(opts.limit));
   if (opts.offset) params.set('offset', String(opts.offset));
-  // Backend espera nome dos filtros (não IDs)
   if (opts.categoriaId) params.set('categorias', String(opts.categoriaId));
   if (opts.marcaId) params.set('marca', String(opts.marcaId));
   if (opts.busca) params.set('nome__icontains', opts.busca);
   const qs = params.toString();
   const res = await request<{ objects: any[]; meta: { total_count: number } }>(`/api/loja-integrada/produto/${qs ? `?${qs}` : ''}`, { method: 'GET' });
+
+  // Carregar categorias e marcas para resolver nomes (a LI retorna URIs, não nomes)
+  const [catsRes, marcasRes] = await Promise.all([
+    request<{ objects: any[] }>('/api/loja-integrada/categoria/'),
+    request<{ objects: any[] }>('/api/loja-integrada/marca/'),
+  ]);
+  const categoriasMap = new Map<number, string>();
+  for (const c of (catsRes.objects || [])) {
+    categoriasMap.set(c.id, c.nome || '');
+  }
+  const marcasMap = new Map<number, string>();
+  for (const m of (marcasRes.objects || [])) {
+    marcasMap.set(m.id, m.nome || '');
+  }
+
   const produtos: Product[] = (res.objects || []).map((p: any) => {
     // Formato da LI: imagens é array de objetos { grande, media, icone, pequena, caminho }
     const imagem = p.imagem_principal?.grande || p.imagem_principal?.media || p.imagens?.[0]?.grande || p.imagens?.[0]?.media || '';
     const imagens = (p.imagens || []).map((i: any) => i.grande || i.media || '').filter(Boolean);
-    // Categoria: a LI retorna URIs, então buscamos o nome via campo ncm ou categorias[0]
-    // NCM 9004 = óculos (sol/grau), NCM 7113 = joias/acessórios
+
+    // Resolver nome da categoria a partir do ID (LI retorna URIs)
+    const catId = p.categorias?.[0] ? Number(String(p.categorias[0]).split('/').filter(Boolean).pop()) : null;
+    const catNome = catId && categoriasMap.has(catId) ? categoriasMap.get(catId)! : (p.categoria_nome || '');
+
+    // Resolver nome da marca a partir do ID (LI retorna URIs)
+    const marcaId = p.marca ? Number(String(p.marca).split('/').filter(Boolean).pop()) : null;
+    const marcaNome = marcaId && marcasMap.has(marcaId) ? marcasMap.get(marcaId)! : (p.marca_nome || '');
+
     const ncm = p.ncm || '';
-    const catNome = p.categorias?.[0]?.nome || p.categoria_nome || '';
-    // Determina se é óculos pelo NCM (9004) ou pela categoria
     const isEyewear = ncm.startsWith('9004') || catNome.toLowerCase().includes('sol') || catNome.toLowerCase().includes('grau');
-    // Limpa o nome do produto: remove prefixos de API e códigos brutos
+
     let nomeLimpo = p.nome || p.apelido || '';
-    // Remove prefixos como "/API/VMARCA/10725275" ou "/PULSERIA-..."
     nomeLimpo = nomeLimpo.replace(/^\/API\/VMARCA\/\d+/i, '').replace(/^\/[A-Z]+-/i, '').replace(/^\/+/, '').trim();
-    // Remove códigos de produto no início (ex: "PRV002-A7S4D0OIF")
     nomeLimpo = nomeLimpo.replace(/^[A-Z0-9]+-[A-Z0-9]+/i, '').trim();
+
     return {
       id: p.id,
       name: nomeLimpo,
-      brand: p.marca || p.brand || '',
+      brand: marcaNome,
       code: p.sku || String(p.id),
       price: Number(p.preco_cheio || p.preco || 0),
       originalPrice: p.preco_promocional ? Number(p.preco_promocional) : undefined,
