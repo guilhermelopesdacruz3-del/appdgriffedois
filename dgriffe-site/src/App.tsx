@@ -8,6 +8,8 @@ import MedicaoPage from './pages/MedicaoPage';
 import HistoriaPage from './pages/HistoriaPage';
 import AfiliadoPage from './pages/AfiliadoPage';
 import AfiliadoAreaPage from './pages/AfiliadoAreaPage';
+import CartPage from './pages/CartPage';
+import CheckoutPage from './pages/CheckoutPage';
 import AdminPage from './pages/AdminPage';
 
 export default function App() {
@@ -24,6 +26,8 @@ export default function App() {
             <Route path="/historia" element={<HistoriaPage />} />
             <Route path="/afiliado" element={<AfiliadoPage />} />
             <Route path="/afiliado-area" element={<AfiliadoAreaPage />} />
+            <Route path="/cart" element={<CartPage />} />
+            <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/admin" element={<AdminPage />} />
           </Routes>
         </main>
