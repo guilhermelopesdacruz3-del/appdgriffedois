@@ -1620,6 +1620,87 @@ app.put("/api/admin/afiliados/:id", requireAdmin, async (req, res) => {
   }
 });
 
+// --- ÁREA DO AFILIADO (público) ---
+// Login do afiliado (email + nome → retorna token temporário)
+app.post("/api/afiliado/login", async (req, res) => {
+  try {
+    const { email, nome } = req.body || {};
+    if (!email || !nome) return res.status(400).json({ erro: "E-mail e nome são obrigatórios." });
+    const sb = supabaseClient();
+    if (!sb) return res.status(503).json({ erro: "Supabase não configurado." });
+
+    const { data: afiliado } = await sb.from("afiliados").select("*").eq("email", email).eq("nome", nome).single();
+    if (!afiliado) return res.status(404).json({ erro: "Afiliado não encontrado. Cadastre-se primeiro." });
+
+    // Token simples: hash do cupom + timestamp
+    const token = Buffer.from(`${afiliado.cupom}:${Date.now()}`).toString("base64");
+
+    return res.json({ ok: true, token, afiliado: { id: afiliado.id, nome: afiliado.nome, email: afiliado.email, cupom: afiliado.cupom } });
+  } catch (err) {
+    console.error("[afiliado] erro no login:", err);
+    return res.status(500).json({ erro: "Falha ao fazer login." });
+  }
+});
+
+// Middleware para rotas do afiliado (token por query param)
+async function requireAfiliado(req, res, next) {
+  const token = req.query.token || "";
+  if (!token) return res.status(401).json({ erro: "Token não informado." });
+  try {
+    const sb = supabaseClient();
+    if (!sb) return res.status(503).json({ erro: "Supabase não configurado." });
+    // Decodificar token: cupom + timestamp
+    const decoded = Buffer.from(token, "base64").toString("utf8");
+    const [cupom] = decoded.split(":");
+    const { data: afiliado } = await sb.from("afiliados").select("*").eq("cupom", cupom).single();
+    if (!afiliado) return res.status(401).json({ erro: "Token inválido." });
+    req.afiliado = afiliado;
+    next();
+  } catch (err) {
+    return res.status(401).json({ erro: "Token inválido." });
+  }
+}
+
+// Dados do afiliado logado
+app.get("/api/afiliado/me", requireAfiliado, async (req, res) => {
+  return res.json({ afiliado: req.afiliado });
+});
+
+// Vendas do afiliado
+app.get("/api/afiliado/me/vendas", requireAfiliado, async (req, res) => {
+  try {
+    const sb = supabaseClient();
+    if (!sb) return res.status(503).json({ erro: "Supabase não configurado." });
+    const { data, error } = await sb.from("afiliado_vendas").select("*").eq("afiliado_id", req.afiliado.id).order("created_at", { ascending: false });
+    if (error) throw error;
+    return res.json({ vendas: data || [] });
+  } catch (err) {
+    console.error("[afiliado] erro ao listar vendas:", err);
+    return res.status(500).json({ erro: "Falha ao listar vendas." });
+  }
+});
+
+// Link do afiliado (cupom + URL base)
+app.get("/api/afiliado/me/link", requireAfiliado, async (req, res) => {
+  const baseUrl = process.env.FRONTEND_ORIGIN || "https://dgriffe-site.pages.dev";
+  const link = `${baseUrl}/afiliado-area?cupom=${encodeURIComponent(req.afiliado.cupom)}`;
+  return res.json({ link, cupom: req.afiliado.cupom });
+});
+
+// Indicações do afiliado (clientes que ele indicou)
+app.get("/api/afiliado/me/indicacoes", requireAfiliado, async (req, res) => {
+  try {
+    const sb = supabaseClient();
+    if (!sb) return res.status(503).json({ erro: "Supabase não configurado." });
+    const { data, error } = await sb.from("indicacoes").select("*").eq("indicador_email", req.afiliado.email).order("created_at", { ascending: false });
+    if (error) throw error;
+    return res.json({ indicacoes: data || [] });
+  } catch (err) {
+    console.error("[afiliado] erro ao listar indicações:", err);
+    return res.status(500).json({ erro: "Falha ao listar indicações." });
+  }
+});
+
 // Listar vendas de um afiliado (admin).
 app.get("/api/admin/afiliado/:id/vendas", requireAdmin, async (req, res) => {
   try {
