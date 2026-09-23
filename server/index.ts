@@ -1562,6 +1562,58 @@ app.get("/api/admin/estoque/movimentos", requireAdmin, async (req, res) => {
   }
 });
 
+// --- AFILIADOS DO SITE ---
+// Listar todos os afiliados (admin).
+app.get("/api/admin/afiliados", requireAdmin, async (_req, res) => {
+  try {
+    if (!sb) return res.status(503).json({ erro: "Supabase não configurado." });
+    const { data, error } = await sb.from("afiliados").select("*").order("created_at", { ascending: false });
+    if (error) throw error;
+    return res.json({ afiliados: data || [] });
+  } catch (err) {
+    console.error("[admin] erro ao listar afiliados:", err);
+    return res.status(500).json({ erro: "Falha ao listar afiliados." });
+  }
+});
+
+// Cadastrar afiliado (público — chamado pelo site).
+app.post("/api/afiliado/registrar", async (req, res) => {
+  try {
+    const { nome, email, telefone } = req.body || {};
+    if (!nome || !email) return res.status(400).json({ erro: "Nome e e-mail são obrigatórios." });
+    if (!sb) return res.status(503).json({ erro: "Supabase não configurado." });
+
+    // Verificar se já existe
+    const { data: existente } = await sb.from("afiliados").select("id").eq("email", email).maybeSingle();
+    if (existente) return res.json({ ok: true, afiliado: existente, mensagem: "Afiliado já cadastrado." });
+
+    const { data, error } = await sb.from("afiliados").insert({ nome, email, telefone }).select().single();
+    if (error) throw error;
+    return res.json({ ok: true, afiliado: data });
+  } catch (err) {
+    console.error("[afiliado] erro ao cadastrar:", err);
+    return res.status(500).json({ erro: "Falha ao cadastrar afiliado." });
+  }
+});
+
+// Atualizar status do afiliado (admin).
+app.put("/api/admin/afiliados/:id", requireAdmin, async (req, res) => {
+  try {
+    if (!sb) return res.status(503).json({ erro: "Supabase não configurado." });
+    const { ativo, total_vendas, total_comissao } = req.body || {};
+    const updates: Record<string, any> = {};
+    if (typeof ativo === "boolean") updates.ativo = ativo;
+    if (typeof total_vendas === "number") updates.total_vendas = total_vendas;
+    if (typeof total_comissao === "number") updates.total_comissao = total_comissao;
+    const { data, error } = await sb.from("afiliados").update(updates).eq("id", req.params.id).select().single();
+    if (error) throw error;
+    return res.json({ ok: true, afiliado: data });
+  } catch (err) {
+    console.error("[admin] erro ao atualizar afiliado:", err);
+    return res.status(500).json({ erro: "Falha ao atualizar afiliado." });
+  }
+});
+
 // Entrada manual de estoque (admin).
 app.post("/api/admin/estoque/entrada", requireAdmin, async (req, res) => {
   try {
