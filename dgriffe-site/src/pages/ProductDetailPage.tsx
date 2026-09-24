@@ -4,6 +4,7 @@ import { buscarProduto } from '../services/api';
 import type { Product } from '../data/types';
 import { formatPrice, formatInstallment, getProductImage } from '../utils/format';
 import LensesModal from '../components/features/LensesModal';
+import MedicaoDnp from '../components/features/MedicaoDnp';
 import { addToCart } from '../services/cart';
 
 // Verifica se o produto é um óculos (categorias Sol/Grau)
@@ -20,6 +21,7 @@ export default function ProductDetailPage() {
   const [selectedColor, setSelectedColor] = useState(0);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [showLensesModal, setShowLensesModal] = useState(false);
+  const [showMedicao, setShowMedicao] = useState(false);
   const [cep, setCep] = useState('');
   const [freteResult, setFreteResult] = useState<string | null>(null);
   const [freteLoading, setFreteLoading] = useState(false);
@@ -271,7 +273,7 @@ export default function ProductDetailPage() {
             )}
           </div>
 
-          {/* Ações rápidas: WhatsApp + Frete */}
+          {/* Ações rápidas: WhatsApp + Frete + Medição */}
           <div className="flex flex-col sm:flex-row gap-3 mb-5">
             <a
               href={`https://wa.me/5551999999999?text=${encodeURIComponent(`Olá! Tenho dúvidas sobre o produto: ${product.name} (${product.code})`)}`}
@@ -301,6 +303,17 @@ export default function ProductDetailPage() {
               </button>
             </div>
           </div>
+
+          {/* Botão Medir DNP (apenas para óculos) */}
+          {isEyewear(product) && (
+            <button
+              onClick={() => setShowMedicao(true)}
+              className="w-full h-12 rounded-xl border-2 border-gold/40 text-gold text-sm font-semibold hover:bg-gold/5 transition-all flex items-center justify-center gap-2 mb-5"
+            >
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+              Medir DNP e Altura para Lentes Multifocais
+            </button>
+          )}
           {freteResult && (
             <div className="mb-4 bg-green-50 border border-green-200 rounded-xl px-4 py-2.5 flex items-center gap-2">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2"><path d="M1 3h15v13H1z"/><path d="M16 8h4l3 3v5h-7V8z"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
@@ -328,6 +341,19 @@ export default function ProductDetailPage() {
           onAddToCart={(item) => {
             addToCart(item);
             setShowLensesModal(false);
+            navigate('/cart');
+          }}
+        />
+      )}
+
+      {/* Modal de Medição DNP */}
+      {showMedicao && product && (
+        <MedicaoDnp
+          product={product}
+          onClose={() => setShowMedicao(false)}
+          onAddToCart={(item) => {
+            addToCart(item);
+            setShowMedicao(false);
             navigate('/cart');
           }}
         />
