@@ -19,6 +19,7 @@ import {
 } from "../services/admin";
 import { BarChart, PieChart } from "../components/admin/AdminCharts";
 import { ApiConfigPanel } from "../components/admin/ApiConfigPanel";
+import ImagensAdmin from "../components/admin/ImagensAdmin";
 import CuponsAdmin from "./admin/CuponsAdmin";
 import FidelidadeAdmin from "./admin/FidelidadeAdmin";
 import NotificacoesAdmin from "./admin/NotificacoesAdmin";
@@ -626,6 +627,16 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
 
           {aba === "site" && (
             <div className="space-y-4">
+              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <h3 className="text-sm font-bold text-slate-800">Imagens do Site</h3>
+                    <p className="text-[11px] text-slate-400">Publique banners, imagens de categorias e conteúdo visual</p>
+                  </div>
+                </div>
+                <ImagensAdmin token={token || ''} />
+              </div>
+
               <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
                 <div className="flex items-center justify-between mb-4">
                   <div>
