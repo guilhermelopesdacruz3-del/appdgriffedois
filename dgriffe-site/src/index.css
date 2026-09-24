@@ -67,3 +67,12 @@
 .animate-slide-in-left {
   animation: slide-in-left 0.3s ease-out;
 }
+
+@keyframes slide-down {
+  from { transform: translateY(-10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.animate-slide-down {
+  animation: slide-down 0.25s ease-out;
+}
