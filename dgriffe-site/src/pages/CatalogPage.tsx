@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { listarProdutos, listarCategorias, listarMarcas } from '../services/api';
 import type { Product } from '../data/types';
 import ProductCard from '../components/features/ProductCard';
+import { getCategoriaNome } from '../data/categoriasMap';
 
 const PAGE_SIZE = 24;
 
@@ -139,11 +140,11 @@ export default function CatalogPage() {
           {categorias.map((c) => {
             const id = c.id;
             const checked = selCategorias.includes(id);
-            const nome = c.nome || (c.descricao || '').replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+            const nome = getCategoriaNome(id);
             return (
               <label key={id} className={`flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors ${checked ? 'bg-gold/10' : 'hover:bg-ice'}`}>
                 <input type="checkbox" checked={checked} onChange={() => toggleArr(selCategorias, id, setSelCategorias)} className="w-4 h-4 accent-gold" />
-                <span className={`text-xs truncate ${checked ? 'font-semibold text-luxury-black' : 'text-gray-600'}`}>{nome || `Categoria ${id}`}</span>
+                <span className={`text-xs truncate ${checked ? 'font-semibold text-luxury-black' : 'text-gray-600'}`}>{nome}</span>
               </label>
             );
           })}

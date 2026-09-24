@@ -1,4 +1,5 @@
 import type { Product } from '../data/types';
+import { getCategoriaNome } from '../data/categoriasMap';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'https://appdgriffedois.onrender.com';
 
@@ -24,22 +25,8 @@ export async function listarProdutos(opts: { limit?: number; offset?: number; ca
   const qs = params.toString();
   const res = await request<{ objects: any[]; meta: { total_count: number } }>(`/api/loja-integrada/produto/${qs ? `?${qs}` : ''}`, { method: 'GET' });
 
-  // Carregar categorias e marcas para resolver nomes (a LI retorna URIs, não nomes)
-  const [catsRes, marcasRes] = await Promise.all([
-    request<{ objects: any[] }>('/api/loja-integrada/categoria/'),
-    request<{ objects: any[] }>('/api/loja-integrada/marca/'),
-  ]);
-  const categoriasMap = new Map<number, string>();
-  for (const c of (catsRes.objects || [])) {
-    // A LI retorna descricao, não nome — extrair nome limpo da descricao
-    const nomeLimpo = (c.descricao || c.nome || '')
-      .replace(/<[^>]*>/g, '')
-      .replace(/&nbsp;/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .split(' ')[0] || '';
-    categoriasMap.set(c.id, nomeLimpo);
-  }
+  // Carregar marcas para resolver nomes (a LI retorna URIs, não nomes)
+  const marcasRes = await request<{ objects: any[] }>('/api/loja-integrada/marca/');
   const marcasMap = new Map<number, string>();
   for (const m of (marcasRes.objects || [])) {
     marcasMap.set(m.id, m.nome || '');
@@ -54,7 +41,7 @@ export async function listarProdutos(opts: { limit?: number; offset?: number; ca
     const catIds = Array.isArray(p.categorias)
       ? p.categorias.map((u: any) => Number(String(u).split('/').filter(Boolean).pop())).filter(Boolean)
       : [];
-    const catNomes = catIds.map((id: number) => categoriasMap.get(id)).filter(Boolean);
+    const catNomes = catIds.map((id: number) => getCategoriaNome(id)).filter(Boolean);
     const catNome = catNomes.length > 0 ? catNomes.join(', ') : (p.categoria_nome || '');
 
     // Resolver nome da marca a partir do ID (LI retorna URIs)
@@ -133,7 +120,7 @@ export async function listarCategorias(): Promise<Array<{ id: number; nome: stri
   const res = await request<{ objects: any[] }>('/api/loja-integrada/categoria/');
   return (res.objects || []).map((c: any) => ({
     id: c.id,
-    nome: c.nome || '',
+    nome: getCategoriaNome(c.id),
     paiId: c.categoria_pai ? Number(String(c.categoria_pai).split('/').filter(Boolean).pop()) : null,
   }));
 }
