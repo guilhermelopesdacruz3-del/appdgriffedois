@@ -9,9 +9,11 @@ export default function Footer() {
           {/* Brand */}
           <div className="md:col-span-1">
             <div className="flex items-center gap-3 mb-5">
-              <div className="w-11 h-11 bg-gold rounded-full flex items-center justify-center">
-                <span className="text-luxury-black font-display font-bold text-lg">D</span>
-              </div>
+              <img
+                src="/logo-dgriffe.png"
+                alt="Ótica D'Griffe Wonders"
+                className="w-11 h-11 rounded-full object-cover shadow-lg shadow-gold/20"
+              />
               <div>
                 <p className="text-[11px] text-gold font-semibold uppercase tracking-widest">Ótica</p>
                 <p className="text-lg font-bold -mt-0.5">D&apos;Griffe Wonders</p>
