@@ -4,6 +4,7 @@ import { listarProdutos, listarCategorias } from '../services/api';
 import type { Product } from '../data/types';
 import ProductCard from '../components/features/ProductCard';
 import CategoryIcon from '../components/features/CategoryIcon';
+import { getCategoriaNome } from '../data/categoriasMap';
 
 const BENEFITS = [
   {
@@ -165,10 +166,10 @@ export default function HomePage() {
                   className="card p-5 text-center group hover:-translate-y-1 transition-all duration-300"
                 >
                   <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-ice flex items-center justify-center group-hover:bg-gold/10 transition-colors">
-                    <CategoryIcon categoryName={cat.nome} />
+                    <CategoryIcon categoryName={getCategoriaNome(cat.id)} />
                   </div>
                   <p className="text-sm font-semibold text-luxury-black group-hover:text-gold transition-colors">
-                    {cat.nome}
+                    {getCategoriaNome(cat.id)}
                   </p>
                 </Link>
               ))

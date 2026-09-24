@@ -47,12 +47,12 @@ export default function CatalogPage() {
     listarMarcas().then(setMarcas).catch(() => {});
   }, []);
 
-  // URL params -> estado inicial
+  // URL params -> estado inicial (com dependência em selCategorias/selMarcas para evitar loop)
   useEffect(() => {
     const cat = searchParams.get('categoria');
-    if (cat) setSelCategorias([Number(cat)]);
     const mar = searchParams.get('marca');
-    if (mar) setSelMarcas([Number(mar)]);
+    setSelCategorias(cat ? [Number(cat)] : []);
+    setSelMarcas(mar ? [Number(mar)] : []);
   }, [searchParams]);
 
   const buildQuery = useCallback((off: number) => {
