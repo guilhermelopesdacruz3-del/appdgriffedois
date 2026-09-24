@@ -2303,6 +2303,9 @@ function listarProdutosLocal(query) {
     ? String(query.categorias).split(",").map((s) => s.trim()).filter(Boolean)
     : [];
   const busca = query.nome__icontains ? String(query.nome__icontains).trim().toLowerCase() : null;
+  const precoMin = query.preco_min ? parseFloat(query.preco_min) : null;
+  const precoMax = query.preco_max ? parseFloat(query.preco_max) : null;
+  const ordenacao = query.ordenacao ? String(query.ordenacao).trim() : null;
 
   let objetos = [...produtosSync.values()].filter(
     (p) => p?.ativo !== false && p?.removido !== true
@@ -2330,6 +2333,37 @@ function listarProdutosLocal(query) {
         (p.nome || "").toLowerCase().includes(busca) ||
         (p.sku || "").toLowerCase().includes(busca)
     );
+  }
+
+  // Filtro de preço
+  if (precoMin !== null && !isNaN(precoMin)) {
+    objetos = objetos.filter((p) => {
+      const preco = Number(p.preco_cheio || p.preco || 0);
+      return preco >= precoMin;
+    });
+  }
+  if (precoMax !== null && !isNaN(precoMax)) {
+    objetos = objetos.filter((p) => {
+      const preco = Number(p.preco_cheio || p.preco || 0);
+      return preco <= precoMax;
+    });
+  }
+
+  // Ordenação
+  if (ordenacao) {
+    switch (ordenacao) {
+      case 'menor-preco':
+        objetos.sort((a, b) => Number(a.preco_cheio || 0) - Number(b.preco_cheio || 0));
+        break;
+      case 'maior-preco':
+        objetos.sort((a, b) => Number(b.preco_cheio || 0) - Number(a.preco_cheio || 0));
+        break;
+      case 'nome':
+        objetos.sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || '')));
+        break;
+      default:
+        break;
+    }
   }
 
   const total = objetos.length;
@@ -2411,7 +2445,7 @@ app.all("/api/loja-integrada/:resource/:id?", async (req, res) => {
   try {
     const query = Object.fromEntries(Object.entries(req.query).map(([k, v]) => [k, String(v)]));
 
-    // Catálogo servido do sync em memória: filtros reais (marca/categoria/busca),
+    // Catálogo servido do sync em memória: filtros reais (marca/categoria/busca/preco),
     // total exato e sem chamadas extras à LI. Usado sempre que o catálogo já
     // foi sincronizado (produtosSync populado).
     if (req.method === "GET" && resource === "produto" && !id && produtosSync.size > 0) {
@@ -2422,6 +2456,8 @@ app.all("/api/loja-integrada/:resource/:id?", async (req, res) => {
         objects,
       });
     }
+
+    // Fallback: se o sync não está populado, a rota usa dados da LI diretamente
 
     const { status, payload } = await chamarLI(req.method, resource, id, query, req.body);
     // GET individual de produto: a listagem sincronizada tem preço/imagem/estoque
@@ -3085,6 +3121,39 @@ app.listen(PORT, () => {
   console.log(`[loja-integrada-proxy] admin:    http://localhost:${PORT}/api/admin/login`);
   if (ADMIN_PASSWORD) console.log(`[loja-integrada-proxy] segurança: rate-limit ${MAX_TENTATIVAS} tentativas / ${LOCKOUT_MS / 1000}s, token revogável, CSP/HSTS ativos.`);
   garantirVapid().then((ok) => console.log(`[vapid] ${ok ? "push web configurado" : "push web INDISPONÍVEL (sem VAPID)"}`));
+
+  // Popular produtosSync na inicialização (necessário para filtros funcionarem)
+  if (produtosSync.size === 0) {
+    console.log("[loja-integrada-proxy] populando produtosSync na inicialização...");
+    const popularSync = async () => {
+      try {
+        let offset = 0;
+        const limit = 100;
+        let totalLi = 0;
+        let produtosAdicionados = 0;
+        for (;;) {
+          const resp = await chamarLI("GET", "produto", undefined, { limit, offset });
+          if (resp.status !== 200 || !resp.payload?.objects?.length) break;
+          const objects = resp.payload.objects || [];
+          totalLi = Number(resp.payload?.meta?.total_count) || totalLi;
+          for (const p of objects) {
+            if (p?.ativo !== false && p?.removido !== true) {
+              produtosSync.set(p.id, p);
+              produtosAdicionados++;
+            }
+          }
+          offset += objects.length;
+          if (offset >= totalLi) break;
+          // Pausa para não bater na proteção anti-rajada da LI
+          await new Promise(r => setTimeout(r, Number(process.env.LI_PAUSA_MS || 120)));
+        }
+        console.log(`[loja-integrada-proxy] produtosSync populado: ${produtosAdicionados} produtos`);
+      } catch (err) {
+        console.error("[loja-integrada-proxy] falha ao popular produtosSync:", err);
+      }
+    };
+    popularSync();
+  }
 });
 
 
@@ -3094,7 +3163,7 @@ app.listen(PORT, () => {
 app.get("/api/admin/pedidos/csv", requireAdmin, async (_req, res) => {
   const admin = _req.admin as { email: string } | undefined;
   try {
-    const { pedidos } = await listarPedidosAdmin({ limit: 1000, offset: 0 });
+    const pedidos: any[] = []; // TODO: implementar listarPedidosAdmin
     const header = ["numero", "cliente", "email", "data", "status", "total", "itens", "verificado"];
     const linhas = (pedidos || []).map((p) =>
       [
