@@ -4,6 +4,7 @@
   "exclude": [
     "/manifest.webmanifest",
     "/sw.js",
+    "/sw-v2.js",
     "/icon-192.png",
     "/icon-512.png",
     "/maskable-192.png",
