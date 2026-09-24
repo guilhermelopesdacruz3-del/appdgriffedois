@@ -2335,16 +2335,16 @@ function listarProdutosLocal(query) {
     );
   }
 
-  // Filtro de preço
+  // Filtro de preço (usa preco_cheio ou precoSync como fallback)
   if (precoMin !== null && !isNaN(precoMin)) {
     objetos = objetos.filter((p) => {
-      const preco = Number(p.preco_cheio || p.preco || 0);
+      const preco = Number(p.preco_cheio || precoSync.get(p.id)?.cheio || p.preco || 0);
       return preco >= precoMin;
     });
   }
   if (precoMax !== null && !isNaN(precoMax)) {
     objetos = objetos.filter((p) => {
-      const preco = Number(p.preco_cheio || p.preco || 0);
+      const preco = Number(p.preco_cheio || precoSync.get(p.id)?.cheio || p.preco || 0);
       return preco <= precoMax;
     });
   }

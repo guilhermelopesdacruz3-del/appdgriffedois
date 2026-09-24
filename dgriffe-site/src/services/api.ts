@@ -15,13 +15,16 @@ async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-export async function listarProdutos(opts: { limit?: number; offset?: number; categoriaId?: number; marcaId?: number; busca?: string } = {}): Promise<{ produtos: Product[]; total: number }> {
+export async function listarProdutos(opts: { limit?: number; offset?: number; categorias?: string; marca?: string; nome__icontains?: string; preco_min?: string; preco_max?: string; ordenacao?: string } = {}): Promise<{ produtos: Product[]; total: number }> {
   const params = new URLSearchParams();
   if (opts.limit) params.set('limit', String(opts.limit));
   if (opts.offset) params.set('offset', String(opts.offset));
-  if (opts.categoriaId) params.set('categorias', String(opts.categoriaId));
-  if (opts.marcaId) params.set('marca', String(opts.marcaId));
-  if (opts.busca) params.set('nome__icontains', opts.busca);
+  if (opts.categorias) params.set('categorias', String(opts.categorias));
+  if (opts.marca) params.set('marca', String(opts.marca));
+  if (opts.nome__icontains) params.set('nome__icontains', String(opts.nome__icontains));
+  if (opts.preco_min) params.set('preco_min', String(opts.preco_min));
+  if (opts.preco_max) params.set('preco_max', String(opts.preco_max));
+  if (opts.ordenacao) params.set('ordenacao', String(opts.ordenacao));
   const qs = params.toString();
   const res = await request<{ objects: any[]; meta: { total_count: number } }>(`/api/loja-integrada/produto/${qs ? `?${qs}` : ''}`, { method: 'GET' });
 
