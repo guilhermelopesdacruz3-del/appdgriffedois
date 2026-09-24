@@ -61,6 +61,7 @@ const BRANDS = [
 export default function HomePage() {
   const [produtos, setProdutos] = useState<Product[]>([]);
   const [categorias, setCategorias] = useState<any[]>([]);
+  const [imagens, setImagens] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -77,6 +78,10 @@ export default function HomePage() {
       }
     }
     carregar();
+  }, []);
+
+  useEffect(() => {
+    fetch('/api/site/imagens').then(r => r.json()).then(d => setImagens(d.imagens || [])).catch(() => {});
   }, []);
 
   const destaques = produtos.filter((p) => p.badge === 'Destaque').slice(0, 6);
@@ -97,7 +102,7 @@ export default function HomePage() {
       <section className="relative overflow-hidden">
         <div className="absolute inset-0">
           <img
-            src="https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=1920&q=80"
+            src={imagens.find((i: any) => i.tipo === 'hero')?.url || 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=1920&q=80'}
             alt="Óculos D'Griffe Wonders"
             className="w-full h-full object-cover"
           />

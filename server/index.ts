@@ -21,8 +21,8 @@ import dotenv from "dotenv";
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import fs from "node:fs";
-import path from "node:path";
+import * as fs from "node:fs";
+import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: path.resolve(__dirname, ".env") });
@@ -464,7 +464,115 @@ app.post("/api/admin/logout", requireAdmin, (req, res) => {
       /* ignora */
     }
   }
-  return res.json({ ok: true });
+  res.json({ ok: true });
+});
+
+// ---------------------------------------------------------------------------
+// IMAGENS DO SITE (admin) — CRUD + endpoint público para o site
+// ---------------------------------------------------------------------------
+// Armazenamento local em JSON (não requer configuração de banco)
+// Estrutura: { imagens: [{ id, url, titulo, tipo, ativo, ordem, criadoEm }] }
+
+const IMAGENS_FILE = path.join(process.cwd(), "imagens_site.json");
+
+interface SiteImage {
+  id: number;
+  url: string;
+  titulo: string;
+  tipo: "hero" | "banner" | "categoria" | "logo" | "outro";
+  ativo: boolean;
+  ordem: number;
+  criadoEm: string;
+}
+
+function carregarImagens(): SiteImage[] {
+  try {
+    if (!fs.existsSync(IMAGENS_FILE)) return [];
+    const raw = fs.readFileSync(IMAGENS_FILE, "utf8");
+    const data = JSON.parse(raw);
+    return data.imagens || [];
+  } catch {
+    return [];
+  }
+}
+
+function salvarImagens(imagens: SiteImage[]): void {
+  fs.writeFileSync(IMAGENS_FILE, JSON.stringify({ imagens }, null, 2));
+}
+
+// Lista todas as imagens (admin)
+app.get("/api/admin/imagens", requireAdmin, (_req, res) => {
+  try {
+    res.json({ imagens: carregarImagens() });
+  } catch (e: any) {
+    res.status(500).json({ erro: e.message });
+  }
+});
+
+// Cria nova imagem (admin)
+app.post("/api/admin/imagens", requireAdmin, async (req, res) => {
+  try {
+    const { url, titulo, tipo } = req.body;
+    if (!url || !titulo) return res.status(400).json({ erro: "URL e título são obrigatórios" });
+    const imagens = carregarImagens();
+    const nova: SiteImage = {
+      id: Date.now(),
+      url,
+      titulo,
+      tipo: tipo || "hero",
+      ativo: true,
+      ordem: imagens.length,
+      criadoEm: new Date().toISOString(),
+    };
+    imagens.push(nova);
+    salvarImagens(imagens);
+    res.status(201).json({ imagem: nova });
+  } catch (e: any) {
+    res.status(500).json({ erro: e.message });
+  }
+});
+
+// Atualiza imagem (admin)
+app.put("/api/admin/imagens/:id", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const imagens = carregarImagens();
+    const idx = imagens.findIndex((i) => i.id === Number(id));
+    if (idx === -1) return res.status(404).json({ erro: "Imagem não encontrada" });
+    if (req.body.ativo !== undefined) imagens[idx].ativo = req.body.ativo;
+    if (req.body.titulo !== undefined) imagens[idx].titulo = req.body.titulo;
+    if (req.body.ordem !== undefined) imagens[idx].ordem = req.body.ordem;
+    if (req.body.tipo !== undefined) imagens[idx].tipo = req.body.tipo;
+    salvarImagens(imagens);
+    res.json({ imagem: imagens[idx] });
+  } catch (e: any) {
+    res.status(500).json({ erro: e.message });
+  }
+});
+
+// Exclui imagem (admin)
+app.delete("/api/admin/imagens/:id", requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const imagens = carregarImagens();
+    const idx = imagens.findIndex((i) => i.id === Number(id));
+    if (idx === -1) return res.status(404).json({ erro: "Imagem não encontrada" });
+    imagens.splice(idx, 1);
+    salvarImagens(imagens);
+    res.json({ ok: true });
+  } catch (e: any) {
+    res.status(500).json({ erro: e.message });
+  }
+});
+
+// Endpoint público: imagens ativas para o site
+app.get("/api/site/imagens", async (_req, res) => {
+  try {
+    const imagens = carregarImagens().filter((i) => i.ativo);
+    res.json({ imagens });
+  } catch (e: any) {
+    res.status(500).json({ erro: e.message });
+  }
 });
 
 // Lista TODOS os pedidos + flag de verificação.
