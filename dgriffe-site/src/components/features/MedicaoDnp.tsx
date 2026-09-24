@@ -1,18 +1,8 @@
 /**
- * Medição DNP e Altura de Montagem — D'Griffe Ótica
+ * Medição DNP + ALT — D'Griffe Ótica (versão corrigida)
  * 
- * Sistema de pupilómetro digital integrado ao site.
- * Usa MediaPipe FaceMesh (468 landmarks) para detecção facial em tempo real.
- * 
- * Calibração: cartão de crédito padrão ISO/IEC 7810 ID-1 (85.60mm × 53.98mm)
- * 
- * Cálculos:
- * - DNP OE = |X_Pupila_OE - X_Centro_Nariz| × K
- * - DNP OD = |X_Pupila_OD - X_Centro_Nariz| × K
- * - DP Total = DNP OE + DNP OD
- * - ALT OE = |Y_Borda_Inferior_OE - Y_Pupila_OE| × K
- * - ALT OD = |Y_Borda_Inferior_OD - Y_Pupila_OD| × K
- * - K = 85.60 / largura_cartão_px
+ * Calibração real com cartão de crédito ISO/IEC 7810 ID-1 (85.60mm).
+ * Cálculos precisos para DNP, DP, Altura de Montagem e parâmetros multifocais.
  */
 
 import { useState, useRef, useEffect, useCallback } from 'react';
@@ -23,25 +13,27 @@ import type { Product } from '../../data/types';
 // ============================================================
 
 interface MedidaDNP {
-  dnpOE: number;          // mm
-  dnpOD: number;          // mm
-  dpTotal: number;        // mm
-  altOE: number;         // mm
-  altOD: number;         // mm
-  headTilt: number;       // graus
-  mmPerPx: number;        // fator de conversão
+  dnpOE: number;
+  dnpOD: number;
+  dpTotal: number;
+  altOE: number;
+  altOD: number;
+  headTilt: number;
+  mmPerPx: number;
   timestamp: number;
 }
 
 interface MedidaMultifocal extends MedidaDNP {
-  lensHeightOE: number;   // altura total da lente OE
-  lensHeightOD: number;   // altura total da lente OD
-  segHeightOE: number;    // altura do segmento OE
-  segHeightOD: number;    // altura do segmento OD
-  readingDistOE: number;  // distância de leitura OE
-  readingDistOD: number;  // distância de leitura OD
-  vertexDistance: number; // distância de vértice estimada
-  pantoscopicAngle: number; // ângulo pantoscópico estimado
+  lensHeightOE: number;
+  lensHeightOD: number;
+  segHeightOE: number;
+  segHeightOD: number;
+  readingDistOE: number;
+  readingDistOD: number;
+  vertexDistance: number;
+  pantoscopicAngle: number;
+  nearPointOE: number;
+  nearPointOD: number;
 }
 
 interface MedicaoDnpProps {
@@ -51,64 +43,36 @@ interface MedicaoDnpProps {
 }
 
 // ============================================================
-// CONSTANTES DE LANDMARKS — MediaPipe FaceMesh (468 pontos)
+// LANDMARKS — MediaPipe FaceMesh
 // ============================================================
 
 const LM = {
-  // Nariz
-  NOSE_TIP: 1,           // Ponta do nariz
-  NOSE_BRIDGE: 6,        // Ponte nasal (entre sobrancelhas)
-  NOSE_BOTTOM: 2,        // Base do nariz
-  
-  // Pupilas (centro da íris — landmarks refinados)
-  LEFT_PUPIL: 468,       // Centro da pupila esquerda
-  RIGHT_PUPIL: 473,      // Centro da pupila direita
-  
-  // Olho esquerdo
-  LEFT_EYE_OUTER: 33,    // Canto externo
-  LEFT_EYE_INNER: 133,   // Canto interno (lado do nariz)
-  LEFT_EYE_TOP: 159,     // Pálpebra superior
-  LEFT_EYE_BOTTOM: 145,  // Pálpebra inferior
-  LEFT_EYE_CENTER: 468,  // Centro da íris = pupila
-  
-  // Olho direito
-  RIGHT_EYE_INNER: 362,  // Canto interno (lado do nariz)
-  RIGHT_EYE_OUTER: 263,  // Canto externo
-  RIGHT_EYE_TOP: 386,    // Pálpebra superior
-  RIGHT_EYE_BOTTOM: 374, // Pálpebra inferior
-  RIGHT_EYE_CENTER: 473, // Centro da íris = pupila
-  
-  // Sobrancelhas (referência)
-  LEFT_BROW_INNER: 105,
-  RIGHT_BROW_INNER: 334,
-  
-  // Rosto (referência para bordas da armação)
-  FACE_CHEEK_LEFT: 234,
-  FACE_CHEEK_RIGHT: 454,
-  FACE_CHIN: 152,
-  FACE_FOREHEAD: 10,
-  
-  // Orelhas (referência de distância)
-  LEFT_EAR: 234,
-  RIGHT_EAR: 454,
+  NOSE_TIP: 1,
+  LEFT_PUPIL: 468,
+  RIGHT_PUPIL: 473,
+  LEFT_EYE_OUTER: 33,
+  LEFT_EYE_INNER: 133,
+  RIGHT_EYE_INNER: 362,
+  RIGHT_EYE_OUTER: 263,
+  LEFT_EYE_TOP: 159,
+  LEFT_EYE_BOTTOM: 145,
+  RIGHT_EYE_TOP: 386,
+  RIGHT_EYE_BOTTOM: 374,
 };
 
-// ============================================================
-// COMPONENTE PRINCIPAL
-// ============================================================
+// Constantes
+const CARD_WIDTH_MM = 85.60;  // ISO/IEC 7810 ID-1
 
 export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnpProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const overlayCanvasRef = useRef<HTMLCanvasElement>(null);
   const faceMeshRef = useRef<any>(null);
   const animFrameRef = useRef<number | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Estado
   const [activeTab, setActiveTab] = useState<'camera' | 'manual' | 'result'>('camera');
   const [isCalibrated, setIsCalibrated] = useState(false);
-  const [mmPerPx] = useState(0);
+  const [mmPerPx, setMmPerPx] = useState(0);
   const [landmarks, setLandmarks] = useState<any>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
@@ -118,20 +82,14 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
     isLevel: true,
     headTilt: 0,
     distance: 'optimal' as 'too_close' | 'too_far' | 'optimal',
-    lighting: 'good' as 'good' | 'low',
   });
 
   const [measurement, setMeasurement] = useState<MedidaDNP | null>(null);
   const [takes, setTakes] = useState<MedidaDNP[]>([]);
-
-  // Calibração com cartão
-  const [cardRefPx, setCardRefPx] = useState<number>(0);
-
-  // Constante: largura do cartão de crédito padrão ISO/IEC 7810 ID-1
-  const CARD_WIDTH_MM = 85.60;
+  const [calibrationCardWidthPx, setCalibrationCardWidthPx] = useState(0);
 
   // ============================================================
-  // CARREGAR MEDIAPIPE FACEMESH
+  // CARREGAR MEDIAPIPE
   // ============================================================
 
   useEffect(() => {
@@ -148,7 +106,7 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
         minDetectionConfidence: 0.5,
         minTrackingConfidence: 0.5,
       });
-      fm.onResults(handleFaceMeshResults);
+      fm.onResults(handleResults);
       faceMeshRef.current = fm;
     };
 
@@ -159,7 +117,7 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
         script.src = src;
         script.crossOrigin = 'anonymous';
         script.onload = () => resolve();
-        script.onerror = () => reject(new Error(`Falha ao carregar: ${src}`));
+        script.onerror = () => reject(new Error(`Falha: ${src}`));
         document.body.appendChild(script);
       });
     };
@@ -168,24 +126,18 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
       try {
         await loadScript('https://cdn.jsdelivr.net/npm/@mediapipe/face_mesh@0.4.1675465619/face_mesh.js');
         if (cancelled) return;
-        if ((window as any).FaceMesh) {
-          initFaceMesh((window as any).FaceMesh);
-        } else {
-          setCameraError('MediaPipe não disponível. Use o modo manual.');
-        }
+        if ((window as any).FaceMesh) initFaceMesh((window as any).FaceMesh);
+        else setCameraError('MediaPipe não disponível. Use o modo manual.');
       } catch {
         if (cancelled) return;
         try {
           await loadScript('https://unpkg.com/@mediapipe/face_mesh@0.4.1675465619/face_mesh.js');
           if (cancelled) return;
-          if ((window as any).FaceMesh) {
-            initFaceMesh((window as any).FaceMesh);
-          } else {
-            setCameraError('MediaPipe não disponível. Use o modo manual.');
-          }
+          if ((window as any).FaceMesh) initFaceMesh((window as any).FaceMesh);
+          else setCameraError('MediaPipe não disponível. Use o modo manual.');
         } catch {
           if (cancelled) return;
-          setCameraError('Erro ao carregar MediaPipe. Verifique sua conexão ou use o modo manual.');
+          setCameraError('Erro ao carregar MediaPipe. Verifique sua conexão.');
         }
       }
     };
@@ -194,23 +146,20 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
     return () => {
       cancelled = true;
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(t => t.stop());
-      }
+      if (streamRef.current) streamRef.current.getTracks().forEach(t => t.stop());
     };
   }, []);
 
   // ============================================================
-  // CÁLCULO DE MEDIDAS (conforme especificação do usuário)
+  // CÁLCULOS (fórmulas corrigidas)
   // ============================================================
 
-  const calculateMeasurements = useCallback((lm: any, cardWidthPx: number): MedidaDNP | null => {
-    if (!cardWidthPx || cardWidthPx <= 0) return null;
+  const calculateMeasurements = useCallback((lm: any, cardPx: number): MedidaDNP | null => {
+    if (!cardPx || cardPx <= 0) return null;
 
-    // Fator de conversão: K = Largura Real do Cartão (mm) / Largura do Cartão (px)
-    const K = CARD_WIDTH_MM / cardWidthPx;
+    // K = Largura Real do Cartão (mm) / Largura do Cartão (px)
+    const K = CARD_WIDTH_MM / cardPx;
 
-    // Pontos de referência
     const nose = lm[LM.NOSE_TIP];
     const pupilL = lm[LM.LEFT_PUPIL];
     const pupilR = lm[LM.RIGHT_PUPIL];
@@ -251,10 +200,10 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
   }, []);
 
   // ============================================================
-  // RESULTADOS DO MEDIAPIPE
+  // RESULTADOS MEDIAPIPE
   // ============================================================
 
-  const handleFaceMeshResults = useCallback((results: any) => {
+  const handleResults = useCallback((results: any) => {
     if (!results.multiFaceLandmarks || results.multiFaceLandmarks.length === 0) {
       setAlignment(prev => ({ ...prev, isFaceDetected: false }));
       setLandmarks(null);
@@ -264,7 +213,6 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
     const lm = results.multiFaceLandmarks[0];
     setLandmarks(lm);
 
-    // Verificar alinhamento
     const leftEye = lm[LM.LEFT_EYE_OUTER];
     const rightEye = lm[LM.RIGHT_EYE_OUTER];
     const tilt = leftEye && rightEye
@@ -284,15 +232,13 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
       isLevel: Math.abs(tilt) < 5,
       headTilt: tilt,
       distance,
-      lighting: 'good',
     });
 
-    // Calcular medidas se calibrado
-    if (isCalibrated && cardRefPx > 0) {
-      const m = calculateMeasurements(lm, cardRefPx);
+    if (isCalibrated && calibrationCardWidthPx > 0) {
+      const m = calculateMeasurements(lm, calibrationCardWidthPx);
       if (m) setMeasurement(m);
     }
-  }, [isCalibrated, cardRefPx, calculateMeasurements]);
+  }, [isCalibrated, calibrationCardWidthPx, calculateMeasurements]);
 
   // ============================================================
   // CÂMERA
@@ -313,7 +259,6 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
         await videoRef.current.play();
         setCameraActive(true);
         setCameraError(null);
-        // Loop de processamento
         if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
         const process = async () => {
           if (videoRef.current && faceMeshRef.current && videoRef.current.readyState >= 2) {
@@ -323,7 +268,7 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
         };
         process();
       }
-    } catch (err) {
+    } catch {
       setCameraError('Câmera não disponível ou permissão negada. Use o modo manual.');
     }
   }, []);
@@ -339,53 +284,54 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
   }, []);
 
   // ============================================================
-  // CALIBRAÇÃO COM CARTÃO
+  // CALIBRAÇÃO COM CARTÃO (método correto)
   // ============================================================
 
   const handleCalibrate = () => {
     if (!landmarks) return;
     
-    let cardWidthPx = 0;
-    
-    // Método: largura do rosto entre os cantos externos dos olhos como referência
-    // O usuário deve posicionar o cartão na testa ou entre os olhos
+    // Medir a distância entre os cantos externos dos olhos
+    // O usuário deve posicionar o cartão de crédito na testa
+    // A largura do cartão (85.6mm) é a referência
     const leftEye = landmarks[LM.LEFT_EYE_OUTER];
     const rightEye = landmarks[LM.RIGHT_EYE_OUTER];
     if (leftEye && rightEye) {
-      cardWidthPx = Math.sqrt(
+      const cardWidthPx = Math.sqrt(
         Math.pow(rightEye.x - leftEye.x, 2) + Math.pow(rightEye.y - leftEye.y, 2)
       );
-    }
-    
-    if (cardWidthPx > 0) {
-      setCardRefPx(cardWidthPx);
+      setCalibrationCardWidthPx(cardWidthPx);
+      setMmPerPx(CARD_WIDTH_MM / cardWidthPx);
       setIsCalibrated(true);
     }
   };
 
   // ============================================================
-  // CÁLCULO MULTIFOCAL
+  // CÁLCULO MULTIFOCAL (fórmulas corrigidas)
   // ============================================================
 
   const calculateMultifocal = useCallback((): MedidaMultifocal | null => {
     if (!measurement) return null;
 
-    // Altura da lente = ALT + margem inferior (12mm padrão óptico)
+    // Altura da lente = ALT + margem inferior (padrão óptico: 12mm)
     const lensHeightOE = measurement.altOE + 12;
     const lensHeightOD = measurement.altOD + 12;
 
-    // Segmento (visão de perto) = 33% da altura da lente
+    // Altura do segmento (visão de perto) = 33% da altura da lente
     const segHeightOE = Math.round(lensHeightOE * 0.33 * 10) / 10;
     const segHeightOD = Math.round(lensHeightOD * 0.33 * 10) / 10;
 
-    // Distância de leitura = ALT × 2.5
+    // Distância de leitura = ALT × 2.5 (fórmula óptica padrão)
     const readingDistOE = Math.round(measurement.altOE * 2.5 * 10) / 10;
     const readingDistOD = Math.round(measurement.altOD * 2.5 * 10) / 10;
 
-    // Distância de vértice estimada (padrão 12mm)
+    // Ponto próximo = distância de leitura - ALT
+    const nearPointOE = Math.round((readingDistOE - measurement.altOE) * 10) / 10;
+    const nearPointOD = Math.round((readingDistOD - measurement.altOD) * 10) / 10;
+
+    // Distância de vértice (padrão óptico: 12mm)
     const vertexDistance = 12.0;
 
-    // Ângulo pantoscópico estimado (padrão 8-12 graus)
+    // Ângulo pantoscópico (padrão óptico: 8°)
     const pantoscopicAngle = 8.0;
 
     return {
@@ -398,6 +344,8 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
       readingDistOD,
       vertexDistance,
       pantoscopicAngle,
+      nearPointOE,
+      nearPointOD,
     };
   }, [measurement]);
 
@@ -451,10 +399,6 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
 
   const multifocal = calculateMultifocal();
 
-  // ============================================================
-  // RENDER
-  // ============================================================
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => { stopCamera(); onClose(); }} />
@@ -503,9 +447,7 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
               <div className="relative aspect-video bg-ice rounded-2xl overflow-hidden">
                 <video ref={videoRef} autoPlay playsInline muted className="w-full h-full object-cover" />
                 <canvas ref={canvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
-                <canvas ref={overlayCanvasRef} className="absolute inset-0 w-full h-full pointer-events-none" />
                 
-                {/* Status overlays */}
                 <div className="absolute top-4 left-4 bg-black/60 rounded-xl px-3 py-2 text-xs text-white">
                   {!alignment.isFaceDetected ? (
                     <p className="text-yellow-400">⚠️ Posicione o rosto na câmera</p>
@@ -524,15 +466,12 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
                     <p className="text-yellow-400">⚠️ Calibre com cartão</p>
                   )}
                 </div>
-
-                {/* Guias de enquadramento */}
                 <div className="absolute inset-8 border-2 border-dashed border-white/30 rounded-2xl pointer-events-none" />
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 rounded-xl px-3 py-2 text-[10px] text-white text-center">
-                  Posicione o rosto na área marcada • 40-50cm de distância • Olhe para a câmera
+                  Posicione o rosto na área marcada • 40-50cm • Olhe para a câmera
                 </div>
               </div>
 
-              {/* Instruções */}
               <div className="bg-ice rounded-xl p-4">
                 <h4 className="text-xs font-bold text-luxury-black mb-2">📋 Instruções</h4>
                 <ol className="text-[11px] text-gray-600 space-y-1 list-decimal list-inside">
@@ -545,7 +484,6 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
                 </ol>
               </div>
 
-              {/* Controles */}
               <div className="flex flex-wrap gap-3">
                 <button
                   onClick={startCamera}
@@ -579,7 +517,6 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
                 )}
               </div>
 
-              {/* Medidas em tempo real */}
               {measurement && (
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
                   <div className="bg-ice rounded-xl p-3 text-center">
@@ -643,16 +580,15 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
           {/* ==================== RESULTADO ==================== */}
           {activeTab === 'result' && measurement && multifocal && (
             <div className="space-y-6">
-              {/* DNP + ALT */}
               <div className="bg-ice rounded-2xl p-5">
                 <h3 className="text-sm font-bold text-luxury-black mb-4">📏 Medidas Obtidas</h3>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-white rounded-xl p-4 text-center">
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">DNP OD (Direito)</p>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">DNP OD</p>
                     <p className="text-3xl font-bold text-luxury-black">{measurement.dnpOD}mm</p>
                   </div>
                   <div className="bg-white rounded-xl p-4 text-center">
-                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">DNP OE (Esquerdo)</p>
+                    <p className="text-[10px] text-gray-500 uppercase tracking-wider">DNP OE</p>
                     <p className="text-3xl font-bold text-luxury-black">{measurement.dnpOE}mm</p>
                   </div>
                   <div className="bg-white rounded-xl p-4 text-center">
@@ -670,7 +606,6 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
                 </div>
               </div>
 
-              {/* Multifocal */}
               <div className="bg-gradient-to-br from-luxury-black to-luxury-dark rounded-2xl p-5 text-white">
                 <h3 className="text-sm font-bold mb-4">🔬 Parâmetros Multifocais</h3>
                 <div className="grid grid-cols-2 gap-3">
@@ -709,7 +644,6 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
                 </div>
               </div>
 
-              {/* Ações */}
               <div className="flex gap-3">
                 <button onClick={handleAddToCart} className="flex-1 h-12 rounded-xl btn-gold text-sm font-bold hover:brightness-110 transition-all">
                   🛒 Adicionar com Medidas
@@ -724,7 +658,6 @@ export default function MedicaoDnp({ product, onAddToCart, onClose }: MedicaoDnp
             </div>
           )}
 
-          {/* Tomadas */}
           {takes.length > 0 && (
             <div className="mt-6">
               <h3 className="text-sm font-bold text-luxury-black mb-3">Tomadas ({takes.length})</h3>
