@@ -72,6 +72,7 @@ export interface LIProduto {
   categorias?: string[];
   categoria?: string | null;
   variacoes?: string[];
+  grades?: string[];
   resource_uri: string;
   data_criacao: string;
   data_modificacao: string;

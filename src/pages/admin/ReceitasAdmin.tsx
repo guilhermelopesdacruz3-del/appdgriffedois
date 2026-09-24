@@ -4,9 +4,6 @@ import { listarReceitasAdmin, type ReceitaAdmin } from "../../services/admin";
 const inputCls =
   "h-10 px-3 rounded-xl border border-slate-300 bg-white text-slate-900 text-xs placeholder:text-slate-400 focus:outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-500/20 transition-all";
 const cardCls = "bg-white border border-slate-200 rounded-2xl shadow-sm";
-const btnPrimary =
-  "bg-gradient-to-r from-violet-600 to-purple-500 text-white font-bold rounded-xl active:scale-[0.98] transition-all hover:brightness-110 disabled:opacity-50";
-
 export default function ReceitasAdmin() {
   const [receitas, setReceitas] = useState<ReceitaAdmin[]>([]);
   const [busca, setBusca] = useState("");

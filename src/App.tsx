@@ -28,6 +28,7 @@ interface CartItem {
   product: Product;
   colorIndex: number;
   quantity: number;
+  variacao?: string;
 }
 
 export default function App() {
