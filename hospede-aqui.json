@@ -1,6 +1,6 @@
 {
   "name": "appdgriffedois",
-  "description": "D'Griffe Ótica backend API (Express/Next.js)",
+  "description": "D'Griffe Ótica backend API (Express)",
   "repo": "guilhermelopesdacruz3-del/appdgriffedois.git",
   "branch": "main",
   "type": "node",
@@ -8,48 +8,17 @@
   "build_command": "npm run build",
   "start_command": "node dist/index.js",
   "env": [
-    {
-      "key": "NODE_ENV",
-      "value": "production"
-    },
-    {
-      "key": "PORT",
-      "value": "8787"
-    },
-    {
-      "key": "ADMIN_PASSWORD",
-      "value": "Dgriffe#2026?",
-      "system": false
-    },
-    {
-      "key": "ADMIN_SECRET",
-      "value": "k7Qm9vT2xNpL4wZ8rY6bH3cF5dG1aJ0eS7uK2nX9mP4tR6",
-      "system": false
-    },
-    {
-      "key": "DEMO_MODE",
-      "value": "false"
-    },
-    {
-      "key": "LOJA_INTEGRADA_API_KEY",
-      "value": "a98fe727fdf413264102",
-      "system": false
-    },
-    {
-      "key": "LOJA_INTEGRADA_APP_KEY",
-      "value": "a98fe727fdf413264102",
-      "system": false
-    },
-    {
-      "key": "SUPABASE_URL",
-      "value": "REDACTED_SUPABASE_URL",
-      "system": true
-    },
-    {
-      "key": "SUPABASE_SERVICE_ROLE",
-      "value": "REDACTED_SUPABASE_SERVICE_ROLE",
-      "system": true
-    }
+    { "key": "NODE_ENV", "value": "production" },
+    { "key": "PORT", "value": "8787" },
+    { "key": "ADMIN_PASSWORD", "value": "CONFIGURE_NO_PAINEL", "secret": true },
+    { "key": "ADMIN_SECRET", "value": "CONFIGURE_NO_PAINEL", "secret": true },
+    { "key": "DEMO_MODE", "value": "false" },
+    { "key": "LOJA_INTEGRADA_API_KEY", "value": "CONFIGURE_NO_PAINEL", "secret": true },
+    { "key": "LOJA_INTEGRADA_APP_KEY", "value": "CONFIGURE_NO_PAINEL", "secret": true },
+    { "key": "LOJA_INTEGRADA_API_BASE_URL", "value": "https://api.awsli.com.br/api/v1" },
+    { "key": "FRONTEND_ORIGIN", "value": "https://dgriffe-site.pages.dev" },
+    { "key": "SUPABASE_URL", "value": "CONFIGURE_NO_PAINEL", "secret": true },
+    { "key": "SUPABASE_SERVICE_ROLE", "value": "CONFIGURE_NO_PAINEL", "secret": true }
   ],
   "databases": [
     {
