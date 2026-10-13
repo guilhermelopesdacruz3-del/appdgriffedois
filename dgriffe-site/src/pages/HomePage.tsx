@@ -96,22 +96,22 @@ export default function HomePage() {
         </p>
       </div>
 
-      {/* 2. Hero Banner — estilo Ray-Ban: full-bleed, headline à esquerda */}
-      <section className="relative overflow-hidden">
+      {/* 2. Hero Banner — altura mínima fixa (full-bleed estilo Ray-Ban) */}
+      <section className="relative overflow-hidden min-h-[70vh] md:min-h-[85vh] flex items-center">
         <div className="absolute inset-0">
           <img
             src={imagens.find((i: any) => i.tipo === 'hero')?.url || 'https://images.unsplash.com/photo-1511499767150-a48a237f0083?w=1920&q=80'}
             alt="Óculos D'Griffe Wonders"
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/75 via-black/45 to-transparent" />
         </div>
-        <div className="container-site relative py-28 md:py-40">
+        <div className="container-site relative py-16 w-full">
           <div className="max-w-xl">
             <h1 className="font-sans text-4xl md:text-6xl font-bold text-white leading-[1.05] mb-5 tracking-tight">
               Sua visão com<br />estilo absoluto
             </h1>
-            <p className="text-base md:text-lg text-white/80 mb-8 max-w-md">
+            <p className="text-base md:text-lg text-white/85 mb-8 max-w-md">
               Óculos originais das melhores grifes. Lentes sob medida com laboratório digital.
             </p>
             <div className="flex flex-wrap gap-3">
@@ -120,7 +120,7 @@ export default function HomePage() {
               </Link>
               <Link
                 to="/catalogo"
-                className="px-8 py-3.5 border border-white/60 text-white text-[12px] font-bold uppercase tracking-widest hover:bg-white/10 transition-colors"
+                className="px-8 py-3.5 border border-white/70 text-white text-[12px] font-bold uppercase tracking-widest hover:bg-white/10 transition-colors"
               >
                 Ver coleção
               </Link>
@@ -129,14 +129,14 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 3. Tiles de Gênero — retrato, estilo Ray-Ban */}
+      {/* 3. Tiles de Gênero — retrato, altura controlada */}
       <section className="grid grid-cols-1 md:grid-cols-3">
         {[
           { label: 'Para ela', img: 'https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=960&q=80', to: '/catalogo' },
           { label: 'Para ele', img: 'https://images.unsplash.com/photo-1508296695146-257a814070b4?w=960&q=80', to: '/catalogo' },
           { label: 'Infantil', img: 'https://images.unsplash.com/photo-1591076482161-42ce6da69f67?w=960&q=80', to: '/catalogo' },
         ].map((g) => (
-          <Link key={g.label} to={g.to} className="relative group overflow-hidden aspect-[3/4] md:aspect-[6/7]">
+          <Link key={g.label} to={g.to} className="relative group overflow-hidden h-64 md:h-80 lg:h-96">
             <img src={g.img} alt={g.label} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" loading="lazy" />
             <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
             <div className="absolute bottom-6 left-6">
