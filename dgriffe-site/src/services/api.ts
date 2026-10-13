@@ -2,6 +2,17 @@ import type { Product } from '../data/types';
 import { getCategoriaNome } from '../data/categoriasMap';
 import { API_BASE } from '../config';
 
+// A LI devolve nomes sujos (prefixos de VMARCA, códigos, barras). Este helper
+// é a ÚNICA fonte dessa limpeza — usado por listarProdutos e buscarProduto.
+function limparNome(nome: string | null | undefined): string {
+  return (nome || '')
+    .replace(/^\/API\/VMARCA\/\d+/i, '')
+    .replace(/^\/[A-Z]+-/i, '')
+    .replace(/^\/+/, '')
+    .replace(/^[A-Z0-9]+-[A-Z0-9]+/i, '')
+    .trim();
+}
+
 async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { 'Content-Type': 'application/json', ...opts.headers },
@@ -53,9 +64,7 @@ export async function listarProdutos(opts: { limit?: number; offset?: number; ca
     const ncm = p.ncm || '';
     const isEyewear = ncm.startsWith('9004') || catNome.toLowerCase().includes('sol') || catNome.toLowerCase().includes('grau');
 
-    let nomeLimpo = p.nome || p.apelido || '';
-    nomeLimpo = nomeLimpo.replace(/^\/API\/VMARCA\/\d+/i, '').replace(/^\/[A-Z]+-/i, '').replace(/^\/+/, '').trim();
-    nomeLimpo = nomeLimpo.replace(/^[A-Z0-9]+-[A-Z0-9]+/i, '').trim();
+    let nomeLimpo = limparNome(p.nome || p.apelido);
 
     return {
       id: p.id,
@@ -91,9 +100,7 @@ export async function buscarProduto(id: number | string): Promise<Product> {
   const ncm = p.ncm || '';
   const catNome = p.categorias?.[0]?.nome || p.categoria_nome || '';
   const isEyewear = ncm.startsWith('9004') || catNome.toLowerCase().includes('sol') || catNome.toLowerCase().includes('grau');
-  let nomeLimpo = p.nome || p.apelido || '';
-  nomeLimpo = nomeLimpo.replace(/^\/API\/VMARCA\/\d+/i, '').replace(/^\/[A-Z]+-/i, '').replace(/^\/+/, '').trim();
-  nomeLimpo = nomeLimpo.replace(/^[A-Z0-9]+-[A-Z0-9]+/i, '').trim();
+  let nomeLimpo = limparNome(p.nome || p.apelido);
   return {
     id: p.id,
     name: nomeLimpo,
