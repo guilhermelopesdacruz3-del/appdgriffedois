@@ -220,31 +220,51 @@ export async function buscarProduto(id: number | string): Promise<Product> {
   let precoPromocional = toNumber(produto.preco_promocional);
   let variacoes: string[] = produto.variacoes || [];
 
-  if ((produto.grades && produto.grades.length > 0) || precoCheio === 0) {
+  if ((produto.grades && produto.grades.length > 0) || precoCheio === 0 || variacoes.length > 0) {
     try {
-      const gradesUris: string[] = produto.grades || [];
+      // O endpoint individual devolve `grades: []` mas `variacoes` com URIs
+      // (ex.: /api/v1/grade/32769/variacao/139499). Extraímos os gradeIds TANTO
+      // de `grades` QUANTO das URIs de `variacoes`, pois o nome legível da
+      // variação ("Masculino") vive dentro do objeto da grade.
+      const gradeIdSet = new Set<number>();
+      for (const g of (produto.grades || [])) {
+        const parts = String(g).split("/").filter(Boolean);
+        const last = parts[parts.length - 1];
+        if (/^\d+$/.test(last)) gradeIdSet.add(Number(last));
+      }
+      for (const u of variacoes) {
+        const m = String(u).match(/\/grade\/(\d+)\/variacao\//i);
+        if (m) gradeIdSet.add(Number(m[1]));
+      }
+
+      // Mapa URI-de-variacao -> nome legível, montado a partir das grades.
+      const nomePorVariacaoUri = new Map<string, string>();
       const variacoesNomes: string[] = [];
       const precos: number[] = [];
 
-      for (const gradeUri of gradesUris) {
+      for (const gradeId of gradeIdSet) {
         try {
-          const parts = gradeUri.split("/").filter(Boolean);
-          const gradeId = parts[parts.length - 1];
-          const grade = await getResource<any>("grades", Number(gradeId));
-          
-          const nome = grade.nome || grade.nome_visivel || "";
-          if (nome) variacoesNomes.push(nome);
-          
+          const grade = await getResource<any>("grades", gradeId);
+          const gradeNome = grade.nome || grade.nome_visivel || "";
+          if (gradeNome) variacoesNomes.push(gradeNome);
           const pCheio = toNumber(grade.preco_cheio || grade.preco);
           const pPromo = toNumber(grade.preco_promocional || grade.preco_promocional);
           if (pPromo > 0) precos.push(pPromo);
           if (pCheio > 0) precos.push(pCheio);
+          // Mapeia cada variação da grade para o seu nome legível.
+          for (const v of (grade.variacoes || [])) {
+            if (v?.resource_uri && v?.nome) nomePorVariacaoUri.set(v.resource_uri, v.nome);
+          }
         } catch {
           /* silencioso - se não achar a grade, segue com a próxima */
         }
       }
 
-      if (variacoesNomes.length > 0) {
+      // Substitui as URIs em `variacoes` pelos nomes legíveis quando disponíveis.
+      if (nomePorVariacaoUri.size > 0) {
+        const resolvidas = variacoes.map((u: string) => nomePorVariacaoUri.get(u) || u);
+        if (resolvidas.some((n) => n && !n.startsWith("/api/"))) variacoes = resolvidas;
+      } else if (variacoesNomes.length > 0) {
         variacoes = variacoesNomes;
       }
       if (precos.length > 0) {
