@@ -1,6 +1,6 @@
-const BASE_URL =
-  (import.meta.env.VITE_API_BASE as string | undefined)?.replace(/\/$/, "") ||
-  "";
+// URL relativa: em dev o Vite faz proxy /api -> localhost:8787;
+// em produção (Cloudflare Pages) a Function encaminha /api/* -> Render.
+const BASE_URL = "";
 
 import { getAdminToken, clearAdminToken } from "./admin";
 import { clearClienteToken } from "../utils/cookies";

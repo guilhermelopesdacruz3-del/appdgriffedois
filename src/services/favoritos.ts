@@ -1,6 +1,8 @@
 import type { Favorito } from "../types";
 
-const API = `${import.meta.env.VITE_API_URL || ""}/api/cliente/favoritos`;
+// URL relativa: em dev o Vite faz proxy /api -> localhost:8787;
+// em produção (Cloudflare Pages) a Function encaminha /api/* -> Render.
+const API = "/api/cliente/favoritos";
 
 export async function getFavoritos(email: string): Promise<Favorito[]> {
   const res = await fetch(`${API}?email=${encodeURIComponent(email)}`);
