@@ -50,12 +50,12 @@ export default function ProductDetailPage() {
     return (
       <div className="container-site py-8">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <div className="aspect-square bg-ice-dark rounded-2xl animate-pulse" />
+          <div className="aspect-square bg-neutral-200 rounded-2xl animate-pulse" />
           <div className="space-y-4">
-            <div className="h-4 bg-ice-dark rounded w-1/4" />
-            <div className="h-8 bg-ice-dark rounded w-3/4" />
-            <div className="h-4 bg-ice-dark rounded w-1/2" />
-            <div className="h-12 bg-ice-dark rounded" />
+            <div className="h-4 bg-neutral-200 rounded w-1/4" />
+            <div className="h-8 bg-neutral-200 rounded w-3/4" />
+            <div className="h-4 bg-neutral-200 rounded w-1/2" />
+            <div className="h-12 bg-neutral-200 rounded" />
           </div>
         </div>
       </div>
@@ -65,8 +65,8 @@ export default function ProductDetailPage() {
   if (!product) {
     return (
       <div className="container-site py-8 text-center">
-        <p className="text-gray-500">Produto não encontrado.</p>
-        <Link to="/catalogo" className="text-gold text-sm font-semibold hover:underline mt-4 inline-block">
+        <p className="text-neutral-500">Produto não encontrado.</p>
+        <Link to="/catalogo" className="text-neutral-700 text-sm font-semibold hover:underline mt-4 inline-block">
           ← Voltar ao catálogo
         </Link>
       </div>
@@ -78,12 +78,12 @@ export default function ProductDetailPage() {
   return (
     <div className="container-site py-8">
       {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-xs text-gray-500 mb-6">
-        <Link to="/" className="hover:text-gold">Início</Link>
+      <nav className="flex items-center gap-2 text-xs text-neutral-500 mb-6">
+        <Link to="/" className="hover:text-neutral-700">Início</Link>
         <span>/</span>
-        <Link to="/catalogo" className="hover:text-gold">Coleção</Link>
+        <Link to="/catalogo" className="hover:text-neutral-700">Coleção</Link>
         <span>/</span>
-        <span className="text-luxury-black font-medium">{product.name}</span>
+        <span className="text-neutral-900 font-medium">{product.name}</span>
       </nav>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -103,7 +103,7 @@ export default function ProductDetailPage() {
                   key={i}
                   onClick={() => setActiveImageIndex(i)}
                   className={`w-16 h-16 rounded-xl overflow-hidden flex-shrink-0 transition-all ${
-                    activeImageIndex === i ? 'ring-2 ring-gold' : 'opacity-70 hover:opacity-100'
+                    activeImageIndex === i ? 'ring-2 ring-neutral-900' : 'opacity-70 hover:opacity-100'
                   }`}
                 >
                   <img src={getProductImage(img)} alt="" className="w-full h-full object-cover" />
@@ -115,16 +115,16 @@ export default function ProductDetailPage() {
 
         {/* Info */}
         <div>
-          <p className="text-xs text-gold font-semibold uppercase tracking-widest mb-1">{product.brand}</p>
-          <h1 className="text-2xl md:text-3xl font-bold text-luxury-black mb-2">{product.name}</h1>
-          <p className="text-xs text-gray-400 mb-4">Cód: {product.code}</p>
+          <p className="text-xs text-neutral-700 font-semibold uppercase tracking-widest mb-1">{product.brand}</p>
+          <h1 className="text-2xl md:text-3xl font-bold text-neutral-900 mb-2">{product.name}</h1>
+          <p className="text-xs text-neutral-400 mb-4">Cód: {product.code}</p>
 
           {/* Preço */}
-          <div className="bg-ice rounded-2xl p-4 mb-4">
+          <div className="bg-neutral-100 rounded-2xl p-4 mb-4">
             <div className="flex items-center gap-3 mb-1">
-              <span className="text-2xl font-bold text-luxury-black">{formatPrice(product.price)}</span>
+              <span className="text-2xl font-bold text-neutral-900">{formatPrice(product.price)}</span>
               {product.originalPrice && (
-                <span className="text-sm text-gray-400 line-through">{formatPrice(product.originalPrice)}</span>
+                <span className="text-sm text-neutral-400 line-through">{formatPrice(product.originalPrice)}</span>
               )}
             </div>
             <div className="flex items-center gap-2 mb-2">
@@ -133,7 +133,7 @@ export default function ProductDetailPage() {
                 <span className="text-[11px] text-green-700 font-bold">{formatPrice(product.pixPrice)} via Pix</span>
               </div>
             </div>
-            <p className="text-[10px] text-gray-400">
+            <p className="text-[10px] text-neutral-400">
               {formatInstallment(product.installmentCount, product.installmentValue)} sem juros
             </p>
           </div>
@@ -141,8 +141,8 @@ export default function ProductDetailPage() {
           {/* Variações */}
           {product.variacoes && product.variacoes.length > 0 && (
             <div className="mb-5">
-              <p className="text-xs font-semibold text-luxury-black mb-3">
-                Variação: <span className="text-gold">{product.variacoes[selectedColor]}</span>
+              <p className="text-xs font-semibold text-neutral-900 mb-3">
+                Variação: <span className="text-neutral-700">{product.variacoes[selectedColor]}</span>
               </p>
               <div className="flex flex-wrap gap-2">
                 {product.variacoes.map((v, i) => (
@@ -151,8 +151,8 @@ export default function ProductDetailPage() {
                     onClick={() => setSelectedColor(i)}
                     className={`h-12 px-5 rounded-xl border transition-all duration-200 ${
                       selectedColor === i
-                        ? 'border-gold bg-gold/10 text-gold font-semibold'
-                        : 'border-ice-dark text-gray-600 hover:border-gold/30'
+                        ? 'border-neutral-900 bg-neutral-100 text-neutral-700 font-semibold'
+                        : 'border-neutral-300 text-neutral-600 hover:border-neutral-900/30'
                     }`}
                   >
                     {v}
@@ -165,8 +165,8 @@ export default function ProductDetailPage() {
           {/* Cores */}
           {product.colors.length > 0 && (
             <div className="mb-5">
-              <p className="text-xs font-semibold text-luxury-black mb-3">
-                Cor: <span className="text-gold">{product.colorNames[selectedColor] || product.colorNames[0]}</span>
+              <p className="text-xs font-semibold text-neutral-900 mb-3">
+                Cor: <span className="text-neutral-700">{product.colorNames[selectedColor] || product.colorNames[0]}</span>
               </p>
               <div className="flex gap-3">
                 {product.colors.map((color, i) => (
@@ -174,7 +174,7 @@ export default function ProductDetailPage() {
                     key={i}
                     onClick={() => setSelectedColor(i)}
                     className={`relative w-12 h-12 rounded-full transition-all duration-200 ${
-                      selectedColor === i ? 'ring-2 ring-gold ring-offset-2 scale-110' : 'ring-1 ring-gray-200 hover:ring-gray-400'
+                      selectedColor === i ? 'ring-2 ring-neutral-900 ring-offset-2 scale-110' : 'ring-1 ring-gray-200 hover:ring-gray-400'
                     }`}
                     style={{ backgroundColor: color }}
                   >
@@ -190,12 +190,12 @@ export default function ProductDetailPage() {
           {/* Tamanhos */}
           {product.tamanhos && product.tamanhos.length > 0 && (
             <div className="mb-5">
-              <p className="text-xs font-semibold text-luxury-black mb-3">Tamanho</p>
+              <p className="text-xs font-semibold text-neutral-900 mb-3">Tamanho</p>
               <div className="flex flex-wrap gap-2">
                 {product.tamanhos.map((t, i) => (
                   <button
                     key={i}
-                    className="h-10 px-4 rounded-xl border border-ice-dark text-gray-600 hover:border-gold/30 transition-all"
+                    className="h-10 px-4 rounded-xl border border-neutral-300 text-neutral-600 hover:border-neutral-900/30 transition-all"
                   >
                     {t}
                   </button>
@@ -206,15 +206,15 @@ export default function ProductDetailPage() {
 
           {/* Banner explicativo */}
           {isEyewear(product) && (
-            <div className="mb-5 bg-gradient-to-r from-luxury-black to-luxury-dark rounded-2xl p-5 text-white relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-32 h-32 bg-gold/10 rounded-full blur-2xl" />
+            <div className="mb-5 bg-gradient-to-r from-neutral-900 to-neutral-800 rounded-2xl p-5 text-white relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-neutral-100 rounded-full blur-2xl" />
               <div className="relative flex items-start gap-4">
-                <div className="w-10 h-10 rounded-full bg-gold/20 flex items-center justify-center flex-shrink-0">
+                <div className="w-10 h-10 rounded-full bg-neutral-200 flex items-center justify-center flex-shrink-0">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#D4A017" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
                 </div>
                 <div>
                   <p className="font-bold text-sm mb-1">Monte seu óculos do seu jeito</p>
-                  <p className="text-xs text-gray-300 leading-relaxed">
+                  <p className="text-xs text-neutral-300 leading-relaxed">
                     Escolha a armação, personalize as lentes com seu grau e receba em casa. 
                     Nosso time de especialistas está pronto para ajudar!
                   </p>
@@ -239,14 +239,14 @@ export default function ProductDetailPage() {
                     });
                     navigate('/cart');
                   }}
-                  className="w-full h-12 rounded-xl bg-luxury-black text-white text-sm font-semibold hover:bg-luxury-dark transition-colors flex items-center justify-center gap-2"
+                  className="w-full h-12 rounded-xl bg-neutral-900 text-white text-sm font-semibold hover:bg-neutral-700 transition-colors flex items-center justify-center gap-2"
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 01-8 0" /></svg>
                   COMPRAR APENAS A ARMAÇÃO — {formatPrice(product.price)}
                 </button>
                 <button
                   onClick={() => setShowLensesModal(true)}
-                  className="w-full h-12 rounded-xl btn-gold text-sm font-bold hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-lg shadow-gold/20"
+                  className="w-full h-12 rounded-xl bg-neutral-900 text-white text-sm font-bold hover:brightness-110 transition-all flex items-center justify-center gap-2 shadow-lg shadow-neutral-900/20"
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg>
                   COMPRAR ÓCULOS COMPLETO COM AS LENTES
@@ -265,7 +265,7 @@ export default function ProductDetailPage() {
                   });
                   navigate('/cart');
                 }}
-                className="w-full h-12 rounded-xl bg-luxury-black text-white text-sm font-semibold hover:bg-luxury-dark transition-colors flex items-center justify-center gap-2"
+                className="w-full h-12 rounded-xl bg-neutral-900 text-white text-sm font-semibold hover:bg-neutral-700 transition-colors flex items-center justify-center gap-2"
               >
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 01-8 0" /></svg>
                 ADICIONAR AO CARRINHO — {formatPrice(product.price)}
@@ -292,12 +292,12 @@ export default function ProductDetailPage() {
                 value={cep}
                 onChange={(e) => setCep(e.target.value.replace(/\D/g, '').slice(0, 8))}
                 placeholder="CEP para frete"
-                className="flex-1 h-11 px-3 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-gold"
+                className="flex-1 h-11 px-3 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-900"
               />
               <button
                 onClick={calcularFrete}
                 disabled={cep.length < 8 || freteLoading}
-                className="h-11 px-4 rounded-xl bg-ice text-luxury-black text-xs font-semibold hover:bg-ice-dark transition-colors disabled:opacity-50 whitespace-nowrap"
+                className="h-11 px-4 rounded-xl bg-neutral-100 text-neutral-900 text-xs font-semibold hover:bg-neutral-200 transition-colors disabled:opacity-50 whitespace-nowrap"
               >
                 {freteLoading ? '...' : 'Calcular'}
               </button>
@@ -308,7 +308,7 @@ export default function ProductDetailPage() {
           {isEyewear(product) && (
             <button
               onClick={() => setShowMedicao(true)}
-              className="w-full h-12 rounded-xl border-2 border-gold/40 text-gold text-sm font-semibold hover:bg-gold/5 transition-all flex items-center justify-center gap-2 mb-5"
+              className="w-full h-12 rounded-xl border-2 border-neutral-900/40 text-neutral-700 text-sm font-semibold hover:bg-gold/5 transition-all flex items-center justify-center gap-2 mb-5"
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
               Medir DNP e Altura para Lentes Multifocais
@@ -324,8 +324,8 @@ export default function ProductDetailPage() {
           {/* Descrição */}
           {product.description && (
             <div className="mt-6">
-              <h4 className="text-xs font-bold text-luxury-black mb-2">Sobre este produto</h4>
-              <p className="text-[13px] text-gray-600 leading-relaxed whitespace-pre-line">
+              <h4 className="text-xs font-bold text-neutral-900 mb-2">Sobre este produto</h4>
+              <p className="text-[13px] text-neutral-600 leading-relaxed whitespace-pre-line">
                 {product.description.replace(/<[^>]*>/g, '').trim()}
               </p>
             </div>

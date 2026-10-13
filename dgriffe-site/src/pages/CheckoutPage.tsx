@@ -51,7 +51,7 @@ export default function CheckoutPage() {
             </svg>
           </div>
           <h1 className="section-title mb-2">Pedido Realizado!</h1>
-          <p className="text-gray-500 mb-4">
+          <p className="text-neutral-500 mb-4">
             Recebemos seu pedido. Você receberá um e-mail com os detalhes.
           </p>
           <button onClick={() => navigate('/catalogo')} className="btn-primary">
@@ -70,38 +70,38 @@ export default function CheckoutPage() {
         {/* Pagamento */}
         <div>
           <div className="bg-white rounded-2xl p-6 shadow-card space-y-4">
-            <h2 className="font-display font-semibold text-lg text-luxury-black">Pagamento</h2>
+            <h2 className="font-display font-semibold text-lg text-neutral-900">Pagamento</h2>
             <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={() => setPagamento('pix')}
                 className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
                   pagamento === 'pix'
-                    ? 'border-gold bg-gold/5 text-luxury-black'
-                    : 'border-ice-dark text-gray-600 hover:border-gray-300'
+                    ? 'border-neutral-900 bg-neutral-900/5 text-neutral-900'
+                    : 'border-neutral-300 text-neutral-600 hover:border-gray-300'
                 }`}
               >
-                <div className="w-10 h-10 rounded-full bg-ice flex items-center justify-center">
-                  <QrCode size={20} className={pagamento === 'pix' ? 'text-gold' : 'text-gray-500'} />
+                <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center">
+                  <QrCode size={20} className={pagamento === 'pix' ? 'text-neutral-700' : 'text-neutral-500'} />
                 </div>
                 <div>
                   <p className="font-semibold text-sm">PIX</p>
-                  <p className="text-xs text-gray-500">{formatPrice(total)}</p>
+                  <p className="text-xs text-neutral-500">{formatPrice(total)}</p>
                 </div>
               </button>
               <button
                 onClick={() => setPagamento('cartao')}
                 className={`flex items-center gap-3 p-4 rounded-xl border-2 transition-all ${
                   pagamento === 'cartao'
-                    ? 'border-gold bg-gold/5 text-luxury-black'
-                    : 'border-ice-dark text-gray-600 hover:border-gray-300'
+                    ? 'border-neutral-900 bg-neutral-900/5 text-neutral-900'
+                    : 'border-neutral-300 text-neutral-600 hover:border-gray-300'
                 }`}
               >
-                <div className="w-10 h-10 rounded-full bg-ice flex items-center justify-center">
-                  <CreditCard size={20} className={pagamento === 'cartao' ? 'text-gold' : 'text-gray-500'} />
+                <div className="w-10 h-10 rounded-full bg-neutral-100 flex items-center justify-center">
+                  <CreditCard size={20} className={pagamento === 'cartao' ? 'text-neutral-700' : 'text-neutral-500'} />
                 </div>
                 <div>
                   <p className="font-semibold text-sm">Cartão</p>
-                  <p className="text-xs text-gray-500">Até 5x sem juros</p>
+                  <p className="text-xs text-neutral-500">Até 5x sem juros</p>
                 </div>
               </button>
             </div>
@@ -111,17 +111,17 @@ export default function CheckoutPage() {
         {/* Resumo */}
         <div className="lg:col-span-1">
           <div className="bg-white rounded-2xl p-6 shadow-card sticky top-24">
-            <h2 className="font-display font-semibold text-lg text-luxury-black mb-4">Resumo do Pedido</h2>
+            <h2 className="font-display font-semibold text-lg text-neutral-900 mb-4">Resumo do Pedido</h2>
             <div className="space-y-3">
               {cart.map((item, idx) => (
                 <div key={idx} className="flex justify-between text-sm">
-                  <span className="text-gray-600 truncate mr-2">
+                  <span className="text-neutral-600 truncate mr-2">
                     {item.quantidade}x {item.productName}
                   </span>
                   <span className="font-semibold">{formatPrice(item.price * item.quantidade)}</span>
                 </div>
               ))}
-              <div className="border-t border-ice-dark pt-3 flex justify-between font-bold text-luxury-black text-base">
+              <div className="border-t border-neutral-300 pt-3 flex justify-between font-bold text-neutral-900 text-base">
                 <span>Total</span>
                 <span>{formatPrice(total)}</span>
               </div>
@@ -129,7 +129,7 @@ export default function CheckoutPage() {
             <button
               onClick={handleSubmit}
               disabled={loading}
-              className="mt-6 w-full h-12 btn-gold disabled:opacity-50 flex items-center justify-center gap-2"
+              className="mt-6 w-full h-12 bg-neutral-900 text-white disabled:opacity-50 flex items-center justify-center gap-2"
             >
               {loading ? (
                 <span className="w-5 h-5 border-2 border-luxury-black/30 border-t-luxury-black rounded-full animate-spin" />
@@ -141,7 +141,7 @@ export default function CheckoutPage() {
               )}
             </button>
             {error && <p className="text-xs text-red-500 mt-2 text-center">{error}</p>}
-            <p className="text-[10px] text-gray-400 text-center mt-3">
+            <p className="text-[10px] text-neutral-400 text-center mt-3">
               <Lock size={10} className="inline mr-1" />
               Compra segura • Seus dados estão protegidos
             </p>

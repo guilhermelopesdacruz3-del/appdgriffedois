@@ -36,16 +36,16 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-ice flex items-center justify-center p-4">
+    <div className="min-h-screen bg-neutral-100 flex items-center justify-center p-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-6">
-          <div className="w-16 h-16 bg-gold/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <span className="text-gold font-display font-bold text-2xl">D</span>
+          <div className="w-16 h-16 bg-neutral-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <span className="text-neutral-700 font-display font-bold text-2xl">D</span>
           </div>
-          <h1 className="text-xl font-bold text-luxury-black">
+          <h1 className="text-xl font-bold text-neutral-900">
             {isCadastro ? 'Criar Conta' : 'Entrar'}
           </h1>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="text-sm text-neutral-500 mt-1">
             {isCadastro ? 'Crie sua conta para comprar' : 'Digite seu e-mail e senha'}
           </p>
         </div>
@@ -54,49 +54,49 @@ export default function LoginPage() {
           {isCadastro && (
             <>
               <div>
-                <label className="text-sm text-gray-600 block mb-1">Nome completo</label>
+                <label className="text-sm text-neutral-600 block mb-1">Nome completo</label>
                 <input
                   type="text"
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
                   required
-                  className="w-full h-11 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-gold"
+                  className="w-full h-11 px-4 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-900"
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 block mb-1">Telefone</label>
+                <label className="text-sm text-neutral-600 block mb-1">Telefone</label>
                 <input
                   type="tel"
                   value={telefone}
                   onChange={(e) => setTelefone(e.target.value)}
-                  className="w-full h-11 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-gold"
+                  className="w-full h-11 px-4 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-900"
                 />
               </div>
               <div>
-                <label className="text-sm text-gray-600 block mb-1">CPF</label>
+                <label className="text-sm text-neutral-600 block mb-1">CPF</label>
                 <input
                   type="text"
                   value={cpf}
                   onChange={(e) => setCpf(e.target.value.replace(/\D/g, '').slice(0, 11))}
-                  className="w-full h-11 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-gold"
+                  className="w-full h-11 px-4 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-900"
                 />
               </div>
             </>
           )}
 
           <div>
-            <label className="text-sm text-gray-600 block mb-1">E-mail</label>
+            <label className="text-sm text-neutral-600 block mb-1">E-mail</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
               placeholder="seu@email.com"
-              className="w-full h-11 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-gold"
+              className="w-full h-11 px-4 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-900"
             />
           </div>
           <div>
-            <label className="text-sm text-gray-600 block mb-1">Senha</label>
+            <label className="text-sm text-neutral-600 block mb-1">Senha</label>
             <input
               type="password"
               value={senha}
@@ -104,7 +104,7 @@ export default function LoginPage() {
               required
               minLength={6}
               placeholder="Mínimo 6 caracteres"
-              className="w-full h-11 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-gold"
+              className="w-full h-11 px-4 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-900"
             />
           </div>
 
@@ -118,19 +118,19 @@ export default function LoginPage() {
             {loading ? 'Entrando...' : isCadastro ? 'Criar Conta' : 'Entrar'}
           </button>
 
-          <p className="text-center text-xs text-gray-500">
+          <p className="text-center text-xs text-neutral-500">
             {isCadastro ? 'Já tem conta?' : 'Não tem conta?'}{' '}
             <button
               type="button"
               onClick={() => { setIsCadastro(!isCadastro); setErro(null); }}
-              className="text-gold hover:underline font-semibold"
+              className="text-neutral-700 hover:underline font-semibold"
             >
               {isCadastro ? 'Entrar' : 'Criar Conta'}
             </button>
           </p>
         </form>
 
-        <p className="text-center text-xs text-gray-400 mt-4">
+        <p className="text-center text-xs text-neutral-400 mt-4">
           Ao continuar, você concorda com os termos de uso e política de privacidade.
         </p>
       </div>

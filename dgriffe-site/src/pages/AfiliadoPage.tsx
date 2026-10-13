@@ -35,17 +35,17 @@ export default function AfiliadoPage() {
   return (
     <div>
       {/* Hero */}
-      <section className="relative bg-luxury-black overflow-hidden">
+      <section className="relative bg-neutral-900 overflow-hidden">
         <div className="absolute inset-0 opacity-20">
-          <div className="absolute top-10 left-10 w-64 h-64 bg-gold rounded-full blur-3xl" />
-          <div className="absolute bottom-10 right-10 w-96 h-96 bg-gold rounded-full blur-3xl" />
+          <div className="absolute top-10 left-10 w-64 h-64 bg-neutral-900 rounded-full blur-3xl" />
+          <div className="absolute bottom-10 right-10 w-96 h-96 bg-neutral-900 rounded-full blur-3xl" />
         </div>
         <div className="container-site relative py-20 md:py-28">
           <div className="max-w-2xl">
-            <p className="text-gold font-semibold uppercase tracking-widest text-sm mb-4">Programa Afiliado</p>
+            <p className="text-neutral-700 font-semibold uppercase tracking-widest text-sm mb-4">Programa Afiliado</p>
             <h1 className="font-display text-4xl md:text-5xl font-bold text-white mb-6">
               Ganhe comissão vendendo
-              <span className="text-gold"> óculos D'Griffe</span>
+              <span className="text-neutral-700"> óculos D'Griffe</span>
             </h1>
             <p className="text-lg text-gray-300 mb-8">
               Cadastre-se como afiliado e ganhe comissão por cada venda realizada através do seu link.
@@ -54,7 +54,7 @@ export default function AfiliadoPage() {
             <div className="flex flex-wrap gap-4">
               <a
                 href="#cadastro"
-                className="btn-gold font-semibold px-6 py-3 rounded-xl transition-all"
+                className="bg-neutral-900 text-white font-semibold px-6 py-3 rounded-xl transition-all"
               >
                 Cadastre-se Agora
               </a>
@@ -62,7 +62,7 @@ export default function AfiliadoPage() {
                 href="https://gomarketme.com.br"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="border border-gold/40 text-gold font-semibold px-6 py-3 rounded-xl hover:bg-gold/10 transition-all"
+                className="border border-neutral-900/40 text-neutral-700 font-semibold px-6 py-3 rounded-xl hover:bg-neutral-100 transition-all"
               >
                 Conheça o GoMarketme
               </a>
@@ -77,29 +77,29 @@ export default function AfiliadoPage() {
           <h2 className="section-title text-center mb-10">Como Funciona</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="card p-6 text-center">
-              <div className="w-12 h-12 rounded-full bg-gold/10 flex items-center justify-center mx-auto mb-4">
-                <Users size={24} className="text-gold" />
+              <div className="w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center mx-auto mb-4">
+                <Users size={24} className="text-neutral-700" />
               </div>
-              <h3 className="text-lg font-bold text-luxury-black mb-2">1. Cadastre-se</h3>
-              <p className="text-sm text-gray-600">
+              <h3 className="text-lg font-bold text-neutral-900 mb-2">1. Cadastre-se</h3>
+              <p className="text-sm text-neutral-600">
                 Crie sua conta de afiliado gratuitamente e receba seu link exclusivo.
               </p>
             </div>
             <div className="card p-6 text-center">
-              <div className="w-12 h-12 rounded-full bg-gold/10 flex items-center justify-center mx-auto mb-4">
-                <TrendingUp size={24} className="text-gold" />
+              <div className="w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center mx-auto mb-4">
+                <TrendingUp size={24} className="text-neutral-700" />
               </div>
-              <h3 className="text-lg font-bold text-luxury-black mb-2">2. Indique</h3>
-              <p className="text-sm text-gray-600">
+              <h3 className="text-lg font-bold text-neutral-900 mb-2">2. Indique</h3>
+              <p className="text-sm text-neutral-600">
                 Compartilhe seu link nas redes sociais, grupos e com amigos.
               </p>
             </div>
             <div className="card p-6 text-center">
-              <div className="w-12 h-12 rounded-full bg-gold/10 flex items-center justify-center mx-auto mb-4">
-                <DollarSign size={24} className="text-gold" />
+              <div className="w-12 h-12 rounded-full bg-neutral-100 flex items-center justify-center mx-auto mb-4">
+                <DollarSign size={24} className="text-neutral-700" />
               </div>
-              <h3 className="text-lg font-bold text-luxury-black mb-2">3. Ganhe</h3>
-              <p className="text-sm text-gray-600">
+              <h3 className="text-lg font-bold text-neutral-900 mb-2">3. Ganhe</h3>
+              <p className="text-sm text-neutral-600">
                 Receba comissão por cada venda realizada através do seu link.
               </p>
             </div>
@@ -111,13 +111,13 @@ export default function AfiliadoPage() {
       <section id="cadastro" className="py-16 bg-ice">
         <div className="container-site max-w-xl">
           <div className="card p-6 md:p-8">
-            <h2 className="text-2xl font-bold text-luxury-black mb-6 text-center">Cadastro de Afiliado</h2>
+            <h2 className="text-2xl font-bold text-neutral-900 mb-6 text-center">Cadastro de Afiliado</h2>
 
             {sucesso ? (
               <div className="text-center py-8">
                 <CheckCircle size={48} className="text-green-500 mx-auto mb-4" />
-                <h3 className="text-lg font-bold text-luxury-black mb-2">Cadastro Realizado!</h3>
-                <p className="text-sm text-gray-600 mb-6">
+                <h3 className="text-lg font-bold text-neutral-900 mb-2">Cadastro Realizado!</h3>
+                <p className="text-sm text-neutral-600 mb-6">
                   Você será redirecionado para sua área de afiliado...
                 </p>
                 <a
@@ -128,8 +128,8 @@ export default function AfiliadoPage() {
                 >
                   Ativar no GoMarketme
                 </a>
-                <p className="text-[10px] text-gray-400 mt-4">
-                  Ou acesse sua área: <a href="/afiliado-area" className="text-gold font-bold">Clique aqui</a>
+                <p className="text-[10px] text-neutral-400 mt-4">
+                  Ou acesse sua área: <a href="/afiliado-area" className="text-neutral-700 font-bold">Clique aqui</a>
                 </p>
               </div>
             ) : (
@@ -141,7 +141,7 @@ export default function AfiliadoPage() {
                     value={nome}
                     onChange={(e) => setNome(e.target.value)}
                     required
-                    className="w-full h-11 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-gold"
+                    className="w-full h-11 px-4 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-900"
                   />
                 </div>
                 <div>
@@ -151,7 +151,7 @@ export default function AfiliadoPage() {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     required
-                    className="w-full h-11 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-gold"
+                    className="w-full h-11 px-4 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-900"
                   />
                 </div>
                 <div>
@@ -162,7 +162,7 @@ export default function AfiliadoPage() {
                     onChange={(e) => setTelefone(e.target.value)}
                     required
                     placeholder="(51) 99999-9999"
-                    className="w-full h-11 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-gold"
+                    className="w-full h-11 px-4 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-900"
                   />
                 </div>
 
@@ -180,7 +180,7 @@ export default function AfiliadoPage() {
                   {loading ? 'Cadastrando...' : 'Cadastrar como Afiliado'}
                 </button>
 
-                <p className="text-[10px] text-gray-400 text-center">
+                <p className="text-[10px] text-neutral-400 text-center">
                   Ao cadastrar, você concorda com os termos do programa de afiliados.
                   Seus dados serão usados apenas para fins de rastreamento de vendas e pagamento de comissões.
                 </p>

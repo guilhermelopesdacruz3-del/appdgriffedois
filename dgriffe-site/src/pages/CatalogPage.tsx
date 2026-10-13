@@ -137,9 +137,9 @@ export default function CatalogPage() {
     <>
       {/* Categorias */}
       <div>
-        <h3 className="text-[11px] font-bold text-luxury-black uppercase tracking-wider mb-2">Categorias</h3>
+        <h3 className="text-[11px] font-bold text-neutral-900 uppercase tracking-widest mb-2">Categorias</h3>
         <div className="space-y-0.5 max-h-56 overflow-y-auto no-scrollbar">
-          {categorias.length === 0 && <p className="text-xs text-gray-400 px-1">Sem categorias.</p>}
+          {categorias.length === 0 && <p className="text-xs text-neutral-400 px-1">Sem categorias.</p>}
           {categorias.map((c) => {
             const id = c.id;
             const checked = filtroCategoria === id;
@@ -148,12 +148,12 @@ export default function CatalogPage() {
               <button
                 key={id}
                 onClick={() => setFiltroCategoria(checked ? null : id)}
-                className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors text-left ${
-                  checked ? 'bg-gold/10' : 'hover:bg-ice'
+                className={`w-full flex items-center gap-2.5 px-2 py-2 cursor-pointer transition-colors text-left ${
+                  checked ? 'bg-neutral-100' : 'hover:bg-neutral-50'
                 }`}
               >
-                <input type="radio" name="categoria" checked={checked} onChange={() => {}} className="w-4 h-4 accent-gold" />
-                <span className={`text-xs truncate ${checked ? 'font-semibold text-luxury-black' : 'text-gray-600'}`}>{nome}</span>
+                <input type="radio" name="categoria" checked={checked} onChange={() => {}} className="w-4 h-4 accent-neutral-900" />
+                <span className={`text-xs truncate uppercase tracking-wider ${checked ? 'font-semibold text-neutral-900' : 'text-neutral-600'}`}>{nome}</span>
               </button>
             );
           })}
@@ -162,9 +162,9 @@ export default function CatalogPage() {
 
       {/* Marcas */}
       <div>
-        <h3 className="text-[11px] font-bold text-luxury-black uppercase tracking-wider mb-2">Marcas</h3>
+        <h3 className="text-[11px] font-bold text-neutral-900 uppercase tracking-widest mb-2">Marcas</h3>
         <div className="space-y-0.5 max-h-56 overflow-y-auto no-scrollbar">
-          {marcas.length === 0 && <p className="text-xs text-gray-400 px-1">Sem marcas.</p>}
+          {marcas.length === 0 && <p className="text-xs text-neutral-400 px-1">Sem marcas.</p>}
           {marcas.map((m) => {
             const id = m.id;
             const checked = filtroMarca === id;
@@ -173,12 +173,12 @@ export default function CatalogPage() {
               <button
                 key={id}
                 onClick={() => setFiltroMarca(checked ? null : id)}
-                className={`w-full flex items-center gap-2.5 px-2 py-2 rounded-lg cursor-pointer transition-colors text-left ${
-                  checked ? 'bg-gold/10' : 'hover:bg-ice'
+                className={`w-full flex items-center gap-2.5 px-2 py-2 cursor-pointer transition-colors text-left ${
+                  checked ? 'bg-neutral-100' : 'hover:bg-neutral-50'
                 }`}
               >
-                <input type="radio" name="marca" checked={checked} onChange={() => {}} className="w-4 h-4 accent-gold" />
-                <span className={`text-xs truncate ${checked ? 'font-semibold text-luxury-black' : 'text-gray-600'}`}>{nome}</span>
+                <input type="radio" name="marca" checked={checked} onChange={() => {}} className="w-4 h-4 accent-neutral-900" />
+                <span className={`text-xs truncate uppercase tracking-wider ${checked ? 'font-semibold text-neutral-900' : 'text-neutral-600'}`}>{nome}</span>
               </button>
             );
           })}
@@ -187,21 +187,21 @@ export default function CatalogPage() {
 
       {/* Preço */}
       <div>
-        <h3 className="text-[11px] font-bold text-luxury-black uppercase tracking-wider mb-2">Preço</h3>
+        <h3 className="text-[11px] font-bold text-neutral-900 uppercase tracking-widest mb-2">Preço</h3>
         <div className="flex gap-2 items-center">
-          <input type="number" value={filtroPrecoMin} onChange={(e) => setFiltroPrecoMin(e.target.value)} placeholder="Min" min="0" className="w-full h-9 px-2 rounded-lg border border-ice-dark text-xs focus:outline-none focus:border-gold" />
-          <span className="text-gray-400 text-xs">–</span>
-          <input type="number" value={filtroPrecoMax} onChange={(e) => setFiltroPrecoMax(e.target.value)} placeholder="Max" min="0" className="w-full h-9 px-2 rounded-lg border border-ice-dark text-xs focus:outline-none focus:border-gold" />
+          <input type="number" value={filtroPrecoMin} onChange={(e) => setFiltroPrecoMin(e.target.value)} placeholder="Min" min="0" className="w-full h-9 px-2 border border-neutral-300 text-xs focus:outline-none focus:border-neutral-900" />
+          <span className="text-neutral-400 text-xs">–</span>
+          <input type="number" value={filtroPrecoMax} onChange={(e) => setFiltroPrecoMax(e.target.value)} placeholder="Max" min="0" className="w-full h-9 px-2 border border-neutral-300 text-xs focus:outline-none focus:border-neutral-900" />
         </div>
       </div>
 
       {/* Ordenação */}
       <div>
-        <h3 className="text-[11px] font-bold text-luxury-black uppercase tracking-wider mb-2">Ordenação</h3>
+        <h3 className="text-[11px] font-bold text-neutral-900 uppercase tracking-widest mb-2">Ordenação</h3>
         <select
           value={ordenacao}
           onChange={(e) => setOrdenacao(e.target.value)}
-          className="w-full h-9 px-2 rounded-lg border border-ice-dark text-xs focus:outline-none focus:border-gold bg-white"
+          className="w-full h-9 px-2 border border-neutral-300 text-xs focus:outline-none focus:border-neutral-900 bg-white uppercase tracking-wider"
         >
           <option value="relevancia">Relevância</option>
           <option value="menor-preco">Menor preço</option>
@@ -211,7 +211,7 @@ export default function CatalogPage() {
       </div>
 
       {hasFiltros && (
-        <button onClick={limparFiltros} className="w-full h-9 rounded-lg border border-red-200 text-red-600 text-xs font-medium hover:bg-red-50 transition-colors">
+        <button onClick={limparFiltros} className="w-full h-9 border border-neutral-300 text-neutral-700 text-[11px] font-bold uppercase tracking-widest hover:border-neutral-900 transition-colors">
           Limpar filtros
         </button>
       )}
@@ -219,11 +219,11 @@ export default function CatalogPage() {
   );
 
   return (
-    <div className="container-site py-6">
+    <div className="container-site py-8">
       {/* Header */}
-      <div className="mb-5">
-        <h1 className="font-display text-2xl md:text-3xl font-bold text-luxury-black">Coleção</h1>
-        <p className="text-sm text-gray-500 mt-1">
+      <div className="mb-6 border-b border-neutral-200 pb-5">
+        <h1 className="font-sans text-xl md:text-2xl font-bold uppercase tracking-widest text-neutral-900">Coleção</h1>
+        <p className="text-xs text-neutral-500 mt-1 uppercase tracking-wider">
           {loading ? 'Carregando...' : `${total.toLocaleString('pt-BR')} produto${total !== 1 ? 's' : ''}`}
           {hasFiltros && items.length > 0 && ` • ${items.length} visível${items.length !== 1 ? 'is' : ''}`}
         </p>
@@ -231,58 +231,58 @@ export default function CatalogPage() {
       </div>
 
       {/* Barra superior: busca + botão filtros (mobile) */}
-      <div className="flex gap-2 mb-5">
+      <div className="flex gap-2 mb-6">
         <div className="relative flex-1">
           <input
             type="text"
             value={buscaInput}
             onChange={(e) => setBuscaInput(e.target.value)}
             placeholder="Buscar produtos..."
-            className="w-full h-11 pl-10 pr-3 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-gold"
+            className="w-full h-11 pl-10 pr-3 border border-neutral-300 text-sm focus:outline-none focus:border-neutral-900"
           />
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
         </div>
         <button
           onClick={() => setSidebarOpen(true)}
-          className="md:hidden flex items-center justify-center gap-1.5 px-4 h-11 rounded-xl border border-ice-dark text-sm font-medium text-gray-600 hover:bg-ice transition-colors"
+          className="md:hidden flex items-center justify-center gap-1.5 px-5 h-11 bg-neutral-900 text-white text-[11px] font-bold uppercase tracking-widest transition-colors"
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z"/></svg>
           Filtros
         </button>
       </div>
 
-      <div className="flex gap-6 items-start">
+      <div className="flex gap-8 items-start">
         {/* Sidebar desktop */}
-        <aside className="hidden md:block w-60 flex-shrink-0">
-          <div className="sticky top-20 space-y-5">{FiltrosBody}</div>
+        <aside className="hidden md:block w-56 flex-shrink-0">
+          <div className="sticky top-20 space-y-6">{FiltrosBody}</div>
         </aside>
 
         {/* Grid de produtos */}
         <div className="flex-1 min-w-0">
           {loading ? (
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="card overflow-hidden animate-pulse">
-                  <div className="aspect-[4/3] bg-ice-dark" />
-                  <div className="p-3 space-y-2">
-                    <div className="h-2.5 bg-ice-dark rounded" />
-                    <div className="h-2.5 bg-ice-dark rounded w-3/4" />
+                <div key={i} className="animate-pulse">
+                  <div className="aspect-square bg-neutral-200" />
+                  <div className="pt-3 space-y-2">
+                    <div className="h-2.5 bg-neutral-200 rounded w-3/4" />
+                    <div className="h-2.5 bg-neutral-200 rounded w-1/2" />
                   </div>
                 </div>
               ))}
             </div>
           ) : items.length > 0 ? (
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
               {items.map((p) => (
                 <ProductCard key={p.id} product={p} />
               ))}
             </div>
           ) : (
             <div className="text-center py-16">
-              <svg className="w-14 h-14 mx-auto mb-3 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
-              <p className="text-gray-500 mb-2">Nenhum produto encontrado.</p>
+              <svg className="w-14 h-14 mx-auto mb-3 text-neutral-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></svg>
+              <p className="text-neutral-500 mb-2 uppercase tracking-wider text-sm">Nenhum produto encontrado.</p>
               {hasFiltros && (
-                <button onClick={limparFiltros} className="text-gold text-sm font-semibold hover:underline">
+                <button onClick={limparFiltros} className="text-neutral-900 text-sm font-semibold hover:underline uppercase tracking-wider">
                   Limpar filtros
                 </button>
               )}
@@ -296,15 +296,15 @@ export default function CatalogPage() {
         <div className="fixed inset-0 z-50 md:hidden">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setSidebarOpen(false)} />
           <div className="absolute left-0 top-0 bottom-0 w-80 max-w-[85vw] bg-white shadow-xl overflow-y-auto animate-slide-in-left">
-            <div className="sticky top-0 bg-white border-b border-ice-dark px-4 py-3 flex items-center justify-between z-10">
-              <h2 className="font-display font-bold text-base text-luxury-black">Filtros</h2>
-              <button onClick={() => setSidebarOpen(false)} className="w-8 h-8 rounded-full bg-ice flex items-center justify-center">
+            <div className="sticky top-0 bg-white border-b border-neutral-200 px-4 py-3 flex items-center justify-between z-10">
+              <h2 className="font-bold text-base text-neutral-900 uppercase tracking-widest text-sm">Filtros</h2>
+              <button onClick={() => setSidebarOpen(false)} className="w-8 h-8 bg-neutral-100 flex items-center justify-center">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 6L6 18M6 6l12 12"/></svg>
               </button>
             </div>
-            <div className="p-4 space-y-5">{FiltrosBody}</div>
-            <div className="sticky bottom-0 bg-white border-t border-ice-dark px-4 py-3">
-              <button onClick={() => setSidebarOpen(false)} className="w-full h-11 btn-gold text-sm font-semibold">
+            <div className="p-4 space-y-6">{FiltrosBody}</div>
+            <div className="sticky bottom-0 bg-white border-t border-neutral-200 px-4 py-3">
+              <button onClick={() => setSidebarOpen(false)} className="w-full h-11 bg-neutral-900 text-white text-[11px] font-bold uppercase tracking-widest">
                 Ver {total.toLocaleString('pt-BR')} produtos
               </button>
             </div>

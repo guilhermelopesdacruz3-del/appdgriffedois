@@ -27,9 +27,9 @@ export default function MedicaoPage() {
     <div className="container-site py-12">
       {/* Header */}
       <div className="text-center mb-10">
-        <p className="text-gold font-semibold uppercase tracking-widest text-sm mb-2">Ótica D'Griffe</p>
+        <p className="text-neutral-700 font-semibold uppercase tracking-widest text-sm mb-2">Ótica D'Griffe</p>
         <h1 className="section-title mb-4">Medição de Lentes Multifocais</h1>
-        <p className="text-gray-600 max-w-2xl mx-auto">
+        <p className="text-neutral-600 max-w-2xl mx-auto">
           Informe os valores da sua receita para obtermos as medidas corretas das suas lentes multifocais.
           Esta ferramenta é para referência — a medição final deve ser feita por um profissional.
         </p>
@@ -40,7 +40,7 @@ export default function MedicaoPage() {
         <button
           onClick={() => setActiveTab('multifocal')}
           className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-            activeTab === 'multifocal' ? 'bg-luxury-black text-white' : 'bg-ice text-gray-600 hover:bg-ice-dark'
+            activeTab === 'multifocal' ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
           }`}
         >
           Lentes Multifocais
@@ -48,7 +48,7 @@ export default function MedicaoPage() {
         <button
           onClick={() => setActiveTab('dnp')}
           className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-            activeTab === 'dnp' ? 'bg-luxury-black text-white' : 'bg-ice text-gray-600 hover:bg-ice-dark'
+            activeTab === 'dnp' ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
           }`}
         >
           Medição DNP
@@ -56,7 +56,7 @@ export default function MedicaoPage() {
         <button
           onClick={() => setActiveTab('info')}
           className={`px-5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-            activeTab === 'info' ? 'bg-luxury-black text-white' : 'bg-ice text-gray-600 hover:bg-ice-dark'
+            activeTab === 'info' ? 'bg-neutral-900 text-white' : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
           }`}
         >
           Como Medir
@@ -67,18 +67,18 @@ export default function MedicaoPage() {
         {/* Conteúdo: Multifocal */}
         {activeTab === 'multifocal' && (
           <div className="card p-6 md:p-8 animate-fade-in">
-            <h2 className="text-xl font-bold text-luxury-black mb-6 flex items-center gap-2">
-              <Ruler size={20} className="text-gold" />
+            <h2 className="text-xl font-bold text-neutral-900 mb-6 flex items-center gap-2">
+              <Ruler size={20} className="text-neutral-700" />
               Calculadora de Lentes Multifocais
             </h2>
 
             {/* Unidade */}
             <div className="flex items-center gap-3 mb-6">
-              <p className="text-sm font-medium text-gray-600">Unidade:</p>
+              <p className="text-sm font-medium text-neutral-600">Unidade:</p>
               <button
                 onClick={() => setUnidade('mm')}
                 className={`px-4 py-2 rounded-lg text-sm font-semibold ${
-                  unidade === 'mm' ? 'bg-gold text-luxury-black' : 'bg-ice text-gray-600'
+                  unidade === 'mm' ? 'bg-neutral-900 text-neutral-900' : 'bg-neutral-100 text-neutral-600'
                 }`}
               >
                 Milímetros (mm)
@@ -86,7 +86,7 @@ export default function MedicaoPage() {
               <button
                 onClick={() => setUnidade('cm')}
                 className={`px-4 py-2 rounded-lg text-sm font-semibold ${
-                  unidade === 'cm' ? 'bg-gold text-luxury-black' : 'bg-ice text-gray-600'
+                  unidade === 'cm' ? 'bg-neutral-900 text-neutral-900' : 'bg-neutral-100 text-neutral-600'
                 }`}
               >
                 Centímetros (cm)
@@ -105,9 +105,9 @@ export default function MedicaoPage() {
                   value={altura}
                   onChange={(e) => setAltura(e.target.value)}
                   placeholder={`Ex.: ${unidade === 'mm' ? '35' : '3.5'}`}
-                  className="w-full h-11 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-gold"
+                  className="w-full h-11 px-4 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-900"
                 />
-                <p className="text-[10px] text-gray-400 mt-1">
+                <p className="text-[10px] text-neutral-400 mt-1">
                   Altura vertical da lente (em {unidade})
                 </p>
               </div>
@@ -122,9 +122,9 @@ export default function MedicaoPage() {
                   value={dnp}
                   onChange={(e) => setDnp(e.target.value)}
                   placeholder={`Ex.: ${unidade === 'mm' ? '60' : '6.0'}`}
-                  className="w-full h-11 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-gold"
+                  className="w-full h-11 px-4 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-900"
                 />
-                <p className="text-[10px] text-gray-400 mt-1">
+                <p className="text-[10px] text-neutral-400 mt-1">
                   Distância entre o centro das duas pupilas (em {unidade})
                 </p>
               </div>
@@ -132,9 +132,9 @@ export default function MedicaoPage() {
 
             {/* Resultado */}
             {resultado && (
-              <div className="mt-6 bg-ice rounded-xl p-4 border border-ice-dark">
+              <div className="mt-6 bg-neutral-100 rounded-xl p-4 border border-neutral-300">
                 <p className="text-sm font-medium text-gray-700 mb-1">Resultado:</p>
-                <pre className="text-sm text-luxury-black whitespace-pre-wrap font-mono">
+                <pre className="text-sm text-neutral-900 whitespace-pre-wrap font-mono">
                   {resultado}
                 </pre>
               </div>
@@ -148,7 +148,7 @@ export default function MedicaoPage() {
               Calcular Medidas
             </button>
 
-            <p className="text-[10px] text-gray-400 text-center mt-4">
+            <p className="text-[10px] text-neutral-400 text-center mt-4">
               ⚠️ Esta ferramenta é para referência apenas. A medição final deve ser feita por um profissional.
             </p>
           </div>
@@ -157,12 +157,12 @@ export default function MedicaoPage() {
         {/* Conteúdo: DNP */}
         {activeTab === 'dnp' && (
           <div className="card p-6 md:p-8 animate-fade-in">
-            <h2 className="text-xl font-bold text-luxury-black mb-6 flex items-center gap-2">
-              <Ruler size={20} className="text-gold" />
+            <h2 className="text-xl font-bold text-neutral-900 mb-6 flex items-center gap-2">
+              <Ruler size={20} className="text-neutral-700" />
               Medição DNP (Distância Naso-Pupilar)
             </h2>
 
-            <div className="bg-ice rounded-xl p-4 mb-6">
+            <div className="bg-neutral-100 rounded-xl p-4 mb-6">
               <p className="text-sm text-gray-700 leading-relaxed">
                 <strong>DNP (Distância Naso-Pupilar)</strong> é a distância entre o centro das duas pupilas.
                 Esta medida é essencial para o correto alinhamento das lentes multifocais.
@@ -178,7 +178,7 @@ export default function MedicaoPage() {
                   type="number"
                   step="0.1"
                   placeholder="Ex.: 30"
-                  className="w-full h-11 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-gold"
+                  className="w-full h-11 px-4 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-900"
                 />
               </div>
               <div>
@@ -189,7 +189,7 @@ export default function MedicaoPage() {
                   type="number"
                   step="0.1"
                   placeholder="Ex.: 30"
-                  className="w-full h-11 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-gold"
+                  className="w-full h-11 px-4 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-neutral-900"
                 />
               </div>
             </div>
@@ -204,19 +204,19 @@ export default function MedicaoPage() {
         {/* Conteúdo: Como Medir */}
         {activeTab === 'info' && (
           <div className="card p-6 md:p-8 animate-fade-in">
-            <h2 className="text-xl font-bold text-luxury-black mb-6 flex items-center gap-2">
-              <Info size={20} className="text-gold" />
+            <h2 className="text-xl font-bold text-neutral-900 mb-6 flex items-center gap-2">
+              <Info size={20} className="text-neutral-700" />
               Como Medir Suas Lentes
             </h2>
 
             <div className="space-y-6">
               <div className="flex gap-4">
-                <div className="w-8 h-8 rounded-full bg-gold/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-gold font-bold text-sm">1</span>
+                <div className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center flex-shrink-0">
+                  <span className="text-neutral-700 font-bold text-sm">1</span>
                 </div>
                 <div>
-                  <h4 className="text-sm font-semibold text-luxury-black mb-1">Altura da Lente</h4>
-                  <p className="text-[13px] text-gray-600 leading-relaxed">
+                  <h4 className="text-sm font-semibold text-neutral-900 mb-1">Altura da Lente</h4>
+                  <p className="text-[13px] text-neutral-600 leading-relaxed">
                     Meça a altura vertical da lente, do topo até a base, usando uma régua.
                     O valor típico varia entre 30mm e 40mm.
                   </p>
@@ -224,12 +224,12 @@ export default function MedicaoPage() {
               </div>
 
               <div className="flex gap-4">
-                <div className="w-8 h-8 rounded-full bg-gold/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-gold font-bold text-sm">2</span>
+                <div className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center flex-shrink-0">
+                  <span className="text-neutral-700 font-bold text-sm">2</span>
                 </div>
                 <div>
-                  <h4 className="text-sm font-semibold text-luxury-black mb-1">DNP (Distância Naso-Pupilar)</h4>
-                  <p className="text-[13px] text-gray-600 leading-relaxed">
+                  <h4 className="text-sm font-semibold text-neutral-900 mb-1">DNP (Distância Naso-Pupilar)</h4>
+                  <p className="text-[13px] text-neutral-600 leading-relaxed">
                     Posicione-se em frente a um espelho e marque o centro de cada pupila.
                     Meça a distância entre as marcas. O valor típico varia entre 54mm e 72mm.
                   </p>
@@ -237,12 +237,12 @@ export default function MedicaoPage() {
               </div>
 
               <div className="flex gap-4">
-                <div className="w-8 h-8 rounded-full bg-gold/10 flex items-center justify-center flex-shrink-0">
-                  <span className="text-gold font-bold text-sm">3</span>
+                <div className="w-8 h-8 rounded-full bg-neutral-100 flex items-center justify-center flex-shrink-0">
+                  <span className="text-neutral-700 font-bold text-sm">3</span>
                 </div>
                 <div>
-                  <h4 className="text-sm font-semibold text-luxury-black mb-1">Informe na Receita</h4>
-                  <p className="text-[13px] text-gray-600 leading-relaxed">
+                  <h4 className="text-sm font-semibold text-neutral-900 mb-1">Informe na Receita</h4>
+                  <p className="text-[13px] text-neutral-600 leading-relaxed">
                     Leve estes valores ao seu oftalmologista e solicite que sejam incluídos na receita.
                     A DNP correta é fundamental para o conforto visual com lentes multifocais.
                   </p>

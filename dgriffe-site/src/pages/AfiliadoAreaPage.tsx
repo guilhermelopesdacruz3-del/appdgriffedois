@@ -69,11 +69,11 @@ export default function AfiliadoAreaPage() {
       <div className="min-h-screen bg-gradient-to-br from-luxury-black via-luxury-dark to-luxury-black flex items-center justify-center p-4">
         <div className="w-full max-w-sm">
           <div className="text-center mb-6">
-            <div className="w-16 h-16 bg-gold/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <span className="text-gold font-display font-bold text-2xl">D</span>
+            <div className="w-16 h-16 bg-neutral-200 rounded-2xl flex items-center justify-center mx-auto mb-4">
+              <span className="text-neutral-700 font-display font-bold text-2xl">D</span>
             </div>
             <h1 className="text-xl font-bold text-white">Área do Afiliado</h1>
-            <p className="text-sm text-gray-400">Acesse com seus dados</p>
+            <p className="text-sm text-neutral-400">Acesse com seus dados</p>
           </div>
           <form onSubmit={handleLogin} className="bg-white rounded-2xl p-6 shadow-card space-y-4">
             <div>
@@ -84,7 +84,7 @@ export default function AfiliadoAreaPage() {
                 onChange={(e) => setNome(e.target.value)}
                 placeholder="Seu nome"
                 required
-                className="w-full h-11 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-violet-500"
+                className="w-full h-11 px-4 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-violet-500"
               />
             </div>
             <div>
@@ -95,7 +95,7 @@ export default function AfiliadoAreaPage() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="seu@email.com"
                 required
-                className="w-full h-11 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-violet-500"
+                className="w-full h-11 px-4 rounded-xl border border-neutral-300 text-sm focus:outline-none focus:border-violet-500"
               />
             </div>
             {erro && <p className="text-xs text-red-500">{erro}</p>}
@@ -118,21 +118,21 @@ export default function AfiliadoAreaPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h1 className="text-xl font-bold text-luxury-black">Olá, {afiliado.nome}!</h1>
-            <p className="text-xs text-gray-500">Seu cupom: <span className="font-bold text-violet-600">{(afiliado as any).cupom || ''}</span></p>
+            <h1 className="text-xl font-bold text-neutral-900">Olá, {afiliado.nome}!</h1>
+            <p className="text-xs text-neutral-500">Seu cupom: <span className="font-bold text-violet-600">{(afiliado as any).cupom || ''}</span></p>
           </div>
-          <button onClick={() => setToken(null)} className="text-xs text-gray-500 hover:text-red-500">Sair</button>
+          <button onClick={() => setToken(null)} className="text-xs text-neutral-500 hover:text-red-500">Sair</button>
         </div>
 
         {/* Link */}
         {link && (
           <div className="card p-4 mb-6">
-            <p className="text-xs font-bold text-luxury-black mb-2">Seu link de afiliado:</p>
+            <p className="text-xs font-bold text-neutral-900 mb-2">Seu link de afiliado:</p>
             <div className="flex gap-2">
               <input
                 readOnly
                 value={link}
-                className="flex-1 h-9 px-3 rounded-lg border border-ice-dark text-xs bg-white"
+                className="flex-1 h-9 px-3 rounded-lg border border-neutral-300 text-xs bg-white"
               />
               <button
                 onClick={() => navigator.clipboard.writeText(link)}
@@ -147,35 +147,35 @@ export default function AfiliadoAreaPage() {
         {/* Stats */}
         <div className="grid grid-cols-3 gap-3 mb-6">
           <div className="card p-4 text-center">
-            <p className="text-[9px] text-gray-400 uppercase tracking-wider">Vendas</p>
-            <p className="text-2xl font-bold text-luxury-black">{(afiliado as any).totalVendas || 0}</p>
+            <p className="text-[9px] text-neutral-400 uppercase tracking-wider">Vendas</p>
+            <p className="text-2xl font-bold text-neutral-900">{(afiliado as any).totalVendas || 0}</p>
           </div>
           <div className="card p-4 text-center">
-            <p className="text-[9px] text-gray-400 uppercase tracking-wider">Comissão</p>
+            <p className="text-[9px] text-neutral-400 uppercase tracking-wider">Comissão</p>
             <p className="text-2xl font-bold text-violet-600">R$ {Number((afiliado as any).totalComissao || 0).toFixed(2)}</p>
           </div>
           <div className="card p-4 text-center">
-            <p className="text-[9px] text-gray-400 uppercase tracking-wider">Indicações</p>
-            <p className="text-2xl font-bold text-luxury-black">{indicacoes.length}</p>
+            <p className="text-[9px] text-neutral-400 uppercase tracking-wider">Indicações</p>
+            <p className="text-2xl font-bold text-neutral-900">{indicacoes.length}</p>
           </div>
         </div>
 
         {/* Vendas */}
         <div className="card p-4 mb-6">
-          <h2 className="text-sm font-bold text-luxury-black mb-3">Suas vendas</h2>
+          <h2 className="text-sm font-bold text-neutral-900 mb-3">Suas vendas</h2>
           {vendas.length === 0 ? (
-            <p className="text-xs text-gray-400">Nenhuma venda registrada ainda.</p>
+            <p className="text-xs text-neutral-400">Nenhuma venda registrada ainda.</p>
           ) : (
             <div className="space-y-2">
               {vendas.map((v) => (
                 <div key={v.id} className="flex items-center justify-between py-2 border-b border-ice last:border-0">
                   <div>
-                    <p className="text-xs font-semibold text-luxury-black">{v.produto_nome}</p>
-                    <p className="text-[9px] text-gray-400">{new Date(v.created_at).toLocaleDateString('pt-BR')}</p>
+                    <p className="text-xs font-semibold text-neutral-900">{v.produto_nome}</p>
+                    <p className="text-[9px] text-neutral-400">{new Date(v.created_at).toLocaleDateString('pt-BR')}</p>
                   </div>
                   <div className="text-right">
                     <p className="text-xs font-bold text-emerald-600">+R$ {Number(v.ganho_afiliado).toFixed(2)}</p>
-                    <p className="text-[9px] text-gray-400">total R$ {Number(v.valor_total).toFixed(2)}</p>
+                    <p className="text-[9px] text-neutral-400">total R$ {Number(v.valor_total).toFixed(2)}</p>
                   </div>
                 </div>
               ))}
@@ -185,16 +185,16 @@ export default function AfiliadoAreaPage() {
 
         {/* Indicações */}
         <div className="card p-4">
-          <h2 className="text-sm font-bold text-luxury-black mb-3">Indicações</h2>
+          <h2 className="text-sm font-bold text-neutral-900 mb-3">Indicações</h2>
           {indicacoes.length === 0 ? (
-            <p className="text-xs text-gray-400">Nenhuma indicação ainda.</p>
+            <p className="text-xs text-neutral-400">Nenhuma indicação ainda.</p>
           ) : (
             <div className="space-y-2">
               {indicacoes.map((i) => (
                 <div key={i.id} className="flex items-center justify-between py-2 border-b border-ice last:border-0">
                   <div>
-                    <p className="text-xs font-semibold text-luxury-black">{i.indicado_email}</p>
-                    <p className="text-[9px] text-gray-400">{i.status}</p>
+                    <p className="text-xs font-semibold text-neutral-900">{i.indicado_email}</p>
+                    <p className="text-[9px] text-neutral-400">{i.status}</p>
                   </div>
                   <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full border ${i.status === 'convertida' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' : 'bg-amber-50 text-amber-600 border-amber-200'}`}>
                     {i.status}
