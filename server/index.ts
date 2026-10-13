@@ -344,13 +344,17 @@ const app = express();
 app.use(express.json({ limit: "512kb", verify: (req, _res, buf) => { req.rawBody = buf.toString("utf8"); } }));
 app.disable("x-powered-by");
 
-// CORS restrito à origem do front (ou '*' só em dev).
-// Inclui também o domínio antigo (dgriffe-app.pages.dev) que ainda está no ar
-// com um build que chama o backend direto — sem isso o navegador bloqueia e o
-// app cai no catálogo de demonstração (8 produtos fake).
-const originsPermitidas = FRONTEND_ORIGIN === "*"
+// CORS restrito à origem do front. Em produção NÃO aceitamos '*' — se
+// FRONTEND_ORIGIN vier como '*', bloqueia e usa apenas a lista fixa de
+// domínios conhecidos (evita que qualquer origem acesse a API).
+const PRODUCAO = process.env.NODE_ENV === "production";
+const corsWildcard = FRONTEND_ORIGIN === "*" && !PRODUCAO;
+if (FRONTEND_ORIGIN === "*" && PRODUCAO) {
+  console.warn("[seguranca] FRONTEND_ORIGIN='*' ignorado em producao; usando lista de dominios fixos.");
+}
+const originsPermitidas = corsWildcard
   ? true
-  : [...new Set([...FRONTEND_ORIGIN.split(",").map((s) => s.trim()), "https://dgriffe-app.pages.dev", "https://dgriffe-site.pages.dev"])];
+  : [...new Set([...FRONTEND_ORIGIN.split(",").map((s) => s.trim()).filter((s) => s && s !== "*"), "https://dgriffe-app.pages.dev", "https://dgriffe-site.pages.dev", "https://appdgriffedois.pages.dev"])];
 app.use(
   cors({
     origin: originsPermitidas,
@@ -1082,7 +1086,7 @@ app.get("/api/mp-public-key", async (_req, res) => {
 // Saldo de fidelidade do cliente (por e-mail) + regras para o front calcular desconto.
 // Usa o e-mail do token de cliente quando houver; evita IDOR por querystring.
 app.get("/api/fidelidade", async (req, res) => {
-  const tokenEmail = requireCliente(req, res);
+  const tokenEmail = await requireCliente(req, res);
   const email = String(tokenEmail || req.query.email || "").trim().toLowerCase();
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ erro: "E-mail inválido." });
@@ -1125,7 +1129,7 @@ app.get("/api/fidelidade", async (req, res) => {
 // Histórico de fidelidade (créditos/resgates) do cliente.
 // Isolado pelo e-mail do token de cliente quando disponível.
 app.get("/api/fidelidade/historico", async (req, res) => {
-  const tokenEmail = requireCliente(req, res);
+  const tokenEmail = await requireCliente(req, res);
   const email = String(tokenEmail || req.query.email || "").trim().toLowerCase();
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ erro: "E-mail inválido." });
@@ -1223,7 +1227,7 @@ app.get("/api/fidelidade/mensagens", async (req, res) => {
 // POST /api/fidelidade/missao/concluir — registra conclusão de missão (ex.: avaliação).
 // Usa o e-mail do token de cliente quando disponível e só aceita body se não houver token.
 app.post("/api/fidelidade/missao/concluir", async (req, res) => {
-  const tokenEmail = requireCliente(req, res);
+  const tokenEmail = await requireCliente(req, res);
   const { email, tipo } = req.body || {};
   const e = (tokenEmail || email || "").toString().trim().toLowerCase();
   if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return res.status(400).json({ ok: false, erro: "E-mail inválido." });
@@ -3132,15 +3136,29 @@ app.post("/api/cliente/excluir-confirmar", async (req, res) => {
 // Todas exigem o token de sessão do usuário (Authorization: Bearer <access_token>).
 // O email do token deve bater com o email da requisição (isolamento).
 // ---------------------------------------------------------------------------
-function emailDoToken(req: express.Request): string | null {
+// Extrai o email do dono validando o token de forma REAL via Supabase Auth.
+// Antes só decodificava o payload do JWT (sem checar assinatura) — um token
+// forjado com qualquer email bastava para acessar os dados daquele cliente.
+// Agora confirmamos com `sb.auth.getUser(token)` antes de liberar a rota.
+async function requireCliente(req: express.Request, res: express.Response): Promise<string | null> {
   const auth = (req.headers.authorization || "").replace("Bearer ", "").trim();
-  // JWT não assinado: só decodifica o payload (não valida — o Supabase já
-  // validou ao emitir; aqui só extraímos o email para isolamento de dados).
-  return extrairEmailDoToken(auth);
-}
-
-function requireCliente(req: express.Request, res: express.Response): string | null {
-  const email = emailDoToken(req);
+  if (!auth) {
+    res.status(401).json({ erro: "Não autorizado." });
+    return null;
+  }
+  const sb = supabaseClient();
+  if (sb) {
+    // Caminho seguro: valida assinatura/expiração no Supabase.
+    const { data: { user }, error } = await sb.auth.getUser(auth);
+    const email = (user?.email || "").trim().toLowerCase();
+    if (error || !user || !/@/.test(email)) {
+      res.status(401).json({ erro: "Sessão inválida." });
+      return null;
+    }
+    return email;
+  }
+  // Fallback apenas se Supabase NÃO estiver configurado (deploy sem auth).
+  const email = extrairEmailDoToken(auth);
   if (!email) {
     res.status(401).json({ erro: "Não autorizado." });
     return null;
@@ -3150,14 +3168,14 @@ function requireCliente(req: express.Request, res: express.Response): string | n
 
 // C2 — buscar/salvar perfil (nome/telefone)
 app.get("/api/cliente/perfil", async (req, res) => {
-  const email = requireCliente(req, res);
+  const email = await requireCliente(req, res);
   if (!email) return;
   const perfil = await buscarPerfil(email);
   res.json(perfil || { email, nome: undefined, telefone: undefined });
 });
 
 app.put("/api/cliente/perfil", async (req, res) => {
-  const email = requireCliente(req, res);
+  const email = await requireCliente(req, res);
   if (!email) return;
   const { nome, telefone } = req.body || {};
   if (nome !== undefined && (typeof nome !== "string" || nome.length > 120)) {
@@ -3172,13 +3190,13 @@ app.put("/api/cliente/perfil", async (req, res) => {
 
 // C3 — livro de endereços (CRUD)
 app.get("/api/cliente/enderecos", async (req, res) => {
-  const email = requireCliente(req, res);
+  const email = await requireCliente(req, res);
   if (!email) return;
   res.json(await listarEnderecos(email));
 });
 
 app.post("/api/cliente/enderecos", async (req, res) => {
-  const email = requireCliente(req, res);
+  const email = await requireCliente(req, res);
   if (!email) return;
   const { nome, endereco, numero, complemento, bairro, cidade, estado, cep, principal } = req.body || {};
   if (!nome || !endereco || !numero || !cidade || !estado || !cep) {
@@ -3196,7 +3214,7 @@ app.post("/api/cliente/enderecos", async (req, res) => {
 });
 
 app.delete("/api/cliente/enderecos/:id", async (req, res) => {
-  const email = requireCliente(req, res);
+  const email = await requireCliente(req, res);
   if (!email) return;
   await excluirEndereco(email, req.params.id);
   res.json({ ok: true });
@@ -3204,14 +3222,14 @@ app.delete("/api/cliente/enderecos/:id", async (req, res) => {
 
 // C7 — preferências de notificação
 app.get("/api/cliente/preferencias", async (req, res) => {
-  const email = requireCliente(req, res);
+  const email = await requireCliente(req, res);
   if (!email) return;
   const prefs = await buscarPreferencias(email);
   res.json(prefs || {});
 });
 
 app.put("/api/cliente/preferencias", async (req, res) => {
-  const email = requireCliente(req, res);
+  const email = await requireCliente(req, res);
   if (!email) return;
   const { prefs } = req.body || {};
   if (!prefs || typeof prefs !== "object") return res.status(400).json({ erro: "Preferências inválidas." });
