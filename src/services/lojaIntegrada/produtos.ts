@@ -208,11 +208,43 @@ export async function listarMarcas(): Promise<FiltroCatalogo[]> {
 
 /** Busca um produto específico por id, com dados atualizados (preço/estoque em tempo real). */
 export async function buscarProduto(id: number | string): Promise<Product> {
-  const [produto, categoriasLookup, marcasLookup] = await Promise.all([
+  let [produto, categoriasLookup, marcasLookup] = await Promise.all([
     getResource<LIProduto>("produto", id),
     getCategoriasLookup(),
     getMarcasLookup(),
   ]);
+
+  // Produtos "atributo_opcao" (variações/filhos) NÃO têm nome/imagem próprios —
+  // vivem no produto-PAI (tipo "atributo"). Sem isso, abrir a variação mostra
+  // nome e foto em branco (a página sobrescreve o card com estes dados crus).
+  // Estratégia: se não tem nome, busca o pai pelo código do modelo (SKU base,
+  // ex.: "0PH3157" a partir do SKU do filho "0PH3157-94777") e herda
+  // nome/imagens/descrição/marca/categorias do pai que contém este filho.
+  if ((!produto.nome || String(produto.nome).trim() === "") && produto.sku) {
+    try {
+      const skuBase = String(produto.sku).split("-").slice(0, 2).join("-");
+      const busca = await listResource<any>("produto", { nome__icontains: skuBase, limit: 50 });
+      const objects = busca.objects || [];
+      // Pai = produto tipo "atributo" cujos filhos incluem este id.
+      const pai = objects.find(
+        (o: any) => o.tipo === "atributo" && Array.isArray(o.filhos) &&
+          o.filhos.some((f: string) => extrairIdDaUri(f) === Number(id))
+      ) || objects.find((o: any) => o.tipo === "atributo" && Array.isArray(o.imagens) && o.imagens.length > 0);
+      if (pai) {
+        produto = {
+          ...produto,
+          nome: pai.nome || produto.nome,
+          imagens: (pai.imagens?.length ? pai.imagens : produto.imagens),
+          imagem_principal: pai.imagem_principal || produto.imagem_principal,
+          descricao_completa: pai.descricao_completa || produto.descricao_completa,
+          marca: produto.marca || pai.marca,
+          categorias: (produto.categorias?.length ? produto.categorias : pai.categorias),
+        } as LIProduto;
+      }
+    } catch {
+      /* se não achar o pai, segue com os dados do filho */
+    }
+  }
 
   // Se o produto tem grades (variações) mas não tem preços no produto principal,
   // busca as grades para obter os nomes e preços das variações.
