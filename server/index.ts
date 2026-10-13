@@ -607,6 +607,50 @@ app.get("/api/admin/pedidos", requireAdmin, async (req, res) => {
 
 // Detalhe de um pedido + flag de verificação.
 app.get("/api/admin/pedidos/:id", requireAdmin, async (req, res) => {
+  // /csv tem prioridade semântica sobre :id — a rota literal precisa ser
+  // atendida antes do parâmetro dinâmico :id capturar "csv".
+  if (req.params.id === "csv") {
+    try {
+      // A LI limita `limit` a 100 por página — paginamos até juntar tudo
+      // (ou até 10 páginas = 1000 pedidos), seguindo a MESMA lógica da
+      // listagem /api/admin/pedidos (id real via resource_uri + verificado).
+      const limitePagina = "100";
+      let offset = 0;
+      const todos: any[] = [];
+      for (let pagina = 0; pagina < 10; pagina++) {
+        const { status, payload } = await chamarLI("GET", "pedido", undefined, {
+          limit: limitePagina,
+          offset: String(offset),
+        });
+        if (status !== 200) return res.status(status).json(payload);
+        const lote = payload.objects || [];
+        if (lote.length === 0) break;
+        todos.push(...lote);
+        if (lote.length < Number(limitePagina)) break;
+        offset += Number(limitePagina);
+      }
+      const objects = await anexarClientesPedidos(todos.map((p) => ({
+        ...p,
+        id_api: extrairIdDaUri(p.resource_uri) ?? p.id,
+        verificado: Boolean(estado.verificacoes[String(p.id)]),
+        verificado_em: estado.verificacoes[String(p.id)] ? estado.verificacoes[String(p.id)].em : null,
+      })));
+      const pedidos = objects || [];
+      const header = ["numero", "cliente", "email", "data", "status", "total", "itens", "verificado"];
+      const linhas = pedidos.map((p) =>
+        [p.numero, p.cliente_nome, p.cliente_email, p.data, p.status, Number(p.total || 0).toFixed(2), p.items, p.verificado ? "sim" : "nao"]
+          .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`)
+          .join(",")
+      );
+      const csv = [header.join(","), ...linhas].join("\n");
+      res.setHeader("Content-Type", "text/csv; charset=utf-8");
+      res.setHeader("Content-Disposition", 'attachment; filename="pedidos-dgriffe.csv"');
+      return res.send(csv);
+    } catch (e) {
+      console.error("[admin] erro ao exportar CSV:", e?.message);
+      return res.status(502).json({ erro: "Falha ao exportar CSV." });
+    }
+  }
   if (MOCK) {
     const p = mockPedidos.find((x) => String(x.id) === String(req.params.id));
     if (!p) return res.status(404).json({ erro: "Pedido não encontrado." });
@@ -3267,35 +3311,9 @@ app.listen(PORT, () => {
 
 // ---------------------------------------------------------------------------
 // A7 — Export CSV de pedidos do painel admin
+// (implementado dentro de GET /api/admin/pedidos/:id quando id === "csv",
+//  para ter prioridade sobre o parâmetro dinâmico :id)
 // ---------------------------------------------------------------------------
-app.get("/api/admin/pedidos/csv", requireAdmin, async (_req, res) => {
-  const admin = _req.admin as { email: string } | undefined;
-  try {
-    const pedidos: any[] = []; // TODO: implementar listarPedidosAdmin
-    const header = ["numero", "cliente", "email", "data", "status", "total", "itens", "verificado"];
-    const linhas = (pedidos || []).map((p) =>
-      [
-        p.numero,
-        p.cliente_nome,
-        p.cliente_email,
-        p.data,
-        p.status,
-        p.total.toFixed(2),
-        p.items,
-        p.verificado ? "sim" : "nao",
-      ]
-        .map((v) => `"${String(v).replace(/"/g, '""')}"`)
-        .join(",")
-    );
-    const csv = [header.join(","), ...linhas].join("\n");
-    res.setHeader("Content-Type", "text/csv; charset=utf-8");
-    res.setHeader("Content-Disposition", 'attachment; filename="pedidos-dgriffe.csv"');
-    return res.send(csv);
-  } catch (e) {
-    console.error("[admin] erro ao exportar CSV:", e?.message);
-    return res.status(502).json({ erro: "Falha ao exportar CSV." });
-  }
-});
 app.get("/api/admin/logs", requireAdmin, async (req, res) => {
   const admin = req.admin as { email: string } | undefined;
   try {
