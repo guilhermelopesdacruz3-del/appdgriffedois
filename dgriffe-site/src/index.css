@@ -36,6 +36,29 @@
   }
 }
 
+/* ── Estilo Ray-Ban: limpo, cinza #f2f2f2, sem sombra, maiúsculas ── */
+@layer components {
+  /* Card de produto no estilo Ray-Ban: fundo cinza, sem borda/sombra */
+  .rb-card {
+    @apply bg-white cursor-pointer;
+  }
+  .rb-card-img {
+    @apply bg-[#f2f2f2] overflow-hidden;
+  }
+  /* Título de seção Ray-Ban: sans, preto, tracking, sem serifado */
+  .rb-section-title {
+    @apply font-sans text-sm md:text-base font-bold uppercase tracking-[0.15em] text-neutral-900;
+  }
+  /* Botão preto cheio (estilo RB) */
+  .rb-btn-dark {
+    @apply w-full bg-neutral-900 text-white text-[11px] font-semibold uppercase tracking-wider py-3 hover:bg-neutral-700 transition-colors;
+  }
+  /* Botão contornado (estilo RB) */
+  .rb-btn-outline {
+    @apply w-full border border-neutral-300 text-neutral-800 text-[11px] font-semibold uppercase tracking-wider py-3 hover:border-neutral-900 transition-colors;
+  }
+}
+
 @layer utilities {
   .no-scrollbar::-webkit-scrollbar {
     display: none;

@@ -90,15 +90,13 @@ export default function HomePage() {
   return (
     <div>
       {/* 1. Announcement Bar */}
-      <div className="bg-luxury-black text-white py-2 px-4 text-center">
-        <p className="text-xs font-medium tracking-wide">
-          <span className="text-gold font-semibold">Frete Grátis</span> acima de R$ 299 •{' '}
-          <span className="text-gold font-semibold">5% OFF</span> no Pix •{' '}
-          <span className="text-gold font-semibold">Até 5x sem juros</span>
+      <div className="bg-neutral-900 text-white py-2.5 px-4 text-center">
+        <p className="text-[11px] font-medium tracking-wide uppercase">
+          Frete grátis acima de R$ 299 · 5% OFF no Pix · Até 5x sem juros
         </p>
       </div>
 
-      {/* 2. Hero Banner */}
+      {/* 2. Hero Banner — estilo Ray-Ban: full-bleed, headline à esquerda */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0">
           <img
@@ -106,48 +104,59 @@ export default function HomePage() {
             alt="Óculos D'Griffe Wonders"
             className="w-full h-full object-cover"
           />
-          <div className="absolute inset-0 bg-gradient-to-r from-luxury-black/90 via-luxury-black/70 to-luxury-black/30" />
+          <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/50 to-transparent" />
         </div>
-        <div className="container-site relative py-24 md:py-36">
-          <div className="max-w-2xl">
-            <p className="text-gold font-semibold uppercase tracking-widest text-sm mb-4 animate-fade-in">
-              Ótica D'Griffe Wonders
-            </p>
-            <h1 className="font-display text-4xl md:text-6xl font-bold text-white leading-tight mb-6 animate-slide-up">
-              Sua visão com o{' '}
-              <span className="text-gold">estilo que você merece</span>
+        <div className="container-site relative py-28 md:py-40">
+          <div className="max-w-xl">
+            <h1 className="font-sans text-4xl md:text-6xl font-bold text-white leading-[1.05] mb-5 tracking-tight">
+              Sua visão com<br />estilo absoluto
             </h1>
-            <p className="text-lg text-gray-200 mb-8 animate-slide-up max-w-lg">
-              Óculos originais Ray-Ban, Michael Kors, Vogue e mais. Lentes personalizadas com laboratório digital.
+            <p className="text-base md:text-lg text-white/80 mb-8 max-w-md">
+              Óculos originais das melhores grifes. Lentes sob medida com laboratório digital.
             </p>
-            <div className="flex flex-wrap gap-4 animate-slide-up">
-              <Link to="/catalogo" className="btn-gold text-base px-8 py-4 shadow-lg shadow-gold/30">
-                Ver Coleção
+            <div className="flex flex-wrap gap-3">
+              <Link to="/catalogo" className="px-8 py-3.5 bg-white text-neutral-900 text-[12px] font-bold uppercase tracking-widest hover:bg-neutral-200 transition-colors">
+                Compre agora
               </Link>
               <Link
                 to="/catalogo"
-                className="px-8 py-4 rounded-xl border-2 border-white/30 text-white font-semibold hover:bg-white/10 transition-all text-base flex items-center gap-2"
+                className="px-8 py-3.5 border border-white/60 text-white text-[12px] font-bold uppercase tracking-widest hover:bg-white/10 transition-colors"
               >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                Monte com sua Lente
+                Ver coleção
               </Link>
             </div>
           </div>
         </div>
       </section>
 
-      {/* 3. Régua de Benefícios */}
-      <section className="py-10 bg-white border-b border-ice-dark">
+      {/* 3. Tiles de Gênero — retrato, estilo Ray-Ban */}
+      <section className="grid grid-cols-1 md:grid-cols-3">
+        {[
+          { label: 'Para ela', img: 'https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=960&q=80', to: '/catalogo' },
+          { label: 'Para ele', img: 'https://images.unsplash.com/photo-1508296695146-257a814070b4?w=960&q=80', to: '/catalogo' },
+          { label: 'Infantil', img: 'https://images.unsplash.com/photo-1591076482161-42ce6da69f67?w=960&q=80', to: '/catalogo' },
+        ].map((g) => (
+          <Link key={g.label} to={g.to} className="relative group overflow-hidden aspect-[3/4] md:aspect-[6/7]">
+            <img src={g.img} alt={g.label} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700" loading="lazy" />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
+            <div className="absolute bottom-6 left-6">
+              <p className="text-white font-bold text-2xl uppercase tracking-wide">{g.label}</p>
+              <span className="inline-block mt-2 text-white text-[11px] font-semibold uppercase tracking-widest border-b border-white/60 pb-0.5 group-hover:border-white">Comprar</span>
+            </div>
+          </Link>
+        ))}
+      </section>
+
+      {/* 4. Régua de Benefícios */}
+      <section className="py-8 bg-white border-b border-neutral-100">
         <div className="container-site">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {BENEFITS.map((b, i) => (
               <div key={i} className="flex items-start gap-3">
-                <div className="w-12 h-12 rounded-xl bg-gold/10 text-gold flex items-center justify-center flex-shrink-0">
-                  {b.icon}
-                </div>
+                <div className="text-neutral-900 flex-shrink-0">{b.icon}</div>
                 <div>
-                  <p className="text-sm font-bold text-luxury-black">{b.title}</p>
-                  <p className="text-xs text-gray-500 mt-0.5">{b.desc}</p>
+                  <p className="text-[11px] font-bold text-neutral-900 uppercase tracking-wider">{b.title}</p>
+                  <p className="text-[11px] text-neutral-500 mt-0.5">{b.desc}</p>
                 </div>
               </div>
             ))}
@@ -155,96 +164,39 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 4. Categorias em Destaque */}
-      <section className="py-14 bg-ice">
+      {/* 5. Categorias em Destaque */}
+      <section className="py-14 bg-white">
         <div className="container-site">
           <div className="text-center mb-10">
-            <h2 className="section-title">Categorias</h2>
-            <p className="text-sm text-gray-500 mt-2">Encontre o óculos perfeito para você</p>
+            <h2 className="rb-section-title">Categorias</h2>
+            <p className="text-sm text-neutral-500 mt-2">Encontre o óculos perfeito para você</p>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
+          <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
             {categorias.length > 0 ? (
               categorias.map((cat) => (
                 <Link
                   key={cat.id}
                   to={`/catalogo?categoria=${cat.id}`}
-                  className="card p-5 text-center group hover:-translate-y-1 transition-all duration-300"
+                  className="rb-card-img py-6 text-center group transition-colors hover:bg-neutral-200"
                 >
-                  <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-ice flex items-center justify-center group-hover:bg-gold/10 transition-colors">
+                  <div className="w-14 h-14 mx-auto mb-3 flex items-center justify-center text-neutral-700 group-hover:text-neutral-900">
                     <CategoryIcon categoryName={getCategoriaNome(cat.id)} />
                   </div>
-                  <p className="text-sm font-semibold text-luxury-black group-hover:text-gold transition-colors">
+                  <p className="text-[11px] font-semibold text-neutral-900 uppercase tracking-wider">
                     {getCategoriaNome(cat.id)}
                   </p>
                 </Link>
               ))
             ) : (
               ['Sol', 'Grau', 'Ray-Ban', 'Grazi', 'Michael Kors', 'Infantil'].map((cat) => (
-                <Link
-                  key={cat}
-                  to="/catalogo"
-                  className="card p-5 text-center group hover:-translate-y-1 transition-all duration-300"
-                >
-                  <div className="w-14 h-14 mx-auto mb-3 rounded-full bg-ice flex items-center justify-center group-hover:bg-gold/10 transition-colors">
+                <Link key={cat} to="/catalogo" className="rb-card-img py-6 text-center group transition-colors hover:bg-neutral-200">
+                  <div className="w-14 h-14 mx-auto mb-3 flex items-center justify-center text-neutral-700 group-hover:text-neutral-900">
                     <CategoryIcon categoryName={cat} />
                   </div>
-                  <p className="text-sm font-semibold text-luxury-black group-hover:text-gold transition-colors">
-                    {cat}
-                  </p>
+                  <p className="text-[11px] font-semibold text-neutral-900 uppercase tracking-wider">{cat}</p>
                 </Link>
               ))
             )}
-          </div>
-        </div>
-      </section>
-
-      {/* 5. Banner "Monte Seu Óculos" */}
-      <section className="py-14 bg-luxury-black text-white relative overflow-hidden">
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-0 right-0 w-96 h-96 bg-gold rounded-full blur-3xl" />
-        </div>
-        <div className="container-site relative">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-10 items-center">
-            <div>
-              <p className="text-gold font-semibold uppercase tracking-widest text-xs mb-3">Ferramenta Exclusiva</p>
-              <h2 className="font-display text-3xl md:text-4xl font-bold mb-4">
-                Monte Seu D'Griffe Wonders
-              </h2>
-              <p className="text-gray-300 mb-8 leading-relaxed">
-                Personalize seu óculos com lentes sob medida. Escolha a armação, anexe sua receita e receba em casa.
-              </p>
-              <div className="space-y-4 mb-8">
-                {[
-                  { step: '1', title: 'Escolha a Armação', desc: 'Selecione o modelo que combina com seu estilo' },
-                  { step: '2', title: 'Anexe sua Receita', desc: 'Envie a receita médica ou tire uma foto com régua' },
-                  { step: '3', title: 'Receba em Casa', desc: 'Lentes produzidas com precisão e envio para todo Brasil' },
-                ].map((item) => (
-                  <div key={item.step} className="flex gap-4">
-                    <div className="w-10 h-10 rounded-full bg-gold/20 text-gold font-bold flex items-center justify-center flex-shrink-0 text-sm">
-                      {item.step}
-                    </div>
-                    <div>
-                      <p className="font-semibold text-sm">{item.title}</p>
-                      <p className="text-xs text-gray-400 mt-0.5">{item.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <Link to="/catalogo" className="btn-gold inline-flex items-center gap-2">
-                Personalizar Meus Óculos Agora
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
-              </Link>
-            </div>
-            <div className="hidden md:block">
-              <div className="relative">
-                <div className="absolute inset-0 bg-gold/20 rounded-3xl blur-2xl" />
-                <img
-                  src="https://images.unsplash.com/photo-1574258495973-f010dfbb5371?w=800&q=80"
-                  alt="Monte seu óculos"
-                  className="relative rounded-3xl shadow-2xl w-full object-cover aspect-[4/3]"
-                />
-              </div>
-            </div>
           </div>
         </div>
       </section>
@@ -254,14 +206,13 @@ export default function HomePage() {
       {destaques.length > 0 && (
         <section className="py-14 bg-white">
           <div className="container-site">
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center justify-between mb-8 border-b border-neutral-200 pb-4">
               <div>
-                <h2 className="section-title">Destaques</h2>
-                <p className="text-sm text-gray-500 mt-1">Os favoritos da coleção</p>
+                <h2 className="rb-section-title">Destaques</h2>
+                <p className="text-xs text-neutral-500 mt-1">Os favoritos da coleção</p>
               </div>
-              <Link to="/catalogo" className="text-sm font-semibold text-gold hover:underline flex items-center gap-1">
+              <Link to="/catalogo" className="text-[11px] font-bold uppercase tracking-widest text-neutral-900 hover:underline">
                 Ver todos
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
               </Link>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -273,17 +224,16 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* Mais Vendidos (simulado com produtos aleatórios) */}
-      <section className="py-14 bg-ice">
+      {/* Mais Vendidos */}
+      <section className="py-14 bg-white">
         <div className="container-site">
-          <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center justify-between mb-8 border-b border-neutral-200 pb-4">
             <div>
-              <h2 className="section-title">Mais Vendidos</h2>
-              <p className="text-sm text-gray-500 mt-1">Os queridinhos dos clientes</p>
+              <h2 className="rb-section-title">Triunfe nesta estação</h2>
+              <p className="text-xs text-neutral-500 mt-1">Os modelos mais amados</p>
             </div>
-            <Link to="/catalogo" className="text-sm font-semibold text-gold hover:underline flex items-center gap-1">
+            <Link to="/catalogo" className="text-[11px] font-bold uppercase tracking-widest text-neutral-900 hover:underline">
               Ver todos
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
             </Link>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -298,14 +248,13 @@ export default function HomePage() {
       {ofertas.length > 0 && (
         <section className="py-14 bg-white">
           <div className="container-site">
-            <div className="flex items-center justify-between mb-8">
+            <div className="flex items-center justify-between mb-8 border-b border-neutral-200 pb-4">
               <div>
-                <h2 className="section-title">Ofertas Imperdíveis</h2>
-                <p className="text-sm text-gray-500 mt-1">Descontos especiais por tempo limitado</p>
+                <h2 className="rb-section-title">Ofertas</h2>
+                <p className="text-xs text-neutral-500 mt-1">Descontos por tempo limitado</p>
               </div>
-              <Link to="/catalogo" className="text-sm font-semibold text-gold hover:underline flex items-center gap-1">
+              <Link to="/catalogo" className="text-[11px] font-bold uppercase tracking-widest text-neutral-900 hover:underline">
                 Ver todas
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
               </Link>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -318,30 +267,23 @@ export default function HomePage() {
       )}
 
       {/* 7. Carrossel de Marcas */}
-      <section className="py-12 bg-ice overflow-hidden">
+      <section className="py-12 bg-white overflow-hidden border-t border-neutral-100">
         <div className="container-site">
           <div className="text-center mb-8">
-            <h2 className="section-title">Nossas Marcas</h2>
-            <p className="text-sm text-gray-500 mt-2">Grifes autorizadas e originais</p>
+            <h2 className="rb-section-title">Nossas marcas</h2>
+            <p className="text-sm text-neutral-500 mt-2">Grifes autorizadas e originais</p>
           </div>
         </div>
         <div className="relative">
-          {/* Fade edges */}
-          <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-ice to-transparent z-10" />
-          <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-ice to-transparent z-10" />
-          {/* Scrolling track */}
+          <div className="absolute left-0 top-0 bottom-0 w-20 bg-gradient-to-r from-white to-transparent z-10" />
+          <div className="absolute right-0 top-0 bottom-0 w-20 bg-gradient-to-l from-white to-transparent z-10" />
           <div className="flex animate-marquee gap-16 items-center py-4">
             {[...BRANDS, ...BRANDS].map((brand, i) => (
               <div
                 key={`${brand.name}-${i}`}
-                className="w-32 h-14 flex items-center justify-center opacity-50 hover:opacity-90 transition-opacity grayscale hover:grayscale-0 flex-shrink-0"
+                className="w-32 h-14 flex items-center justify-center opacity-40 hover:opacity-90 transition-opacity grayscale hover:grayscale-0 flex-shrink-0"
               >
-                <img
-                  src={brand.logo}
-                  alt={brand.name}
-                  className="max-w-full max-h-full object-contain"
-                  loading="lazy"
-                />
+                <img src={brand.logo} alt={brand.name} className="max-w-full max-h-full object-contain" loading="lazy" />
               </div>
             ))}
           </div>
@@ -349,29 +291,23 @@ export default function HomePage() {
       </section>
 
       {/* 8. Newsletter */}
-      <section className="py-14 bg-white">
+      <section className="py-16 bg-neutral-100">
         <div className="container-site">
-          <div className="max-w-2xl mx-auto text-center">
-            <div className="w-14 h-14 bg-gold/10 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#D4A017" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="2" y="4" width="20" height="16" rx="2"/>
-                <path d="M22 6l-10 7L2 6"/>
-              </svg>
-            </div>
-            <h2 className="font-display text-2xl md:text-3xl font-bold text-luxury-black mb-3">
+          <div className="max-w-xl mx-auto text-center">
+            <h2 className="font-sans text-xl md:text-2xl font-bold text-neutral-900 uppercase tracking-wide mb-3">
               Receba 10% OFF na primeira compra
             </h2>
-            <p className="text-sm text-gray-500 mb-6">
-              Cadastre seu e-mail e ganhe um cupom de desconto exclusivo. Fique por dentro das novidades e ofertas.
+            <p className="text-sm text-neutral-500 mb-6">
+              Cadastre seu e-mail e ganhe um cupom exclusivo. Fique por dentro das novidades e ofertas.
             </p>
-            <form onSubmit={(e) => { e.preventDefault(); alert('Cadastro realizado! Você receberá o cupom por e-mail.'); }} className="flex gap-3 max-w-md mx-auto">
+            <form onSubmit={(e) => { e.preventDefault(); alert('Cadastro realizado! Você receberá o cupom por e-mail.'); }} className="flex gap-2 max-w-md mx-auto">
               <input
                 type="email"
                 placeholder="Seu melhor e-mail"
                 required
-                className="flex-1 h-12 px-4 rounded-xl border border-ice-dark text-sm focus:outline-none focus:border-gold"
+                className="flex-1 h-12 px-4 bg-white border border-neutral-300 text-sm focus:outline-none focus:border-neutral-900"
               />
-              <button type="submit" className="h-12 px-6 rounded-xl bg-luxury-black text-white text-sm font-semibold hover:bg-luxury-dark transition-colors whitespace-nowrap">
+              <button type="submit" className="h-12 px-6 bg-neutral-900 text-white text-[11px] font-bold uppercase tracking-widest hover:bg-neutral-700 transition-colors whitespace-nowrap">
                 Quero 10% OFF
               </button>
             </form>
@@ -384,7 +320,7 @@ export default function HomePage() {
         <section className="py-8 bg-white">
           <div className="container-site text-center">
             <p className="text-red-500 text-sm">{error}</p>
-            <p className="text-gray-500 text-xs mt-2">Carregando produtos em breve...</p>
+            <p className="text-neutral-500 text-xs mt-2">Carregando produtos em breve...</p>
           </div>
         </section>
       )}
