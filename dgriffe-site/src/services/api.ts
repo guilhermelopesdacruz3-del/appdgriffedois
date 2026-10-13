@@ -13,6 +13,42 @@ function limparNome(nome: string | null | undefined): string {
     .trim();
 }
 
+// A LI devolve as variações de um produto como URIs cruas
+// (ex.: /api/v1/grade/32769/variacao/139499). O nome legível ("Masculino")
+// vive dentro do objeto da grade. Este helper busca cada grade única e monta
+// um mapa URI -> nome da variação. Cache em memória evita rebuscar a mesma grade.
+const gradesCache = new Map<number, Map<string, string>>();
+async function resolverNomesVariacoes(uris: string[]): Promise<Map<string, string>> {
+  const out = new Map<string, string>();
+  if (!Array.isArray(uris) || uris.length === 0) return out;
+  // Extrai os gradeId únicos das URIs
+  const gradeIds = [...new Set(
+    uris
+      .map((u) => {
+        const m = String(u).match(/\/grade\/(\d+)\/variacao\//i);
+        return m ? Number(m[1]) : null;
+      })
+      .filter((n): n is number => n !== null)
+  )];
+  for (const gradeId of gradeIds) {
+    let variacoesMap = gradesCache.get(gradeId);
+    if (!variacoesMap) {
+      try {
+        const grade = await request<any>(`/api/loja-integrada/grades/${gradeId}`);
+        variacoesMap = new Map<string, string>();
+        for (const v of (grade.variacoes || [])) {
+          if (v?.resource_uri && v?.nome) variacoesMap.set(v.resource_uri, v.nome);
+        }
+        gradesCache.set(gradeId, variacoesMap);
+      } catch {
+        variacoesMap = new Map<string, string>(); // não repete busca em caso de erro
+      }
+    }
+    for (const [uri, nome] of variacoesMap) out.set(uri, nome);
+  }
+  return out;
+}
+
 async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     headers: { 'Content-Type': 'application/json', ...opts.headers },
@@ -45,7 +81,12 @@ export async function listarProdutos(opts: { limit?: number; offset?: number; ca
     marcasMap.set(m.id, m.nome || '');
   }
 
-  const produtos: Product[] = (res.objects || []).map((p: any) => {
+  // Resolve de uma vez os nomes de TODAS as variações dos produtos da página
+  // (cache por grade evita rebuscar a mesma grade entre produtos).
+  const todasUris = (res.objects || []).flatMap((p: any) => Array.isArray(p.variacoes) ? p.variacoes : []);
+  const nomesVarGlobal = await resolverNomesVariacoes(todasUris);
+
+  const produtos: Product[] = await Promise.all((res.objects || []).map(async (p: any) => {
     // Formato da LI: imagens é array de objetos { grande, media, icone, pequena, caminho }
     const imagem = p.imagem_principal?.grande || p.imagem_principal?.media || p.imagens?.[0]?.grande || p.imagens?.[0]?.media || '';
     const imagens = (p.imagens || []).map((i: any) => i.grande || i.media || '').filter(Boolean);
@@ -65,6 +106,10 @@ export async function listarProdutos(opts: { limit?: number; offset?: number; ca
     const isEyewear = ncm.startsWith('9004') || catNome.toLowerCase().includes('sol') || catNome.toLowerCase().includes('grau');
 
     let nomeLimpo = limparNome(p.nome || p.apelido);
+
+    // Variações: URIs -> nomes legíveis (ex.: "Masculino")
+    const variacoesUris: string[] = Array.isArray(p.variacoes) ? p.variacoes : [];
+    const variacoesNomes = variacoesUris.map((u: string) => nomesVarGlobal.get(u) || u);
 
     return {
       id: p.id,
@@ -86,10 +131,10 @@ export async function listarProdutos(opts: { limit?: number; offset?: number; ca
       reviews: 0,
       installmentCount: 5,
       installmentValue: Number(p.preco_cheio || 0) / 5,
-      variacoes: p.variacoes || [],
+      variacoes: variacoesNomes.length > 0 ? variacoesNomes : (p.variacoes || []),
       tamanhos: p.tamanhos || [],
     };
-  });
+  }));
   return { produtos, total: res.meta?.total_count || produtos.length };
 }
 
@@ -101,6 +146,10 @@ export async function buscarProduto(id: number | string): Promise<Product> {
   const catNome = p.categorias?.[0]?.nome || p.categoria_nome || '';
   const isEyewear = ncm.startsWith('9004') || catNome.toLowerCase().includes('sol') || catNome.toLowerCase().includes('grau');
   let nomeLimpo = limparNome(p.nome || p.apelido);
+  // Resolve URIs de variação -> nomes legíveis (ex.: "Masculino")
+  const variacoesUris: string[] = Array.isArray(p.variacoes) ? p.variacoes : [];
+  const nomesVar = await resolverNomesVariacoes(variacoesUris);
+  const variacoesNomes = variacoesUris.map((u: string) => nomesVar.get(u) || u);
   return {
     id: p.id,
     name: nomeLimpo,
@@ -120,7 +169,7 @@ export async function buscarProduto(id: number | string): Promise<Product> {
     reviews: 0,
     installmentCount: 5,
     installmentValue: Number(p.preco_cheio || 0) / 5,
-    variacoes: p.variacoes || [],
+    variacoes: variacoesNomes.length > 0 ? variacoesNomes : (p.variacoes || []),
     tamanhos: p.tamanhos || [],
   };
 }

@@ -335,6 +335,7 @@ const RECURSOS_PERMITIDOS = new Set([
   "formapagamento",
   "formaenvio",
   "situacao",
+  "grades",
 ]);
 
 const RECURSOS_ESCRITA_PERMITIDOS = new Set(["cliente", "pedido"]);
