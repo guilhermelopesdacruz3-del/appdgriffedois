@@ -1,7 +1,6 @@
 import type { Product } from '../data/types';
 import { getCategoriaNome } from '../data/categoriasMap';
-
-const API_BASE = import.meta.env.VITE_API_URL || 'https://appdgriffedois.onrender.com';
+import { API_BASE } from '../config';
 
 async function request<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
