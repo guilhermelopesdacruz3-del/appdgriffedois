@@ -56,3 +56,10 @@ twa-project/local.properties
 
 # Temporários
 src/pages/.hermes-tmp.*
+# Catalogo estatico GERADO (nao importado por ninguem — dados vem da API)
+src/data/produtos.json
+src/data/produtos.ts
+scripts/fetch-produtos.js
+
+# Script de teste manual do mapper
+server/test-mapper.mts

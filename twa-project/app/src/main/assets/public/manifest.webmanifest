@@ -1,0 +1,90 @@
+{
+  "name": "D'Griffe — Ótica de Luxo",
+  "short_name": "D'Griffe",
+  "description": "Ótica de luxo D'Griffe — óculos originais, fidelidade e cupons exclusivos.",
+  "id": "/",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "lang": "pt-BR",
+  "categories": ["shopping", "lifestyle"],
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/phone1.png",
+      "sizes": "1170x2532",
+      "type": "image/png",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/screenshots/phone2.png",
+      "sizes": "1170x2532",
+      "type": "image/png",
+      "form_factor": "narrow"
+    },
+    {
+      "src": "/screenshots/tablet1.png",
+      "sizes": "2048x2732",
+      "type": "image/png",
+      "form_factor": "wide"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Catálogo",
+      "url": "/",
+      "description": "Ver catálogo de óculos"
+    },
+    {
+      "name": "Meus Cupons",
+      "url": "/?rota=cupons",
+      "description": "Ver meus cupons"
+    },
+    {
+      "name": "Fidelidade",
+      "url": "/?rota=clube",
+      "description": "Programa de fidelidade"
+    },
+    {
+      "name": "Perfil",
+      "url": "/?rota=perfil",
+      "description": "Meu perfil"
+    }
+  ],
+  "prefer_related_applications": true,
+  "related_applications": [
+    {
+      "platform": "play",
+      "url": "https://play.google.com/store/apps/details?id=com.dgriffe.app",
+      "id": "com.dgriffe.app"
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.dgriffe.app",
+      "sha256_cert_fingerprints": [
+        "FF:61:D2:57:58:5F:68:89:D4:CD:BF:9B:60:64:23:2B:F3:C6:83:CD:43:D5:97:6A:FB:A4:61:E1:4A:81:D6:DD"
+      ]
+    }
+  }
+]
