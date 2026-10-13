@@ -187,17 +187,3 @@ export async function listarMarcas(): Promise<Array<{ id: number; nome: string }
   const res = await request<{ objects: any[] }>('/api/loja-integrada/marca/');
   return (res.objects || []).map((m: any) => ({ id: m.id, nome: m.nome || '' }));
 }
-
-// --- Afiliado ---
-export async function registrarAfiliado(data: { email: string; nome: string; telefone: string }): Promise<{ ok: boolean; afiliado?: any }> {
-  return request('/api/afiliado/registrar', { method: 'POST', body: JSON.stringify(data) });
-}
-
-export async function registrarVendaAfiliado(data: { afiliadoEmail: string; produtoNome: string; valor: number }): Promise<{ ok: boolean }> {
-  return request('/api/afiliado/venda', { method: 'POST', body: JSON.stringify(data) });
-}
-
-// --- Admin ---
-export async function listarAfiliados(token: string): Promise<{ afiliados: any[]; stats: any }> {
-  return request('/api/admin/afiliados', { headers: { Authorization: `Bearer ${token}` } });
-}

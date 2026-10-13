@@ -6,8 +6,6 @@ import CatalogPage from './pages/CatalogPage';
 import ProductDetailPage from './pages/ProductDetailPage';
 import MedicaoPage from './pages/MedicaoPage';
 import HistoriaPage from './pages/HistoriaPage';
-import AfiliadoPage from './pages/AfiliadoPage';
-import AfiliadoAreaPage from './pages/AfiliadoAreaPage';
 import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
 import LoginPage from "./pages/LoginPage";
@@ -24,8 +22,6 @@ export default function App() {
             <Route path="/produto/:id" element={<ProductDetailPage />} />
             <Route path="/medicao" element={<MedicaoPage />} />
             <Route path="/historia" element={<HistoriaPage />} />
-            <Route path="/afiliado" element={<AfiliadoPage />} />
-            <Route path="/afiliado-area" element={<AfiliadoAreaPage />} />
             <Route path="/cart" element={<CartPage />} />
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/login" element={<LoginPage />} />

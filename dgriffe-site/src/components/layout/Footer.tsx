@@ -41,7 +41,6 @@ export default function Footer() {
               <li><Link to="/catalogo" className="text-sm text-neutral-400 hover:text-white transition-colors">Coleção</Link></li>
               <li><Link to="/medicao" className="text-sm text-neutral-400 hover:text-white transition-colors">Medição de Lentes</Link></li>
               <li><Link to="/historia" className="text-sm text-neutral-400 hover:text-white transition-colors">Nossa História</Link></li>
-              <li><Link to="/afiliado" className="text-sm text-neutral-400 hover:text-white transition-colors">Programa Afiliado</Link></li>
               <li><Link to="/login" className="text-sm text-neutral-400 hover:text-white transition-colors">Entrar / Cadastrar</Link></li>
             </ul>
           </div>
@@ -75,10 +74,10 @@ export default function Footer() {
             <h4 className="text-[12px] font-bold uppercase tracking-widest text-white mb-5">Institucional</h4>
             <ul className="space-y-3">
               <li><Link to="/historia" className="text-sm text-neutral-400 hover:text-white transition-colors">Sobre Nós</Link></li>
-              <li><Link to="/afiliado" className="text-sm text-neutral-400 hover:text-white transition-colors">Trabalhe Conosco</Link></li>
-              <li><Link to="/afiliado" className="text-sm text-neutral-400 hover:text-white transition-colors">Política de Privacidade</Link></li>
-              <li><Link to="/afiliado" className="text-sm text-neutral-400 hover:text-white transition-colors">Termos de Uso</Link></li>
-              <li><Link to="/afiliado" className="text-sm text-neutral-400 hover:text-white transition-colors">Trocas e Devoluções</Link></li>
+              <li><a href="mailto:contato@dgriffe.com.br" className="text-sm text-neutral-400 hover:text-white transition-colors">Trabalhe Conosco</a></li>
+              <li><a href="mailto:contato@dgriffe.com.br" className="text-sm text-neutral-400 hover:text-white transition-colors">Política de Privacidade</a></li>
+              <li><a href="mailto:contato@dgriffe.com.br" className="text-sm text-neutral-400 hover:text-white transition-colors">Termos de Uso</a></li>
+              <li><a href="mailto:contato@dgriffe.com.br" className="text-sm text-neutral-400 hover:text-white transition-colors">Trocas e Devoluções</a></li>
             </ul>
           </div>
         </div>
