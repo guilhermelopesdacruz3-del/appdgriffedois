@@ -1,11 +1,58 @@
-gradle-*.zip
+# Build / artefatos
+dist/
+build/
+*.tsbuildinfo
+
+# Dependências
+node_modules/
+
+# Segredos — NUNCA commitar
+.env
+.env.local
+.env.*.local
+server/.env
+*.keystore
+*.pem
+*token*.txt
+sessao_dgriffe.json
+
+# Instaladores e binários pesados
+*.exe
 *.zip
+*.jar
+*.apk
+*.apks
+*.aab
+
+# Lixo de diagnóstico / extração
+apks_extract/
+frames/
+diag_*.ps1
+getip.ps1
+rm_*.bat
+nul
+
+# Logs
+logs/
+*.log
+server/logs/
+
+# Projetos auxiliares / não fazem parte do app D'Griffe
+crmdgriffe/
+lab-hack/
+pentest-vendas/
+otica-capao/
+stylo-merge/
+jarvis_rag.py
+
+# Ferramentas do Hermes
+.hermes/
+
+# Gradle (TWA)
+gradle-*.zip
 twa-project/app/build/
 twa-project/.gradle/
-node_modules/
-twa-project/app/dgriffe-release.keystore
 twa-project/local.properties
+
+# Temporários
 src/pages/.hermes-tmp.*
-dist/
-.env
-server/.env
