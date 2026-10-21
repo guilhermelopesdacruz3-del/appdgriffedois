@@ -92,7 +92,7 @@ export default function HomePage() {
       {/* 1. Announcement Bar */}
       <div className="bg-neutral-900 text-white py-2.5 px-4 text-center">
         <p className="text-[11px] font-medium tracking-wide uppercase">
-          Frete grátis acima de R$ 299 · 5% OFF no Pix · Até 5x sem juros
+          Frete grátis acima de R$ 299 · PIX ou cartão em até 5x
         </p>
       </div>
 

@@ -54,10 +54,9 @@ export default function Header() {
         <div className="flex animate-marquee gap-14 text-[10px] font-medium uppercase tracking-widest whitespace-nowrap">
           {[
             'Frete grátis acima de R$ 299',
-            '5% OFF no Pix',
+            'PIX ou cartão em até 5x',
             'Troca grátis em até 30 dias',
             'Produtos 100% originais',
-            'Até 5x sem juros',
             'Novidades toda semana',
           ].map((text, i) => (
             <span key={i} className="flex items-center gap-2 opacity-90">{text}</span>

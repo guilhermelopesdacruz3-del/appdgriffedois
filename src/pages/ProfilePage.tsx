@@ -464,13 +464,13 @@ function PreferenciasPage({ voltar }: { voltar: () => void }) {
           const pub = await getPushPublicKey();
           if (!pub) { setPushMsg("Push indisponível no momento."); return; }
           const nova = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(pub) });
-          await assinarPush(email, { endpoint: nova.endpoint, keys: { p256dh: chaveParaBase64(nova.getKey("p256dh")), auth: chaveParaBase64(nova.getKey("auth")) } });
+          await assinarPush({ endpoint: nova.endpoint, keys: { p256dh: chaveParaBase64(nova.getKey("p256dh")), auth: chaveParaBase64(nova.getKey("auth")) } });
           setPushMsg("Notificações ativadas neste dispositivo.");
         } else {
-          await assinarPush(email, { endpoint: existente.endpoint, keys: { p256dh: chaveParaBase64(existente.getKey("p256dh")), auth: chaveParaBase64(existente.getKey("auth")) } });
+          await assinarPush({ endpoint: existente.endpoint, keys: { p256dh: chaveParaBase64(existente.getKey("p256dh")), auth: chaveParaBase64(existente.getKey("auth")) } });
         }
       } else if (existente) {
-        await cancelarPush(email, existente.endpoint);
+        await cancelarPush(existente.endpoint);
         await existente.unsubscribe().catch(() => {});
         setPushMsg("Notificações desativadas neste dispositivo.");
       }

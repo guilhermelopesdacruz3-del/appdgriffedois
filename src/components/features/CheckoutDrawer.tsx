@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { formatPrice } from "../../utils";
 import { useCliente } from "../../hooks/useCliente";
-import { validarCupom, usarCupom } from "../../services/cupomApp";
+import { validarCupom } from "../../services/cupomApp";
 import { iniciarCheckout } from "../../services/apiConfig";
 import type { Product } from "../../data";
 
@@ -20,7 +20,7 @@ interface CheckoutDrawerProps {
   onSuccess?: (info: unknown) => void;
 }
 
-type Passo = "resumo" | "dados" | "escolher" | "processando" | "pix" | "cartao" | "sucesso" | "erro";
+type Passo = "resumo" | "dados" | "escolher" | "processando" | "pix" | "cartao" | "pendente" | "sucesso" | "erro";
 
 const ETAPAS: { id: Passo; rotulo: string }[] = [
   { id: "resumo", rotulo: "Carrinho" },
@@ -46,6 +46,10 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
   const [cupomCodigo, setCupomCodigo] = useState("");
   const [cupomAplicado, setCupomAplicado] = useState<{ codigo: string; tipo: string; valor: number; id: string } | null>(null);
   const [cupomErro, setCupomErro] = useState<string | null>(null);
+  // Reutiliza a mesma chave de idempotência enquanto a tentativa (carrinho +
+  // valores + meio) não muda. Em retry de rede, o MP devolve a mesma cobrança
+  // em vez de criar outra.
+  const idemRef = useRef<{ key: string; assinatura: string; meio: string } | null>(null);
 
   const [email, setEmail] = useState(cliente?.email || perfil?.email || "");
   const [nome, setNome] = useState(perfil?.nome || cliente?.nome || "");
@@ -91,6 +95,23 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
   const descontoCupom = cupomAplicado ? (cupomAplicado.tipo === "percentual" ? total * (cupomAplicado.valor / 100) : Number(cupomAplicado.valor)) : 0;
   const totalComDesconto = Math.max(0, total - descontoPontos - descontoCupom);
 
+  // Assinatura da tentativa: se o carrinho, o total, os pontos ou o cupom
+  // mudarem, geramos outra chave. Retry idêntico reutiliza a mesma.
+  const assinaturaCheckout = JSON.stringify({
+    itens: items.map((it) => `${it.product.id}:${it.quantity}:${it.colorIndex}`),
+    total: Number(totalComDesconto.toFixed(2)),
+    pontos: pontosResgate,
+    cupom: cupomAplicado?.codigo || null,
+  });
+  const obterIdempotencyKey = (meio: "pix" | "cartao") => {
+    if (idemRef.current && idemRef.current.assinatura === assinaturaCheckout && idemRef.current.meio === meio) {
+      return idemRef.current.key;
+    }
+    const key = globalThis.crypto?.randomUUID?.() || `chk-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    idemRef.current = { key, assinatura: assinaturaCheckout, meio };
+    return key;
+  };
+
   const emailValido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
   const dadosValidos =
     emailValido &&
@@ -105,7 +126,8 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
     if (!res.valido || !res.cupom) return setCupomErro(res.erro || "Cupom inválido.");
     if (res.cupom.valor_minimo != null && total < res.cupom.valor_minimo) return setCupomErro(`Mínimo ${formatPrice(Number(res.cupom.valor_minimo))}.`);
     setCupomAplicado({ codigo: res.cupom.codigo, tipo: res.cupom.tipo, valor: Number(res.cupom.valor), id: res.cupom.id });
-    if (res.atribuicao_id) await usarCupom(res.cupom.id, 0).catch(() => {});
+    // NÃO consumimos o cupom aqui: o servidor valida e consome somente após a
+    // confirmação do pagamento.
   };
 
   const iniciar = async (meio: "pix" | "cartao") => {
@@ -134,7 +156,8 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
         meio,
         email: email.trim(),
         pontosResgate: pontosResgate > 0 ? pontosResgate : undefined,
-        cupom: cupomAplicado || undefined,
+        cupom: cupomAplicado ? { codigo: cupomAplicado.codigo } : undefined,
+        idempotencyKey: obterIdempotencyKey(meio),
       });
       if (meio === "pix") {
         setPix({ qr: resultado.pix_qr_base64 || "", copia: resultado.pix_copia_cola || "" });
@@ -145,10 +168,20 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
           setPasso("pix");
         }
       } else {
-        setPontosC(Number(resultado.pontos_creditados || 0));
-        setPasso("sucesso");
+        const st = String(resultado.status || "").toLowerCase();
+        if (st === "approved" || st === "aprovado") {
+          setPontosC(Number(resultado.pontos_creditados || 0));
+          setPasso("sucesso");
+          onSuccess?.(resultado);
+        } else if (["rejected", "cancelled", "refunded", "charged_back"].includes(st)) {
+          idemRef.current = null;
+          setErro("Pagamento não aprovado pelo Mercado Pago. Tente outro cartão ou use o PIX.");
+          setPasso("erro");
+          return;
+        } else {
+          setPasso("pendente");
+        }
       }
-      onSuccess?.(resultado);
       window.dispatchEvent(new Event("fidelidade-atualizada"));
     } catch (e: any) {
       setErro(e.message || "Falha ao iniciar o pagamento.");
@@ -366,7 +399,7 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
                 <button onClick={() => iniciar("pix")} className="w-full h-14 bg-luxury-black text-white font-bold rounded-2xl active:scale-[0.98] transition-all">
                   Pagar com PIX
                 </button>
-                <button onClick={() => iniciar("cartao")} className="w-full h-14 border border-luxury-black text-luxury-black font-bold rounded-2xl active:scale-[0.98] transition-all">
+                <button onClick={() => setPasso("cartao")} className="w-full h-14 border border-luxury-black text-luxury-black font-bold rounded-2xl active:scale-[0.98] transition-all">
                   Cartão de Crédito
                 </button>
                 <div className="flex gap-2">
@@ -398,6 +431,21 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
                 </div>
                 <button onClick={copiar} className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl">Copiar código PIX</button>
                 <p className="text-[10px] text-gray-400 text-center">Após o pagamento, o pedido é confirmado automaticamente.</p>
+              </div>
+            )}
+
+            {passo === "pendente" && (
+              <div className="flex flex-col items-center py-8 space-y-3">
+                <div className="w-16 h-16 rounded-full bg-amber-50 flex items-center justify-center">
+                  <span className="text-2xl">⏳</span>
+                </div>
+                <p className="text-base font-bold text-luxury-black">Pagamento em análise</p>
+                <p className="text-xs text-gray-500 text-center px-6">
+                  O Mercado Pago está analisando o pagamento. Você receberá a confirmação por e-mail assim que for aprovado.
+                </p>
+                <button onClick={onClose} className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl">
+                  Fechar
+                </button>
               </div>
             )}
 
@@ -454,12 +502,26 @@ export default function CheckoutDrawer({ items, isOpen, onClose, onSuccess, fide
                       email: email.trim(),
                       card_token: cardToken,
                       pontosResgate: pontosResgate > 0 ? pontosResgate : undefined,
-                      cupom: cupomAplicado || undefined,
+                      cupom: cupomAplicado ? { codigo: cupomAplicado.codigo } : undefined,
+                      idempotencyKey: obterIdempotencyKey("cartao"),
                     });
-                    setPontosC(Number(resultado.pontos_creditados || 0));
-                    setPasso("sucesso");
-                    onSuccess?.(resultado);
+                    const st = String(resultado.status || "").toLowerCase();
+                    if (st === "approved" || st === "aprovado") {
+                      setPontosC(Number(resultado.pontos_creditados || 0));
+                      setPasso("sucesso");
+                      onSuccess?.(resultado);
+                    } else if (["rejected", "cancelled", "refunded", "charged_back"].includes(st)) {
+                      // Um cartão recusado não pode reutilizar a mesma chave de
+                      // idempotência: o MP devolveria a mesma recusa.
+                      idemRef.current = null;
+                      setErro("Pagamento não aprovado pelo Mercado Pago. Tente outro cartão ou use o PIX.");
+                      setPasso("erro");
+                    } else {
+                      setPasso("pendente");
+                    }
                   } catch (e: any) {
+                    // Em erro de rede a cobrança pode ter sido criada; mantém
+                    // a chave para o retry não gerar uma segunda cobrança.
                     setErro(e.message || "Falha ao processar o cartão.");
                     setPasso("erro");
                   }

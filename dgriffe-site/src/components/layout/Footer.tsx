@@ -21,7 +21,7 @@ export default function Footer() {
               </div>
             </div>
             <p className="text-sm text-neutral-400 leading-relaxed">
-              Óculos originais Ray-Ban, Michael Kors, Vogue e mais. Até 5x sem juros ou desconto no Pix.
+              Óculos originais Ray-Ban, Michael Kors, Vogue e mais. PIX ou cartão em até 5x.
             </p>
             <div className="flex gap-3 mt-5">
               <a href="https://instagram.com/oticadgriffe" target="_blank" rel="noopener noreferrer" className="w-9 h-9 border border-neutral-700 flex items-center justify-center hover:border-white transition-colors">

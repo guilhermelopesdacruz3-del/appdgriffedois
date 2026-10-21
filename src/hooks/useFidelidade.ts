@@ -42,8 +42,8 @@ export function useFidelidade(email: string | null | undefined) {
         const headers: Record<string, string> = { Accept: "application/json" };
         if (token) headers["Authorization"] = `Bearer ${token}`;
         return Promise.all([
-          fetch(`${PROXY}/api/fidelidade?email=${encodeURIComponent(e)}`, { headers }).then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))),
-          fetch(`${PROXY}/api/fidelidade/historico?email=${encodeURIComponent(e)}`, { headers }).then((r) => (r.ok ? r.json() : { historico: [] })),
+          fetch(`${PROXY}/api/fidelidade`, { headers }).then((r) => (r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))),
+          fetch(`${PROXY}/api/fidelidade/historico`, { headers }).then((r) => (r.ok ? r.json() : { historico: [] })),
         ]);
       })
       .then(([d, h]) => {

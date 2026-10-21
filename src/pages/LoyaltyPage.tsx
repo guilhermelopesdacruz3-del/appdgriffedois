@@ -1,6 +1,16 @@
 import { useState, useEffect } from "react";
 import { useCliente } from "../hooks/useCliente";
+import { obterTokenValido } from "../services/cliente";
 import { NIVEIS, BENEFICIO_BASE, TETO_BENEFICIOS_PERC } from "../data/fidelidade";
+
+// As rotas de fidelidade/família/indicação agora identificam o cliente pelo
+// Bearer token — o e-mail em query/body não é mais aceito.
+async function fetchAutenticado(url: string, init: RequestInit = {}): Promise<Response> {
+  const token = await obterTokenValido();
+  const headers = new Headers(init.headers || {});
+  if (token) headers.set("Authorization", `Bearer ${token}`);
+  return fetch(url, { ...init, headers });
+}
 
 function formatarData(iso?: string): string {
   if (!iso) return "";
@@ -37,7 +47,7 @@ export default function LoyaltyPage({ fidelidade: info, historicoFidelidade: his
     let mounted = true;
     setMissoesLoading(true);
     setMissoesErro(null);
-    fetch(`/api/fidelidade/missao?email=${encodeURIComponent(email)}`)
+    fetchAutenticado(`/api/fidelidade/missao`)
       .then((r) => {
         if (!mounted) return;
         if (!r.ok) throw new Error(`Falha ao carregar missões (HTTP ${r.status}).`);
@@ -62,11 +72,12 @@ export default function LoyaltyPage({ fidelidade: info, historicoFidelidade: his
     setMissoesErro(null);
     setMissoesSucesso(null);
     try {
-      const j = await (await fetch("/api/fidelidade/missao/concluir", {
+      const r = await fetchAutenticado("/api/fidelidade/missao/concluir", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, tipo }),
-      })).json();
+        body: JSON.stringify({ tipo }),
+      });
+      const j = await r.json();
       if (!j.ok) {
         const mensagem = j.erro || `Falha ao concluir missão.`;
         setMissoesErro(mensagem);
@@ -209,8 +220,9 @@ export default function LoyaltyPage({ fidelidade: info, historicoFidelidade: his
           <button onClick={async () => {
             if (!cliente?.email) return;
             try {
-              const r = await fetch(`/api/indicacao/codigo?email=${encodeURIComponent(cliente.email)}`);
+              const r = await fetchAutenticado("/api/indicacao/codigo");
               const j = await r.json();
+              if (!r.ok) { alert(j.erro || "Não foi possível gerar o código."); return; }
               alert(`Seu código: ${j.codigo}\nIndicações convertidas: ${j.indicacoesConvertidas}/${j.limiteAnual}`);
             } catch { alert("Não foi possível gerar o código."); }
           }} className="px-4 py-2 bg-luxury-black text-white text-[10px] font-bold rounded-xl active:scale-95 transition-all">Indicar</button>
@@ -224,8 +236,9 @@ export default function LoyaltyPage({ fidelidade: info, historicoFidelidade: his
           <button onClick={async () => {
             if (!cliente?.email) return;
             try {
-              const r = await fetch(`/api/familia?email=${encodeURIComponent(cliente.email)}`);
+              const r = await fetchAutenticado("/api/familia");
               const j = await r.json();
+              if (!r.ok) { alert(j.erro || "Não foi possível ler o clube."); return; }
               alert(`Membros: ${j.membros?.length}/${j.limite}\nCréditos Família: R$ ${j.creditos?.creditoRs || 0}`);
             } catch { alert("Não foi possível ler o clube."); }
           }} className="px-4 py-2 bg-luxury-black text-white text-[10px] font-bold rounded-xl active:scale-95 transition-all">Ver</button>

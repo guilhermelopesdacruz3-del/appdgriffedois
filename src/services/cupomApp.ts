@@ -98,9 +98,15 @@ export async function validarCupom(codigo: string): Promise<{
   cupom?: Cupom;
   atribuicao_id?: string;
 }> {
-  return request(`/api/cupons/validar/${encodeURIComponent(codigo)}`);
-}
-
-export async function usarCupom(id: string, discount: number): Promise<{ ok: boolean; desconto: number }> {
-  return request<{ ok: boolean; desconto: number }>(`/api/cupons/${encodeURIComponent(id)}/usar`, { method: "POST", body: { discount } });
+  // Usa o token do CLIENTE (cupons atribuídos dependem dele). O token de admin
+  // não representa o cliente e não deve ser usado aqui.
+  const token = (await obterTokenValido()) || "";
+  const headers: Record<string, string> = { Accept: "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(`${BASE_URL}/api/cupons/validar/${encodeURIComponent(codigo)}`, { headers });
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    throw new Error(`Falha (${res.status}): ${txt.slice(0, 200)}`);
+  }
+  return (await res.json()) as { valido: boolean; erro?: string; cupom?: Cupom; atribuicao_id?: string };
 }

@@ -6,11 +6,19 @@ import { getAdminToken, clearAdminToken } from "./admin";
 
 // Chamadas do APP DO CLIENTE (rotas públicas: /api/checkout, /api/fidelidade, etc).
 // NÃO envia token de admin. Usado pelo fluxo de compra do cliente final.
+// Quando o cliente está logado, envia o Bearer do cliente — o checkout usa
+// isso para validar pontos/cupons atribuídos e nunca confia no e-mail do body.
 async function clientCall<T>(path: string, opts: { method?: string; body?: unknown } = {}): Promise<T> {
+  let token = "";
+  try {
+    const { obterTokenValido } = await import("./cliente");
+    token = (await obterTokenValido()) || "";
+  } catch { /* sem sessão: segue como convidado */ }
   const res = await fetch(`/api/${path}`, {
     method: opts.method ?? "GET",
     headers: {
       ...(opts.body !== undefined ? { "Content-Type": "application/json" } : {}),
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
   });
@@ -97,7 +105,7 @@ export interface CheckoutResult {
 }
 
 export async function iniciarCheckout(payload: {
-  items: { price: number; qty: number; li_uri?: string; sku?: string; nome?: string }[];
+  items: { price: number; qty: number; li_uri?: string; sku?: string; nome?: string; variacao?: string }[];
   cliente?: {
     email?: string;
     nome?: string;
@@ -119,7 +127,11 @@ export async function iniciarCheckout(payload: {
   card_token?: string;
   email?: string;
   pontosResgate?: number;
-  cupom?: { codigo: string; tipo: string; valor: number; id: string };
+  /** Só o código importa; tipo/valor são validados no servidor. */
+  cupom?: { codigo: string };
+  /** Chave estável por tentativa — evita cobrança dupla em retry. */
+  idempotencyKey?: string;
+  parcelas?: number;
   /** "app" (TWA/standalone) ou "site" (navegador). */
   origem?: "app" | "site";
 }) {

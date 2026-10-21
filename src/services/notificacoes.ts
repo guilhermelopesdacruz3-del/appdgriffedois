@@ -1,10 +1,26 @@
+import { obterTokenValido } from "./cliente";
+
 const BASE = "/api";
 
-async function req<T>(path: string, opts: { method?: string; body?: unknown } = {}): Promise<T> {
+type AuthMode = "cliente" | "admin";
+
+// Rotas de cliente usam o Bearer do cliente; apenas /api/admin/* usa o token
+// de admin. Antes o token de admin era enviado em rotas de cliente (e o e-mail
+// ia na query/body), o que permitia ler notificações de outras pessoas.
+async function req<T>(
+  path: string,
+  opts: { method?: string; body?: unknown } = {},
+  auth: AuthMode = "cliente"
+): Promise<T> {
   const headers: Record<string, string> = {};
   if (opts.body !== undefined) headers["Content-Type"] = "application/json";
-  const tokenAdmin = (await import("./admin")).getAdminToken?.();
-  if (tokenAdmin) headers["Authorization"] = `Bearer ${tokenAdmin}`;
+  if (auth === "admin") {
+    const tokenAdmin = (await import("./admin")).getAdminToken?.();
+    if (tokenAdmin) headers["Authorization"] = `Bearer ${tokenAdmin}`;
+  } else {
+    const token = await obterTokenValido();
+    if (token) headers["Authorization"] = `Bearer ${token}`;
+  }
   const res = await fetch(`${BASE}${path}`, {
     method: opts.method || "GET",
     headers,
@@ -27,12 +43,12 @@ export interface Notificacao {
   created_at: string;
 }
 
-export async function listarNotificacoes(email: string): Promise<{ notificacoes: Notificacao[]; naoLidas: number }> {
-  return req(`/notificacoes?email=${encodeURIComponent(email)}`);
+export async function listarNotificacoes(): Promise<{ notificacoes: Notificacao[]; naoLidas: number }> {
+  return req("/notificacoes");
 }
 
-export async function marcarNotificacaoLida(email: string, id: string): Promise<void> {
-  await req(`/notificacoes/${id}/lida?email=${encodeURIComponent(email)}`, { method: "POST" });
+export async function marcarNotificacaoLida(id: string): Promise<void> {
+  await req(`/notificacoes/${encodeURIComponent(id)}/lida`, { method: "POST" });
 }
 
 export interface FiltrosNotificar {
@@ -46,7 +62,7 @@ export async function notificarClientesAdmin(p: {
   tipo: Notificacao["tipo"];
   filtros: FiltrosNotificar;
 }): Promise<{ ok: boolean; enviadas: number; destinatarios: number; pushEnviados?: number }> {
-  return req("/admin/notificar", { method: "POST", body: p });
+  return req("/admin/notificar", { method: "POST", body: p }, "admin");
 }
 
 // --- Web Push ---
@@ -62,12 +78,12 @@ export async function getPushPublicKey(): Promise<string | null> {
   return j?.publicKey || null;
 }
 
-export async function assinarPush(email: string, subscription: PushSubscriptionInput): Promise<void> {
-  await req("/notificacoes/subscribe", { method: "POST", body: { email, subscription } });
+export async function assinarPush(subscription: PushSubscriptionInput): Promise<void> {
+  await req("/notificacoes/subscribe", { method: "POST", body: { subscription } });
 }
 
-export async function cancelarPush(email: string, endpoint: string): Promise<void> {
-  await req("/notificacoes/unsubscribe", { method: "POST", body: { email, endpoint } });
+export async function cancelarPush(endpoint: string): Promise<void> {
+  await req("/notificacoes/unsubscribe", { method: "POST", body: { endpoint } });
 }
 
 export function urlBase64ToUint8Array(base64: string): Uint8Array<ArrayBuffer> {

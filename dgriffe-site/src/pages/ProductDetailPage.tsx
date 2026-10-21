@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { buscarProduto } from '../services/api';
 import type { Product } from '../data/types';
-import { formatPrice, formatInstallment, getProductImage } from '../utils/format';
+import { formatPrice, getProductImage } from '../utils/format';
 import LensesModal from '../components/features/LensesModal';
 import MedicaoDnp from '../components/features/MedicaoDnp';
 import { addToCart } from '../services/cart';
@@ -130,11 +130,11 @@ export default function ProductDetailPage() {
             <div className="flex items-center gap-2 mb-2">
               <div className="flex items-center gap-1 bg-green-50 rounded-lg px-2 py-1">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2"><rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" /></svg>
-                <span className="text-[11px] text-green-700 font-bold">{formatPrice(product.pixPrice)} via Pix</span>
+                <span className="text-[11px] text-green-700 font-bold">PIX ou cartão</span>
               </div>
             </div>
             <p className="text-[10px] text-neutral-400">
-              {formatInstallment(product.installmentCount, product.installmentValue)} sem juros
+              Em até {product.installmentCount}x de {formatPrice(product.installmentValue)} — parcelamento sujeito às condições do Mercado Pago.
             </p>
           </div>
 

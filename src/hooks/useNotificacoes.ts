@@ -13,7 +13,7 @@ export function useNotificacoes(email: string | null | undefined) {
       return;
     }
     try {
-      const r = await listarNotificacoes(email);
+      const r = await listarNotificacoes();
       setNotificacoes(r.notificacoes);
       setNaoLidas(r.naoLidas);
     } catch {
@@ -37,7 +37,7 @@ export function useNotificacoes(email: string | null | undefined) {
     async (id: string) => {
       if (!email) return;
       try {
-        await marcarNotificacaoLida(email, id);
+        await marcarNotificacaoLida(id);
         setNotificacoes((prev) => prev.map((n) => (n.id === id ? { ...n, lida: true } : n)));
         setNaoLidas((prev) => Math.max(0, prev - 1));
       } catch {

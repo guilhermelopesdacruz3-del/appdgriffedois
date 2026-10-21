@@ -35,6 +35,21 @@ export function isClienteLogado(): boolean {
   return !!getClienteToken();
 }
 
+// Lê o e-mail do JWT do cliente para pré-preencher o checkout. Não valida a
+// assinatura (quem valida é o servidor); serve só para conveniência da UI.
+export function getClienteEmail(): string | null {
+  const token = getClienteToken();
+  if (!token) return null;
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+    const json = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+    return typeof json?.email === "string" ? json.email : null;
+  } catch {
+    return null;
+  }
+}
+
 export function logoutCliente() {
   localStorage.removeItem(CLIENTE_TOKEN_KEY);
   localStorage.removeItem(CLIENTE_REFRESH_KEY);
