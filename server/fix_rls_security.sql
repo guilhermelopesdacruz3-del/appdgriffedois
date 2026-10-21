@@ -1,3 +1,12 @@
+-- ===========================================================================
+-- ⚠️  DEPRECATED / NÃO EXECUTAR EM PRODUÇÃO (LGPD P0)
+--
+-- Este script cria policies `USING (true)` para o role `authenticated`, o que
+-- permite que QUALQUER usuário logado leia/edite dados de todos os clientes.
+-- Ele foi substituído por:
+--   supabase/migrations/20261021_rls_canonical.sql
+-- Mantido apenas como histórico. Não rode este arquivo.
+-- ===========================================================================
 -- ============================================================
 -- FIX DE SEGURANÇA v5: RLS completo (corrigido)
 -- Execução: Supabase Dashboard → SQL Editor → colar e rodar

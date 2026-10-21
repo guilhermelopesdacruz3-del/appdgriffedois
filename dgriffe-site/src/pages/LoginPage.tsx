@@ -25,6 +25,9 @@ export default function LoginPage() {
       if (res.ok && res.session) {
         setClienteSession(res.session);
         navigate('/checkout');
+      } else if (res.ok && res.mensagem) {
+        // Cadastro criado, mas confirmação de e-mail pendente.
+        setErro(res.mensagem);
       } else {
         setErro('E-mail ou senha inválidos.');
       }

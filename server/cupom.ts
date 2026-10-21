@@ -190,7 +190,7 @@ function app() {
               }
             }
           } catch (e) {
-            console.warn("[cupons] falha ao criar usuario para", email, (e as Error)?.message);
+            console.warn("[cupons] falha ao criar usuário (e-mail omitido):", (e as Error)?.message);
           }
         }
       }

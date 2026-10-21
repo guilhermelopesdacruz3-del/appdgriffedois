@@ -4,7 +4,7 @@ import {
   buscarClientePorId,
   type ClienteApp,
 } from "../services/lojaIntegrada";
-import { clienteApi, type PerfilCliente, type EnderecoCliente } from "../services/cliente";
+import { clienteApi, obterTokenValido, type PerfilCliente, type EnderecoCliente } from "../services/cliente";
 
 interface UseClienteResult {
   cliente: ClienteApp | null;
@@ -241,9 +241,14 @@ export function ClienteProvider({ children }: { children: ReactNode }) {
       if (dados.telefone) body.telefone_celular = dados.telefone;
       if (enderecos.length) body.enderecos = enderecos;
 
-      const res = await fetch(`${PROXY}/api/loja-integrada/cliente/${atual.id}`, {
+      const token = await obterTokenValido();
+      if (!token) throw new Error("Sessão expirada. Faça login novamente.");
+      const res = await fetch(`${PROXY}/api/cliente/loja/${encodeURIComponent(String(atual.id))}`, {
         method: "PUT",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify(body),
       });
       if (!res.ok) throw new Error(`Falha ao atualizar (${res.status})`);

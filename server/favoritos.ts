@@ -1,30 +1,24 @@
 // ---------------------------------------------------------------------------
 // FAVORITOS — CRUD por cliente (user_id do Supabase Auth)
+//
+// SEGURANÇA: identidade derivada do token Bearer validado no Supabase Auth.
+// Não aceitamos e-mail em query string/body (IDOR).
 // ---------------------------------------------------------------------------
 import { Router, type Request, type Response } from "express";
 import { supabaseClient } from "./db";
+import { requireClienteAuth, type ClienteAutenticado } from "./auth";
 
 export const favoritosApp = Router();
 
-async function resolveUserId(email: string): Promise<string | null> {
-  const sb = supabaseClient();
-  if (!sb) return null;
-  try {
-    const list = await sb.auth.admin.listUsers();
-    const u = list.data?.users?.find((x) => x.email === email);
-    return u?.id || null;
-  } catch {
-    return null;
-  }
+favoritosApp.use(requireClienteAuth);
+
+function clienteDe(req: Request): ClienteAutenticado {
+  return (req as any).cliente as ClienteAutenticado;
 }
 
-// GET /api/cliente/favoritos?email=...
+// GET /api/cliente/favoritos
 favoritosApp.get("/", async (req: Request, res: Response) => {
-  const email = String(req.query.email || "").trim().toLowerCase();
-  if (!email) return res.status(400).json({ erro: "E-mail obrigatório." });
-
-  const userId = await resolveUserId(email);
-  if (!userId) return res.json({ ok: true, favoritos: [] });
+  const { userId } = clienteDe(req);
 
   const sb = supabaseClient();
   if (!sb) return res.status(503).json({ erro: "Banco indisponível." });
@@ -45,12 +39,9 @@ favoritosApp.get("/", async (req: Request, res: Response) => {
 
 // POST /api/cliente/favoritos
 favoritosApp.post("/", async (req: Request, res: Response) => {
-  const { email, produto_id, sku, nome, imagem, preco } = req.body || {};
-  const e = String(email || "").trim().toLowerCase();
-  if (!e || !produto_id) return res.status(400).json({ erro: "E-mail e produto obrigatórios." });
-
-  const userId = await resolveUserId(e);
-  if (!userId) return res.status(404).json({ erro: "Cliente não encontrado." });
+  const { userId } = clienteDe(req);
+  const { produto_id, sku, nome, imagem, preco } = req.body || {};
+  if (!produto_id) return res.status(400).json({ erro: "Produto obrigatório." });
 
   const sb = supabaseClient();
   if (!sb) return res.status(503).json({ erro: "Banco indisponível." });
@@ -78,11 +69,7 @@ favoritosApp.post("/", async (req: Request, res: Response) => {
 
 // DELETE /api/cliente/favoritos/:id
 favoritosApp.delete("/:id", async (req: Request, res: Response) => {
-  const email = String(req.query.email || "").trim().toLowerCase();
-  if (!email) return res.status(400).json({ erro: "E-mail obrigatório." });
-
-  const userId = await resolveUserId(email);
-  if (!userId) return res.status(404).json({ erro: "Cliente não encontrado." });
+  const { userId } = clienteDe(req);
 
   const sb = supabaseClient();
   if (!sb) return res.status(503).json({ erro: "Banco indisponível." });

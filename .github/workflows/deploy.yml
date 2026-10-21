@@ -25,7 +25,8 @@ jobs:
   sync-supabase:
     needs: test
     runs-on: ubuntu-latest
-    continue-on-error: true
+    # Sem continue-on-error: se o RLS canônico falhar, o deploy para. É melhor
+    # bloquear do que publicar o backend com o banco em estado permissivo.
     steps:
       - uses: actions/checkout@v4
       - name: Aplicar schema no Supabase
@@ -51,7 +52,17 @@ jobs:
             -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
             -H "Content-Type: application/json" \
             -d "$(jq -n --arg q "$SQL2" '{query:$q}')")
-          echo "Resposta Supabase (fidelidade): $RESP2"
+          echo "Resposta Supabase (fidelidade/DDL): $RESP2"
+          # IMPORTANTE: schema-fidelidade.sql cria policies antigas com USING (true).
+          # A migração canônica roda DEPOIS e remove todas elas, deixando o RLS
+          # apenas com as policies de dono. Sem este passo, cada push reabriria
+          # os dados de todos os clientes para qualquer usuário autenticado.
+          SQL3=$(cat supabase/migrations/20261021_rls_canonical.sql)
+          RESP3=$(curl -fsSL -X POST "https://api.supabase.com/v1/projects/$PROJECT_REF/database/query" \
+            -H "Authorization: Bearer $SUPABASE_ACCESS_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg q "$SQL3" '{query:$q}')")
+          echo "Resposta Supabase (RLS canônico): $RESP3"
 
   # Observação: o projeto CF Pages está conectado ao GitHub (source: github).
   # O Cloudflare faz o deploy automático (build + functions + _routes.json) via webhook

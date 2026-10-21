@@ -1,44 +1,48 @@
-import { getResource, postResource, request } from "./client";
 import { mapClienteParaApp, type ClienteApp } from "./mappers";
 import type { LICliente } from "./types";
+import { obterTokenValido } from "../cliente";
+import { LojaIntegradaError } from "./client";
 
 /**
- * Busca um cliente pelo e-mail usando o endpoint DEDICADO da Loja Integrada
- * (GET /cliente/busca/?email=...). O filtro em GET /cliente/?email= falha e
- * sempre retorna o primeiro cliente — por isso usamos /busca/ (doc oficial).
+ * Dados do cliente na Loja Integrada.
+ *
+ * O proxy público `/api/loja-integrada/cliente` foi removido: ele permitia
+ * consultar/alterar qualquer cliente pelo e-mail. Agora o backend expõe
+ * `/api/cliente/loja`, autenticado, e resolve o e-mail pelo token — o
+ * argumento `email` é mantido apenas por compatibilidade e é ignorado.
  */
-export async function buscarClientePorEmail(email: string): Promise<ClienteApp | null> {
-  const resposta = await request<{ objects: LICliente[] }>("/cliente/search/", {
-    cliente_email: email,
+const BASE =
+  (import.meta.env.VITE_LOJA_INTEGRADA_PROXY_URL as string | undefined)
+    ?.replace(/\/api\/loja-integrada\/?$/, "") || "";
+
+async function clienteFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const token = await obterTokenValido();
+  if (!token) {
+    throw new LojaIntegradaError("Faça login para acessar seus dados.", 401);
+  }
+  const res = await fetch(`${BASE}${path}`, {
+    ...init,
+    headers: {
+      Accept: "application/json",
+      ...(init.body ? { "Content-Type": "application/json" } : {}),
+      ...(init.headers || {}),
+      Authorization: `Bearer ${token}`,
+    },
   });
-  const cliente = resposta.objects?.[0];
-  return cliente ? mapClienteParaApp(cliente) : null;
+  if (!res.ok) {
+    const body = await res.text().catch(() => "");
+    throw new LojaIntegradaError(`API ${res.status}: ${body.slice(0, 200)}`, res.status);
+  }
+  return (await res.json()) as T;
 }
 
-export async function buscarClientePorCpf(cpf: string): Promise<ClienteApp | null> {
-  const cpfLimpo = cpf.replace(/\D/g, "");
-  const resposta = await request<{ objects: LICliente[] }>("/cliente/search/", {
-    cliente_cpf: cpfLimpo,
-  });
+export async function buscarClientePorEmail(_email?: string): Promise<ClienteApp | null> {
+  const resposta = await clienteFetch<{ objects: LICliente[] }>("/api/cliente/loja");
   const cliente = resposta.objects?.[0];
   return cliente ? mapClienteParaApp(cliente) : null;
 }
 
 export async function buscarClientePorId(id: number | string): Promise<ClienteApp> {
-  const cliente = await getResource<LICliente>("cliente", id);
-  return mapClienteParaApp(cliente);
-}
-
-export interface NovoClientePayload {
-  nome: string;
-  email: string;
-  cpf?: string;
-  telefone_celular?: string;
-  tipo?: "PF" | "PJ";
-}
-
-/** Cria um novo cliente na Loja Integrada (ex.: cadastro feito neste site). */
-export async function criarCliente(payload: NovoClientePayload): Promise<ClienteApp> {
-  const cliente = await postResource<LICliente>("cliente", payload);
+  const cliente = await clienteFetch<LICliente>(`/api/cliente/loja/${encodeURIComponent(String(id))}`);
   return mapClienteParaApp(cliente);
 }

@@ -32,14 +32,19 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
     try {
       const r = await registrarComSenha(email.trim().toLowerCase(), senha, nome);
       if (r.ok) {
-        if (r.session) {
-          try {
-            const sess = r.session as any;
-            if (sess?.access_token) {
-              salvarClienteSessao({ access_token: sess.access_token, refresh_token: sess.refresh_token });
-            }
-          } catch { /* ignora */ }
+        // Cadastro com confirmação de e-mail pendente: não há sessão ainda.
+        // Não gravamos cliente local nem fingimos login — orientamos a confirmar.
+        if (!r.session) {
+          setMensagem(r.mensagem || "Conta criada. Confirme seu e-mail para entrar.");
+          setEtapa("login");
+          return;
         }
+        try {
+          const sess = r.session as any;
+          if (sess?.access_token) {
+            salvarClienteSessao({ access_token: sess.access_token, refresh_token: sess.refresh_token });
+          }
+        } catch { /* ignora */ }
         const emailL = email.trim().toLowerCase();
         let cli: any = null;
         try { cli = await buscarClientePorEmail(emailL); } catch { /* ignora */ }
@@ -69,14 +74,16 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
     try {
       const r = await loginComSenha(email.trim().toLowerCase(), senha);
       if (r.ok) {
-        if (r.session) {
-          try {
-            const sess = r.session as any;
-            if (sess?.access_token) {
-              salvarClienteSessao({ access_token: sess.access_token, refresh_token: sess.refresh_token });
-            }
-          } catch { /* ignora */ }
+        if (!r.session) {
+          setErro("Não foi possível iniciar a sessão. Tente novamente.");
+          return;
         }
+        try {
+          const sess = r.session as any;
+          if (sess?.access_token) {
+            salvarClienteSessao({ access_token: sess.access_token, refresh_token: sess.refresh_token });
+          }
+        } catch { /* ignora */ }
         const emailL = email.trim().toLowerCase();
         let cli: any = null;
         try { cli = await buscarClientePorEmail(emailL); } catch { /* ignora */ }

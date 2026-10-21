@@ -29,7 +29,6 @@ dotenv.config({ path: path.resolve(__dirname, ".env") });
 const DIST_DIR = path.resolve(__dirname, "..", "..", "dist");
 import {
   demoResponder,
-  demoCriarCliente,
   demoAdminPedidos,
   demoAdminPedido,
   demoAdminSituacoes,
@@ -44,7 +43,6 @@ import cupomApp from "./cupom.ts";
 import { receitasApp } from "./receitas";
 import { favoritosApp } from "./favoritos";
 import webpush from "web-push";
-import { extrairEmailDoToken } from "./tokenEmail";
 import { log } from "./logger";
 
 const {
@@ -323,6 +321,10 @@ async function chamarLI(method, resource, id, query, body) {
   return { status: upstreamResponse.status, payload };
 }
 
+// Apenas catálogo/logística. Dados de cliente e pedidos NÃO são expostos
+// pelo proxy público: eles contêm CPF, telefone, endereço e histórico de
+// compras. Esses dados só saem por rotas autenticadas (/api/cliente/loja) ou
+// pelo admin (service role).
 const RECURSOS_PERMITIDOS = new Set([
   "produto",
   "produto_preco",
@@ -330,15 +332,15 @@ const RECURSOS_PERMITIDOS = new Set([
   "produto_imagem",
   "categoria",
   "marca",
-  "cliente",
-  "pedido",
   "formapagamento",
   "formaenvio",
   "situacao",
   "grades",
 ]);
 
-const RECURSOS_ESCRITA_PERMITIDOS = new Set(["cliente", "pedido"]);
+// Nenhuma escrita pública via proxy. Cadastro/edição de cliente passa por
+// rotas autenticadas no backend.
+const RECURSOS_ESCRITA_PERMITIDOS = new Set<string>();
 
 const app = express();
 app.use(express.json({ limit: "512kb", verify: (req, _res, buf) => { req.rawBody = buf.toString("utf8"); } }));
@@ -764,7 +766,7 @@ app.put("/api/admin/pedidos/:id", requireAdmin, async (req, res) => {
         liBody.id_externo = atual2.payload.id_externo;
       }
     }
-    console.error(`[admin-put-pedido] id=${req.params.id} body=${JSON.stringify(req.body)} liBody=${JSON.stringify(liBody)}`);
+    console.log(`[admin-put-pedido] id=${req.params.id} campos=${Object.keys(req.body || {}).join(",")} situacao=${String((req.body || {}).situacao ?? "")}`);
     const { status, payload } = await chamarLI("PUT", "pedido", req.params.id, undefined, liBody);
     return res.status(status).json(payload);
   } catch (err) {
@@ -2570,33 +2572,9 @@ app.all("/api/loja-integrada/:resource/:id?", async (req, res) => {
 
   if (DEMO) {
     const query = Object.fromEntries(Object.entries(req.query).map(([k, v]) => [k, String(v)]));
-    if (req.method === "POST" && resource === "cliente") {
-      const r = demoCriarCliente(req.body || {});
-      return res.status(r.status).json(r.body);
-    }
     const r = demoResponder(resource, id, req.method, query);
     if (r) return res.status(r.status).json(r.body);
     return res.status(404).json({ erro: `Recurso "${resource}" não tem dados de demo.` });
-  }
-
-  // Segurança: PUT em cliente só se o email do body for dono do id (impede edição de terceiro).
-  if (req.method === "PUT" && resource === "cliente") {
-    const emailBody = (req.body && (req.body.email || (req.body.cliente && req.body.cliente.email))) || "";
-    if (!emailBody) {
-      return res.status(403).json({ erro: "Informe o email do cliente para confirmar a edição." });
-    }
-    try {
-      const { status, payload } = await chamarLI("GET", "cliente", id, {});
-      const atual = typeof payload === "string" ? JSON.parse(payload || "{}") : payload || {};
-      const obj = Array.isArray(atual.objects) ? atual.objects[0] : atual;
-      const donoEmail = (obj.email || (obj.cliente && obj.cliente.email) || "").toString().trim().toLowerCase();
-      console.error(`[seguranca-put] id=${id} status=${status} dono=${donoEmail} body=${emailBody}`);
-      if (status !== 200 || donoEmail !== emailBody.toString().trim().toLowerCase()) {
-        return res.status(403).json({ erro: "Este cliente não pertence ao e-mail informado." });
-      }
-    } catch {
-      return res.status(502).json({ erro: "Falha ao validar a posse do cliente." });
-    }
   }
 
   try {
@@ -2883,65 +2861,79 @@ app.post("/api/cliente/login-password", async (req, res) => {
     } catch { /* ignora */ }
 
     if (listUser) {
-      // Tenta login com senha direto. Se falhar (usuário sem senha, cadastro via OTP),
-      // define a senha e faz login novamente.
+      // Login ESTRITO: nunca redefine a senha de uma conta existente. O código
+      // antigo fazia fallback de `admin.updateUserById({ password })` após uma
+      // falha de login — qualquer pessoa que soubesse o e-mail tomava a conta.
       const { data, error: loginErr } = await sb.auth.signInWithPassword({ email: e, password: s });
-      if (loginErr) {
-        try {
-          const { error: updErr } = await sb.auth.admin.updateUserById(listUser, { password: s });
-          if (updErr) throw updErr;
-          const { data: data2, error: loginErr2 } = await sb.auth.signInWithPassword({ email: e, password: s });
-          if (loginErr2) throw loginErr2;
-          registrarTentativaSucesso(ip);
-          try { await sb.from("profiles").upsert({ id: data2.user!.id, email: e, nome: (nome || null), updated_at: new Date().toISOString() }, { onConflict: "id" }); } catch (pErr) {
-            console.warn("[login-password] falha ao salvar perfil (ignorado):", (pErr as Error)?.message);
-          }
-          // Sincroniza com a Loja Integrada (se houver credenciais configuradas).
-          try {
-            const { LI_APP_KEY, LI_API_KEY } = await getSecretsLI();
-            if (LI_APP_KEY && LI_API_KEY) await criarClienteLI(e, { nome, telefone, cpf });
-          } catch (liErr) {
-            console.warn("[login-password] falha ao sincronizar com Loja Integrada (ignorado):", (liErr as Error)?.message);
-          }
-          return res.json({ ok: true, session: data2.session, user: data2.user, mensagem: "Senha definida e login OK." });
-        } catch (fallbackErr) {
-          console.error("[login-password] fallback senha falhou:", (fallbackErr as Error)?.message);
-          return res.status(401).json({ erro: "Senha incorreta." });
+      if (loginErr || !data?.session || !data.user) {
+        registrarTentativaFalha(ip);
+        if (loginErr && /email not confirmed|not confirmed/i.test(loginErr.message)) {
+          return res.status(403).json({ erro: "Confirme seu e-mail antes de entrar." });
         }
+        return res.status(401).json({ erro: "E-mail ou senha inválidos." });
       }
       registrarTentativaSucesso(ip);
-      try { await sb.from("profiles").upsert({ id: data.user!.id, email: e, nome: (nome || null), updated_at: new Date().toISOString() }, { onConflict: "id" }); } catch (pErr) {
-        console.warn("[login-password] falha ao salvar perfil (ignorado):", (pErr as Error)?.message);
-      }
-      // Sincroniza com a Loja Integrada (se houver credenciais configuradas).
       try {
-        const { LI_APP_KEY, LI_API_KEY } = await getSecretsLI();
-        if (LI_APP_KEY && LI_API_KEY) await criarClienteLI(e, { nome, telefone, cpf });
-      } catch (liErr) {
-        console.warn("[login-password] falha ao sincronizar com Loja Integrada (ignorado):", (liErr as Error)?.message);
+        const perfil: any = { id: data.user.id, email: e, updated_at: new Date().toISOString() };
+        if (nome) perfil.nome = nome;
+        await sb.from("profiles").upsert(perfil, { onConflict: "id" });
+      } catch (pErr) {
+        console.warn("[login-password] falha ao salvar perfil (ignorado):", (pErr as Error)?.message);
       }
       return res.json({ ok: true, session: data.session, user: data.user, mensagem: "Login OK" });
     }
 
-    // Cria o usuário com senha (bypassa confirmação de e-mail).
-    const { data, error } = await sb.auth.admin.createUser({
+    // Cadastro: usa o fluxo do Supabase Auth (envia confirmação de e-mail quando
+    // habilitado no projeto). NÃO usamos `admin.createUser({ email_confirm: true })`
+    // — isso permitia que alguém registrasse o e-mail de outra pessoa e depois
+    // mantivesse uma senha conhecida nessa conta (account squatting).
+    // Se o cadastro veio de uma origem permitida (app ou site), o link de
+    // confirmação volta para /auth/callback dessa origem. Sem origem válida,
+    // usa o Site URL configurado no Supabase.
+    const origem = String(req.headers.origin || "").trim();
+    const redirectPermitido =
+      !corsWildcard && Array.isArray(originsPermitidas) && origem && originsPermitidas.includes(origem)
+        ? `${origem}/auth/callback`
+        : undefined;
+    const { data, error } = await sb.auth.signUp({
       email: e,
       password: s,
-      email_confirm: true,
-      user_metadata: { nome: nome || "", telefone: "" },
+      options: {
+        data: { nome: nome || "", telefone: telefone || "" },
+        ...(redirectPermitido ? { emailRedirectTo: redirectPermitido } : {}),
+      },
     });
     if (error) {
-      console.error("[register-password] createUser erro:", error.message);
-      // Não vaza detalhes do Supabase; tenta fallback de login caso já exista.
-      if (/already/i.test(error.message)) {
+      console.error("[register-password] signUp erro:", error.message);
+      if (/already|registered|exists/i.test(error.message)) {
         return res.status(409).json({ erro: "Já existe uma conta com este e-mail. Faça login." });
       }
       return res.status(400).json({ erro: "Não foi possível criar a conta." });
     }
+    if (!data.user) {
+      return res.status(400).json({ erro: "Não foi possível criar a conta." });
+    }
+    // Supabase devolve um usuário "obfuscado" (sem identities) quando o e-mail
+    // já existe e a confirmação está habilitada.
+    if (Array.isArray((data.user as any).identities) && (data.user as any).identities.length === 0) {
+      return res.status(409).json({ erro: "Já existe uma conta com este e-mail. Faça login." });
+    }
     registrarTentativaSucesso(ip);
-    // Garante perfil na tabela profiles.
+
+    // Sem sessão = confirmação de e-mail pendente. Não gravamos PII (perfil/LI)
+    // antes da confirmação; o usuário confirma pelo link e depois entra.
+    if (!data.session) {
+      return res.status(201).json({
+        ok: true,
+        user: data.user,
+        mensagem: "Conta criada. Confirme seu e-mail para entrar.",
+      });
+    }
+
+    // Confirmação desabilitada no projeto (ou já confirmado): sessão imediata.
     try {
-      const perfil: any = { id: data.user!.id, email: e, nome: (nome || null), updated_at: new Date().toISOString() };
+      const perfil: any = { id: data.user.id, email: e, updated_at: new Date().toISOString() };
+      if (nome) perfil.nome = nome;
       if (telefone) perfil.telefone = telefone;
       if (cpf) perfil.cpf = cpf;
       await sb.from("profiles").upsert(perfil, { onConflict: "id" });
@@ -2955,14 +2947,7 @@ app.post("/api/cliente/login-password", async (req, res) => {
     } catch (liErr) {
       console.warn("[register-password] falha ao sincronizar com Loja Integrada (ignorado):", (liErr as Error)?.message);
     }
-    // Faz login para obter a sessão.
-    const { data: loginData, error: loginErr } = await sb.auth.signInWithPassword({ email: e, password: s });
-    if (loginErr) {
-      // Se o login falhar (raro), retorna ok mas sem sessão — o cliente tenta de novo.
-      console.warn("[register-password] signInWithPassword falhou:", loginErr.message);
-      return res.json({ ok: true, user: data.user, mensagem: "Conta criada. Faça login." });
-    }
-    return res.json({ ok: true, session: loginData.session, user: loginData.user, mensagem: "Conta criada com sucesso." });
+    return res.json({ ok: true, session: data.session, user: data.user, mensagem: "Conta criada com sucesso." });
   } catch (err) {
     console.error("[register-password] erro:", err);
     return res.status(500).json({ erro: "Falha ao criar conta." });
@@ -3141,30 +3126,129 @@ app.post("/api/cliente/excluir-confirmar", async (req, res) => {
 // forjado com qualquer email bastava para acessar os dados daquele cliente.
 // Agora confirmamos com `sb.auth.getUser(token)` antes de liberar a rota.
 async function requireCliente(req: express.Request, res: express.Response): Promise<string | null> {
-  const auth = (req.headers.authorization || "").replace("Bearer ", "").trim();
+  const auth = (req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
   if (!auth) {
     res.status(401).json({ erro: "Não autorizado." });
     return null;
   }
+  // Fail-closed: sem Supabase não há como validar assinatura/expiração. O
+  // fallback antigo só decodificava o JWT e aceitava token FORJADO.
   const sb = supabaseClient();
-  if (sb) {
-    // Caminho seguro: valida assinatura/expiração no Supabase.
-    const { data: { user }, error } = await sb.auth.getUser(auth);
-    const email = (user?.email || "").trim().toLowerCase();
-    if (error || !user || !/@/.test(email)) {
-      res.status(401).json({ erro: "Sessão inválida." });
-      return null;
-    }
-    return email;
+  if (!sb) {
+    res.status(503).json({ erro: "Autenticação indisponível." });
+    return null;
   }
-  // Fallback apenas se Supabase NÃO estiver configurado (deploy sem auth).
-  const email = extrairEmailDoToken(auth);
-  if (!email) {
-    res.status(401).json({ erro: "Não autorizado." });
+  const { data: { user }, error } = await sb.auth.getUser(auth);
+  const email = (user?.email || "").trim().toLowerCase();
+  if (error || !user || !/@/.test(email)) {
+    res.status(401).json({ erro: "Sessão inválida." });
     return null;
   }
   return email;
 }
+
+// ---------------------------------------------------------------------------
+// Dados do cliente na Loja Integrada — rotas autenticadas que substituem o
+// antigo proxy público `/api/loja-integrada/cliente` (que vazava CPF,
+// telefone, endereço e permitia editar qualquer cadastro pelo e-mail).
+// A identidade vem SEMPRE do token validado; o e-mail do body é ignorado.
+// ---------------------------------------------------------------------------
+function idClienteLI(valor: unknown): string | null {
+  const s = String(valor ?? "").trim();
+  return /^\d+$/.test(s) ? s : null;
+}
+
+function objetoClienteLI(payload: unknown): any | null {
+  if (!payload) return null;
+  const obj = Array.isArray((payload as any).objects) ? (payload as any).objects[0] : payload;
+  return obj && typeof obj === "object" ? obj : null;
+}
+
+function emailDoObjetoCliente(obj: any): string {
+  return String(obj?.email || obj?.cliente?.email || "").trim().toLowerCase();
+}
+
+// GET /api/cliente/loja — cliente da LI correspondente ao e-mail do token.
+app.get("/api/cliente/loja", async (req, res) => {
+  const email = await requireCliente(req, res);
+  if (!email) return;
+
+  try {
+    const { status, payload } = await chamarLI("GET", "cliente", "search", { cliente_email: email });
+    if (status !== 200) {
+      return res.status(502).json({ erro: "Falha ao consultar a Loja Integrada." });
+    }
+    const objects = Array.isArray((payload as any)?.objects) ? (payload as any).objects : [];
+    // Defesa extra: mesmo que a LI devolva mais de um registro, só expomos o
+    // cliente cujo e-mail coincide com o do token.
+    const meus = objects.filter((c: any) => emailDoObjetoCliente(c) === email);
+    return res.json({ objects: meus });
+  } catch (err) {
+    console.error("[cliente-loja] erro ao buscar cliente:", (err as Error)?.message);
+    return res.status(502).json({ erro: "Falha ao consultar a Loja Integrada." });
+  }
+});
+
+// GET /api/cliente/loja/:id — só devolve se o cliente pertence ao token.
+app.get("/api/cliente/loja/:id", async (req, res) => {
+  const email = await requireCliente(req, res);
+  if (!email) return;
+  const id = idClienteLI(req.params.id);
+  if (!id) return res.status(400).json({ erro: "ID inválido." });
+
+  try {
+    const { status, payload } = await chamarLI("GET", "cliente", id, {});
+    const obj = objetoClienteLI(payload);
+    if (status !== 200 || !obj || emailDoObjetoCliente(obj) !== email) {
+      return res.status(404).json({ erro: "Cliente não encontrado." });
+    }
+    return res.json(obj);
+  } catch (err) {
+    console.error("[cliente-loja] erro ao buscar cliente:", (err as Error)?.message);
+    return res.status(502).json({ erro: "Falha ao consultar a Loja Integrada." });
+  }
+});
+
+// PUT /api/cliente/loja/:id — atualiza apenas o próprio cadastro e apenas
+// campos permitidos (não deixa trocar e-mail/CPF nem editar terceiros).
+app.put("/api/cliente/loja/:id", async (req, res) => {
+  const email = await requireCliente(req, res);
+  if (!email) return;
+  const id = idClienteLI(req.params.id);
+  if (!id) return res.status(400).json({ erro: "ID inválido." });
+
+  try {
+    const atual = await chamarLI("GET", "cliente", id, {});
+    const obj = objetoClienteLI(atual.payload);
+    if (atual.status !== 200 || !obj || emailDoObjetoCliente(obj) !== email) {
+      return res.status(404).json({ erro: "Cliente não encontrado." });
+    }
+
+    const body = req.body && typeof req.body === "object" ? req.body : {};
+    const permitido: any = { email };
+    for (const campo of ["nome", "telefone_celular", "telefone_principal", "enderecos"]) {
+      if (body[campo] !== undefined) permitido[campo] = body[campo];
+    }
+    if (permitido.nome !== undefined && (typeof permitido.nome !== "string" || permitido.nome.length > 120)) {
+      return res.status(400).json({ erro: "Nome inválido." });
+    }
+    if (permitido.enderecos !== undefined && (!Array.isArray(permitido.enderecos) || permitido.enderecos.length > 20)) {
+      return res.status(400).json({ erro: "Endereços inválidos." });
+    }
+    if (Object.keys(permitido).length <= 1) {
+      return res.status(400).json({ erro: "Nenhum campo para atualizar." });
+    }
+
+    const { status, payload } = await chamarLI("PUT", "cliente", id, {}, permitido);
+    if (status >= 400) {
+      return res.status(502).json({ erro: "A Loja Integrada recusou a atualização." });
+    }
+    return res.status(status).json(payload);
+  } catch (err) {
+    console.error("[cliente-loja] erro ao atualizar cliente:", (err as Error)?.message);
+    return res.status(502).json({ erro: "Falha ao atualizar o cadastro." });
+  }
+});
 
 // C2 — buscar/salvar perfil (nome/telefone)
 app.get("/api/cliente/perfil", async (req, res) => {

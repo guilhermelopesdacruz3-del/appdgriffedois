@@ -1,31 +1,26 @@
 // ---------------------------------------------------------------------------
 // RECEITAS SALVAS — CRUD por cliente (user_id do Supabase Auth)
+//
+// SEGURANÇA: a identidade do titular vem exclusivamente do token Bearer,
+// validado pelo Supabase Auth. Não aceitamos mais `?email=` nem `email` no
+// body — isso permitia que qualquer pessoa lesse/alterasse receitas alheias
+// (dado pessoal sensível de saúde).
 // ---------------------------------------------------------------------------
 import { Router, type Request, type Response } from "express";
 import { supabaseClient } from "./db";
+import { requireClienteAuth, type ClienteAutenticado } from "./auth";
 
 export const receitasApp = Router();
 
-// Resolve user_id a partir do e-mail (igual fluxo de cadastro).
-async function resolveUserId(email: string): Promise<string | null> {
-  const sb = supabaseClient();
-  if (!sb) return null;
-  try {
-    const list = await sb.auth.admin.listUsers();
-    const u = list.data?.users?.find((x) => x.email === email);
-    return u?.id || null;
-  } catch {
-    return null;
-  }
+receitasApp.use(requireClienteAuth);
+
+function clienteDe(req: Request): ClienteAutenticado {
+  return (req as any).cliente as ClienteAutenticado;
 }
 
-// GET /api/cliente/receitas?email=...
+// GET /api/cliente/receitas
 receitasApp.get("/", async (req, res) => {
-  const email = String(req.query.email || "").trim().toLowerCase();
-  if (!email) return res.status(400).json({ erro: "E-mail obrigatório." });
-
-  const userId = await resolveUserId(email);
-  if (!userId) return res.json({ ok: true, receitas: [] });
+  const { userId } = clienteDe(req);
 
   const sb = supabaseClient();
   if (!sb) return res.status(503).json({ erro: "Banco indisponível." });
@@ -46,21 +41,40 @@ receitasApp.get("/", async (req, res) => {
 
 // POST /api/cliente/receitas
 receitasApp.post("/", async (req, res) => {
-  const { email, tipo, descricao, arquivo_url, nome, medico, data_receita, esf_od_longe, cil_od_longe, eixo_od_longe, esf_oe_longe, cil_oe_longe, eixo_oe_longe, esf_od_perto, cil_od_perto, eixo_od_perto, esf_oe_perto, cil_oe_perto, eixo_oe_perto, dip } = req.body || {};
-  const e = String(email || "").trim().toLowerCase();
-  if (!e) return res.status(400).json({ erro: "E-mail obrigatório." });
+  const { email, userId } = clienteDe(req);
+  const { tipo, descricao, arquivo_url, nome, medico, data_receita, esf_od_longe, cil_od_longe, eixo_od_longe, esf_oe_longe, cil_oe_longe, eixo_oe_longe, esf_od_perto, cil_od_perto, eixo_od_perto, esf_oe_perto, cil_oe_perto, eixo_oe_perto, dip } = req.body || {};
+
   const desc = String(descricao || "").trim();
   if (!desc) return res.status(400).json({ erro: "Descrição obrigatória." });
-
-  const userId = await resolveUserId(e);
-  if (!userId) return res.status(404).json({ erro: "Cliente não encontrado." });
 
   const sb = supabaseClient();
   if (!sb) return res.status(503).json({ erro: "Banco indisponível." });
 
   const { data, error } = await sb
     .from("receitas")
-    .insert({ user_id: userId, email: e, tipo: tipo || "grau", descricao: desc, arquivo_url: arquivo_url || null, nome, medico, data_receita, esf_od_longe, cil_od_longe, eixo_od_longe, esf_oe_longe, cil_oe_longe, eixo_oe_longe, esf_od_perto, cil_od_perto, eixo_od_perto, esf_oe_perto, cil_oe_perto, eixo_oe_perto, dip })
+    .insert({
+      user_id: userId,
+      email,
+      tipo: tipo || "grau",
+      descricao: desc,
+      arquivo_url: arquivo_url || null,
+      nome,
+      medico,
+      data_receita,
+      esf_od_longe,
+      cil_od_longe,
+      eixo_od_longe,
+      esf_oe_longe,
+      cil_oe_longe,
+      eixo_oe_longe,
+      esf_od_perto,
+      cil_od_perto,
+      eixo_od_perto,
+      esf_oe_perto,
+      cil_oe_perto,
+      eixo_oe_perto,
+      dip,
+    })
     .select("*")
     .single();
 
@@ -74,12 +88,8 @@ receitasApp.post("/", async (req, res) => {
 
 // PUT /api/cliente/receitas/:id
 receitasApp.put("/:id", async (req, res) => {
-  const { email, tipo, descricao, arquivo_url, nome, medico, data_receita, esf_od_longe, cil_od_longe, eixo_od_longe, esf_oe_longe, cil_oe_longe, eixo_oe_longe, esf_od_perto, cil_od_perto, eixo_od_perto, esf_oe_perto, cil_oe_perto, eixo_oe_perto, dip } = req.body || {};
-  const e = String(email || "").trim().toLowerCase();
-  if (!e) return res.status(400).json({ erro: "E-mail obrigatório." });
-
-  const userId = await resolveUserId(e);
-  if (!userId) return res.status(404).json({ erro: "Cliente não encontrado." });
+  const { userId } = clienteDe(req);
+  const { tipo, descricao, arquivo_url, nome, medico, data_receita, esf_od_longe, cil_od_longe, eixo_od_longe, esf_oe_longe, cil_oe_longe, eixo_oe_longe, esf_od_perto, cil_od_perto, eixo_od_perto, esf_oe_perto, cil_oe_perto, eixo_oe_perto, dip } = req.body || {};
 
   const sb = supabaseClient();
   if (!sb) return res.status(503).json({ erro: "Banco indisponível." });
@@ -105,6 +115,10 @@ receitasApp.put("/:id", async (req, res) => {
   if (eixo_oe_perto !== undefined) updates.eixo_oe_perto = eixo_oe_perto;
   if (dip !== undefined) updates.dip = dip;
 
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ erro: "Nenhum campo para atualizar." });
+  }
+
   const { data, error } = await sb
     .from("receitas")
     .update(updates)
@@ -123,16 +137,7 @@ receitasApp.put("/:id", async (req, res) => {
 
 // DELETE /api/cliente/receitas/:id
 receitasApp.delete("/:id", async (req: Request, res: Response) => {
-  const email = String(req.query.email || "").trim().toLowerCase();
-  if (!email) return res.status(400).json({ erro: "E-mail obrigatório." });
-
-  const isDemo = process.env.DEMO_MODE === "true" || process.env.DEMO_MODE === "1" || process.env.ADMIN_MOCK === "1" || process.env.ADMIN_MOCK === "true";
-  if (isDemo) {
-    return res.json({ ok: true });
-  }
-
-  const userId = await resolveUserId(email);
-  if (!userId) return res.status(404).json({ erro: "Cliente não encontrado." });
+  const { userId } = clienteDe(req);
 
   const sb = supabaseClient();
   if (!sb) return res.status(503).json({ erro: "Banco indisponível." });

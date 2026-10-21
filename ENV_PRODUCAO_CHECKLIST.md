@@ -24,6 +24,12 @@ VITE_SUPABASE_ANON=sb_publishable_olC8FxBz8o2jlTNgQmT9vw_Q_UhfDOY
 VITE_SUPABASE_FUNCTIONS=https://unpbvztvscuisqnzofqp.supabase.co/functions/v1
 VITE_LOJA_INTEGRADA_PROXY_URL=https://appdgriffedois.onrender.com/api/loja-integrada
 
+# ---- Supabase Edge Function (opcional: li-proxy) ----
+# A função li-proxy agora é fechada por padrão. Se NÃO for usada, não configure
+# nada e deixe-a desativada (responde 503). Se for usada, defina:
+# LI_PROXY_TOKEN=<segredo-forte>      # enviado no header x-li-proxy-token
+# LI_PROXY_ORIGIN=https://SEU-SITE.netlify.app  # CORS restrito (opcional)
+
 # ---- Mercado Pago ----
 # Vão pelo PAINEL ADMIN do app (aba APIs) -> gravados no Supabase (store_config):
 #   MP_ACCESS_TOKEN   (produção, após aprovação de conta com CNPJ)

@@ -1,4 +1,12 @@
 -- ===========================================================================
+-- ⚠️  DEPRECATED / NÃO EXECUTAR EM PRODUÇÃO (LGPD P0)
+--
+-- As policies abaixo usam `USING (true)` para `authenticated`, permitindo que
+-- qualquer usuário logado leia/edite dados de família, endereços e fidelidade
+-- de terceiros. Use somente:
+--   supabase/migrations/20261021_rls_canonical.sql
+-- ===========================================================================
+-- ===========================================================================
 -- MIGRAÇÃO: Família + Indicação + coluna credito_rs
 -- Roda UMA VEZ no Supabase SQL Editor (idempotente).
 -- ===========================================================================

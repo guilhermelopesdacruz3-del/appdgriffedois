@@ -1,13 +1,36 @@
 // Supabase Edge Function: li-proxy
-// Substitui o servidor Express local. Faz proxy da API da Loja Integrada
-// lendo as chaves de store_config (ou Secrets). Mantém modo DEMO se vazio.
+// ATENÇÃO (LGPD P0): esta função usa a service_role e, se pública, vira um
+// proxy aberto para CPF/telefone/endereço/pedidos de qualquer cliente.
+//
+// Agora ela é "fechada por padrão":
+//   * exige o segredo LI_PROXY_TOKEN no header `x-li-proxy-token`;
+//   * sem esse secret configurado, a função responde 503 (desativada);
+//   * só permite recursos de catálogo (nunca cliente/pedido);
+//   * só aceita GET e, se LI_PROXY_ORIGIN for definido, restringe o CORS.
+//
 // Deploy: supabase functions deploy li-proxy --project-ref unpbvztvscuisqnzofqp
+// Secret: supabase secrets set LI_PROXY_TOKEN=<valor-forte>
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const LI_API_BASE = "https://api.awsli.com.br/api/v1";
+
+const LI_PROXY_TOKEN = Deno.env.get("LI_PROXY_TOKEN") ?? "";
+const LI_PROXY_ORIGIN = Deno.env.get("LI_PROXY_ORIGIN") ?? "";
+const RECURSOS_PERMITIDOS = new Set([
+  "produto",
+  "produto_preco",
+  "produto_estoque",
+  "produto_imagem",
+  "categoria",
+  "marca",
+  "grades",
+  "formapagamento",
+  "formaenvio",
+  "situacao",
+]);
 
 const demoData = {
   categoria: [
@@ -93,16 +116,45 @@ async function getConfig(): Promise<{ appKey: string; apiKey: string }> {
 async function chamarLI(method: string, resource: string, id: string | null, query: Record<string, string>, appKey: string, apiKey: string) {
   const url = new URL(`${LI_API_BASE}/${resource}/${id ? `${id}/` : ""}`);
   Object.entries(query).forEach(([k, v]) => { if (v) url.searchParams.set(k, v); });
-  url.searchParams.set("chave_aplicacao", appKey);
-  url.searchParams.set("chave_api", apiKey);
   url.searchParams.set("format", "json");
-  const r = await fetch(url.toString(), { method, signal: AbortSignal.timeout(15000) });
+  // Credenciais em header (não na query string, que vaza em logs/proxies).
+  const r = await fetch(url.toString(), {
+    method,
+    headers: {
+      Accept: "application/json",
+      Authorization: `chave_api ${apiKey} aplicacao ${appKey}`,
+    },
+    signal: AbortSignal.timeout(15000),
+  });
   const ct = r.headers.get("content-type") || "";
   const payload = ct.includes("application/json") ? await r.json() : await r.text();
   return { status: r.status, payload };
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders: Record<string, string> = LI_PROXY_ORIGIN
+    ? {
+        "Access-Control-Allow-Origin": LI_PROXY_ORIGIN,
+        "Access-Control-Allow-Headers": "content-type, x-li-proxy-token",
+        "Access-Control-Allow-Methods": "GET, OPTIONS",
+        Vary: "Origin",
+      }
+    : {};
+  const responder = (status: number, body: unknown) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders, "content-type": "application/json" },
+    });
+
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: corsHeaders });
+  }
+  // Fechada por padrão: sem secret configurado, ninguém usa a função.
+  if (!LI_PROXY_TOKEN) return responder(503, { erro: "Função desativada." });
+  if ((req.headers.get("x-li-proxy-token") || "") !== LI_PROXY_TOKEN) {
+    return responder(401, { erro: "Não autorizado." });
+  }
+
   const url = new URL(req.url);
   const parts = url.pathname.replace(/^\/|\/$/g, "").split("/"); // api/loja-integrada/<resource>/<id>
   const resource = parts[2];
@@ -110,15 +162,22 @@ Deno.serve(async (req) => {
   const method = req.method;
   const query = Object.fromEntries(url.searchParams.entries());
 
+  if (method !== "GET") return responder(405, { erro: "Método não suportado." });
+  if (!RECURSOS_PERMITIDOS.has(resource)) {
+    return responder(404, { erro: "Recurso não exposto por este proxy." });
+  }
+  if (id && !/^\d+$/.test(id)) return responder(400, { erro: "ID inválido." });
+
   const { appKey, apiKey } = await getConfig();
   if (!appKey || !apiKey) {
     const r = demoResponder(resource, id, method, url.searchParams);
-    return new Response(JSON.stringify(r.body), { status: r.status, headers: { "content-type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    return responder(r.status, r.body);
   }
   try {
     const { status, payload } = await chamarLI(method, resource, id, query, appKey, apiKey);
-    return new Response(typeof payload === "string" ? payload : JSON.stringify(payload), { status, headers: { "content-type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    return responder(status, payload);
   } catch (e) {
-    return new Response(JSON.stringify({ erro: "Falha ao chamar Loja Integrada" }), { status: 502, headers: { "content-type": "application/json", "Access-Control-Allow-Origin": "*" } });
+    console.error("[li-proxy] falha:", (e as Error)?.message);
+    return responder(502, { erro: "Falha ao chamar Loja Integrada" });
   }
 });

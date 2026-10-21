@@ -1,3 +1,6 @@
+-- ⚠️  DEPRECATED / NÃO EXECUTAR (LGPD P0)
+-- Script antigo, com referências a colunas que podem não existir. Use:
+--   supabase/migrations/20261021_rls_canonical.sql
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS "svc_all_profiles" ON public.profiles;
 DROP POLICY IF EXISTS "owner_profiles" ON public.profiles;

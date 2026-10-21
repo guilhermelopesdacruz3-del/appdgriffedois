@@ -1,4 +1,12 @@
 -- ===========================================================================
+-- ⚠️  LEGACY / DDL APENAS (LGPD P0)
+-- Este arquivo é mantido porque o workflow de deploy o usa para criar as
+-- tabelas de fidelidade. As policies seguras ficam em:
+--   supabase/migrations/20261021_rls_canonical.sql
+-- O workflow aplica a migração canônica DEPOIS deste arquivo. Não use este
+-- script sozinho para configurar RLS.
+-- ===========================================================================
+-- ===========================================================================
 -- Fidelidade D'Griffe (pontos por compra)
 -- Aplica após o schema-segredos.sql. Idempotente.
 -- Regra padrão: 1 ponto por real gasto; 100 pontos = R$ 10 de desconto.
@@ -32,15 +40,19 @@ on conflict (key) do nothing;
 alter table public.fidelidade enable row level security;
 alter table public.fidelidade_historico enable row level security;
 
+-- Policies antigas `USING (true)` removidas: qualquer usuário autenticado
+-- conseguia ler/editar os pontos de todos os clientes. O acesso do cliente é
+-- somente leitura dos próprios pontos, pelo e-mail do JWT.
 drop policy if exists "svc_all_fidelidade" on public.fidelidade;
-create policy "svc_all_fidelidade"
-  on public.fidelidade for all to authenticated
-  using (true) with check (true);
-
 drop policy if exists "svc_all_fidelidade_hist" on public.fidelidade_historico;
-create policy "svc_all_fidelidade_hist"
-  on public.fidelidade_historico for all to authenticated
-  using (true) with check (true);
 
-grant select, insert, update, delete on public.fidelidade to authenticated;
-grant select, insert on public.fidelidade_historico to authenticated;
+grant select on public.fidelidade to authenticated;
+grant select on public.fidelidade_historico to authenticated;
+
+create policy "fidelidade_select_own"
+  on public.fidelidade for select to authenticated
+  using (lower(email) = lower(auth.jwt() ->> 'email'));
+
+create policy "fidelidade_historico_select_own"
+  on public.fidelidade_historico for select to authenticated
+  using (lower(email) = lower(auth.jwt() ->> 'email'));

@@ -183,6 +183,6 @@ async function aplicarAprovacao(paymentId: string, payment: any, liPedidoFallbac
     console.warn("[webhook-mp] falha ao atualizar pedido LI:", e?.message || e);
   }
 
-  console.log(`[webhook-mp] pagamento ${paymentId} APROVADO email=${email} valor=${valor} pontos=${pontos}`);
+  console.log(`[webhook-mp] pagamento ${paymentId} APROVADO valor=${valor} pontos=${pontos}`);
   return { status: "ok", pontos };
 }

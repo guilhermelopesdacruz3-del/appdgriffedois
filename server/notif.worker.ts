@@ -13,9 +13,9 @@ const connection = new IORedis(redisUrl, { maxRetriesPerRequest: null, enableRea
 const worker = new Worker<NotificacaoPayload>(
   "notificacoes",
   async (job) => {
-    const { titulo, corpo, tipo, email } = job.data;
+    const { titulo } = job.data;
     // Backend já salva a notificação no banco; aqui podemos colocar passo extra de entrega externa depois.
-    console.log(`[notif-worker] enviado para ${email}: ${titulo}`);
+    console.log(`[notif-worker] notificação processada (destinatário omitido): ${titulo}`);
     return { ok: true };
   },
   { connection, concurrency: 10 }

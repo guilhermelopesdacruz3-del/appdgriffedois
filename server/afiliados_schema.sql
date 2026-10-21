@@ -1,3 +1,9 @@
+-- ⚠️  DEPRECATED / NÃO EXECUTAR EM PRODUÇÃO (LGPD P0)
+-- As policies abaixo permitem INSERT anônimo e SELECT de todos os afiliados
+-- (nome, e-mail, telefone) por qualquer usuário autenticado. Use:
+--   supabase/migrations/20261021_rls_canonical.sql
+-- A criação de afiliado deve passar pelo backend (service_role).
+
 -- Tabela de afiliados do site D'Griffe
 CREATE TABLE IF NOT EXISTS public.afiliados (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),

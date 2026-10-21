@@ -60,7 +60,7 @@ async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
 export async function loginCliente(data: {
   email: string;
   senha: string;
-}): Promise<{ ok: boolean; session: Session; user: Cliente }> {
+}): Promise<{ ok: boolean; session: Session; user: Cliente; mensagem?: string }> {
   return api('/api/cliente/login-password', {
     method: 'POST',
     body: JSON.stringify(data),
