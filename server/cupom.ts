@@ -65,6 +65,141 @@ export interface CupomValidacao {
   atribuicao_id?: string;
 }
 
+// Cupom já validado no servidor, com o desconto calculado a partir do banco.
+// O checkout NUNCA usa `tipo`/`valor` enviados pelo front.
+export interface CupomCheckout {
+  id: string;
+  codigo: string;
+  tipo: "percentual" | "fixo";
+  valor: number;
+  desconto: number;
+}
+
+function erroCheckout(mensagem: string): Error {
+  return Object.assign(new Error(mensagem), { status: 400 });
+}
+
+async function perfilPorEmail(sb: any, email: string): Promise<{ id: string } | null> {
+  const { data } = await sb.from("profiles").select("id").eq("email", email).limit(1).maybeSingle();
+  return data?.id ? { id: data.id } : null;
+}
+
+// Valida um cupom para o checkout e devolve o desconto calculado no servidor.
+// Regras: ativo, dentro da vigência, dentro do limite de usos, valor mínimo e,
+// se o cupom foi atribuído a usuários específicos, exige login e atribuição
+// não utilizada. Lança erro com status 400 quando inválido.
+export async function validarCupomCheckout(
+  codigo: string | undefined,
+  email: string | undefined,
+  subtotal: number
+): Promise<CupomCheckout> {
+  const code = String(codigo || "").trim().toUpperCase();
+  if (!code) throw erroCheckout("Cupom inválido.");
+  const sb = supabaseClient();
+  if (!sb) throw erroCheckout("Não foi possível validar o cupom agora.");
+
+  const { data, error } = await sb
+    .from("cupons")
+    .select("*")
+    .eq("codigo", code)
+    .eq("ativo", true)
+    .maybeSingle();
+  if (error) throw erroCheckout("Não foi possível validar o cupom agora.");
+  if (!data) throw erroCheckout("Cupom não encontrado.");
+
+  const agora = Date.now();
+  if (data.data_inicio && new Date(data.data_inicio).getTime() > agora) {
+    throw erroCheckout("Cupom ainda não está válido.");
+  }
+  if (data.data_fim && new Date(data.data_fim).getTime() < agora) {
+    throw erroCheckout("Cupom expirado.");
+  }
+  if (data.max_usos != null && Number(data.usos || 0) >= Number(data.max_usos)) {
+    throw erroCheckout("Cupom esgotado.");
+  }
+  if (data.valor_minimo != null && Number(subtotal) < Number(data.valor_minimo)) {
+    throw erroCheckout(`Este cupom exige compra mínima de R$ ${Number(data.valor_minimo).toFixed(2)}.`);
+  }
+
+  // Cupom atribuído a destinatários específicos? Só o dono pode usar.
+  const { count } = await sb
+    .from("cupons_usuarios")
+    .select("id", { count: "exact", head: true })
+    .eq("cupom_id", data.id);
+  if ((count || 0) > 0) {
+    const e = String(email || "").trim().toLowerCase();
+    if (!e) throw erroCheckout("Faça login para usar este cupom.");
+    const perfil = await perfilPorEmail(sb, e);
+    if (!perfil) throw erroCheckout("Cupom não atribuído a você.");
+    const { data: attr } = await sb
+      .from("cupons_usuarios")
+      .select("id,usado")
+      .eq("cupom_id", data.id)
+      .eq("user_id", perfil.id)
+      .maybeSingle();
+    if (!attr) throw erroCheckout("Cupom não atribuído a você.");
+    if (attr.usado) throw erroCheckout("Cupom já utilizado.");
+  }
+
+  const tipo: "percentual" | "fixo" = data.tipo === "percentual" ? "percentual" : "fixo";
+  const valor = Number(data.valor) || 0;
+  let desconto = tipo === "percentual" ? Number(subtotal) * (valor / 100) : valor;
+  desconto = Math.min(Math.max(0, desconto), Number(subtotal));
+  desconto = Number(desconto.toFixed(2));
+  if (!(desconto > 0)) throw erroCheckout("Cupom sem desconto aplicável.");
+
+  return { id: data.id, codigo: data.codigo, tipo, valor, desconto };
+}
+
+// Consome o cupom APÓS o pagamento aprovado (webhook/demo). O front não decide
+// mais quando consumir. Idempotente para cupons atribuídos: se a atribuição já
+// estava usada, não incrementa o contador de novo.
+export async function consumirCupomCheckout(codigo: string | undefined, email?: string): Promise<void> {
+  const code = String(codigo || "").trim().toUpperCase();
+  if (!code) return;
+  const sb = supabaseClient();
+  if (!sb) return;
+
+  const { data: cupom } = await sb.from("cupons").select("id,usos,max_usos").eq("codigo", code).maybeSingle();
+  if (!cupom?.id) return;
+
+  // Marca a atribuição como usada, quando existir. Se já estava usada, este
+  // cupom já foi consumido — não incrementa de novo.
+  if (email) {
+    const perfil = await perfilPorEmail(sb, String(email).trim().toLowerCase());
+    if (perfil) {
+      const { data: attr } = await sb
+        .from("cupons_usuarios")
+        .select("id,usado")
+        .eq("cupom_id", cupom.id)
+        .eq("user_id", perfil.id)
+        .maybeSingle();
+      if (attr) {
+        if (attr.usado) return;
+        const { error: attrErr } = await sb
+          .from("cupons_usuarios")
+          .update({ usado: true, usado_em: new Date().toISOString() })
+          .eq("id", attr.id);
+        if (attrErr) {
+          console.warn("[cupom] falha ao marcar atribuição como usada:", attrErr.message);
+          return;
+        }
+      }
+    }
+  }
+
+  // Incremento otimista: só atualiza se o valor de `usos` não mudou desde a
+  // leitura. Evita estourar max_usos em duas confirmações simultâneas.
+  const usosAtual = Number(cupom.usos || 0);
+  if (cupom.max_usos != null && usosAtual >= Number(cupom.max_usos)) return;
+  const { error } = await sb
+    .from("cupons")
+    .update({ usos: usosAtual + 1 })
+    .eq("id", cupom.id)
+    .eq("usos", usosAtual);
+  if (error) console.warn("[cupom] falha ao incrementar usos:", error.message);
+}
+
 function app() {
   const r = express.Router();
   const sb = supabaseClient();
@@ -289,50 +424,11 @@ function app() {
     }
   });
 
-  // Usar cupom (checkout/backend)
-  r.post("/api/cupons/:id/usar", async (req: any, res: any) => {
-    try {
-      const { id } = req.params;
-      const { discount } = req.body || {};
-      const cupom_id = id;
-
-      // Marcar usado no cupons_usuarios se houver atribuição
-      const auth = req.headers.authorization || "";
-      const token = auth.replace("Bearer ", "");
-      if (token) {
-        const { data: { user } } = await sb.auth.getUser(token);
-        if (user) {
-          const { data: attr } = await sb
-            .from("cupons_usuarios")
-            .select("id")
-            .eq("cupom_id", cupom_id)
-            .eq("user_id", user.id)
-            .eq("usado", false)
-            .maybeSingle();
-          if (attr) {
-            const { error } = await sb.from("cupons_usuarios").update({ usado: true, usado_em: new Date().toISOString() }).eq("id", attr.id);
-            if (error) return res.status(500).json({ erro: error.message });
-          }
-        }
-      }
-
-      // Incrementa o contador de usos. Se a função SQL incrementar_usos_cupom
-      // não existir no Supabase (schema antigo), faz o incremento direto.
-      const { error: rpcErr } = await sb.rpc("incrementar_usos_cupom", { cupom_id });
-      if (rpcErr) {
-        const { data: cupomAtual } = await sb.from("cupons").select("usos").eq("id", cupom_id).maybeSingle();
-        const { error: upErr } = await sb
-          .from("cupons")
-          .update({ usos: ((cupomAtual?.usos || 0) + 1) })
-          .eq("id", cupom_id);
-        if (upErr) return res.status(500).json({ erro: upErr.message });
-      }
-
-      return res.json({ ok: true, desconto: Number(discount || 0) });
-    } catch (err) {
-      console.error("[cupons] usar:", err);
-      return res.status(500).json({ erro: "Falha ao usar cupom." });
-    }
+  // Consumo de cupom: agora é feito pelo servidor, após a confirmação do
+  // pagamento (webhook). Esta rota pública permitia que qualquer pessoa
+  // queimasse cupons de terceiros só com o id.
+  r.post("/api/cupons/:id/usar", async (_req: any, res: any) => {
+    return res.status(410).json({ erro: "O cupom é consumido automaticamente após a confirmação do pagamento." });
   });
 
   return r;

@@ -13,9 +13,10 @@
 import crypto from "node:crypto";
 import { getSecret, creditarPontos, jaProcessadoMP, upsertPedidoMP, confirmarPagamentoMP, buscarPedidoMP } from "./db.ts";
 import { atualizarPedidoLI } from "./liClient.ts";
+import { demoPermitido } from "./ambiente.ts";
+import { consumirCupomCheckout } from "./cupom.ts";
 
 const MP_API = "https://api.mercadopago.com";
-const DEMO = process.env.DEMO_MODE === "true";
 
 // Valida a assinatura do webhook MP (header x-signature).
 // Formato oficial (v1): "ts=TIMESTAMP,v1=HMAC_SHA256(manifest, secret)" onde
@@ -93,7 +94,7 @@ export async function processarWebhookMP(
   // DEMO: exercita o fluxo de ponta a ponta (crédito de pontos + pedido LI)
   // sem validar assinatura nem chamar a API real do MP. Só ativo com
   // DEMO_MODE=true — em produção este bloco é ignorado sempre.
-  if (DEMO) {
+  if (demoPermitido()) {
     let payload: any;
     try {
       payload = JSON.parse(bodyRaw);
@@ -142,6 +143,24 @@ export async function processarWebhookMP(
   return await aplicarAprovacao(String(paymentId), payment);
 }
 
+// A referência externa do pagamento é um JSON montado pelo checkout:
+// { ref, cupom, cliente }. Aceita também o formato antigo (string pura) para
+// não quebrar pagamentos já criados.
+function lerReferenciaExterna(raw: unknown): { ref?: string; cupom?: string; cliente?: string } {
+  if (raw == null || raw === "") return {};
+  try {
+    const j = JSON.parse(String(raw));
+    if (j && typeof j === "object") {
+      return {
+        ref: typeof j.ref === "string" ? j.ref : undefined,
+        cupom: typeof j.cupom === "string" ? j.cupom : undefined,
+        cliente: typeof j.cliente === "string" ? j.cliente : undefined,
+      };
+    }
+  } catch { /* formato antigo */ }
+  return { ref: String(raw) };
+}
+
 // Extrai dados do payment e, se aprovado, credita pontos + espelha no Supabase
 // + atualiza o pedido na Loja Integrada para "Pago". Usado tanto em produção
 // quanto em DEMO (com payment fake).
@@ -150,15 +169,21 @@ async function aplicarAprovacao(paymentId: string, payment: any, liPedidoFallbac
   const email = (payment?.payer?.email || "").toLowerCase() || null;
   const valor = Number(payment?.transaction_amount || 0);
   const externalRef = payment?.external_reference || null;
+  const ref = lerReferenciaExterna(externalRef);
+  // O espelho criado no checkout guarda o e-mail completo da conta. Preferimos
+  // ele ao campo `cliente` da referência externa (que é truncado para caber no
+  // limite do MP). Assim pontos/cupom vão para a conta certa mesmo quando o
+  // pagamento foi feito com outro e-mail de contato.
+  const espelhoAntes = await buscarPedidoMP(String(paymentId));
+  const emailConta = (espelhoAntes?.email || ref.cliente || email || "").toLowerCase() || null;
 
   // Espelha o pedido independente de aprovado ou não (para auditoria).
   await upsertPedidoMP({
     mp_payment_id: String(paymentId),
-    email,
+    email: emailConta || email,
     valor,
     status: status || "desconhecido",
     external_reference: externalRef,
-    pontos_creditados: false,
   });
 
   if (status !== "approved") {
@@ -167,14 +192,23 @@ async function aplicarAprovacao(paymentId: string, payment: any, liPedidoFallbac
 
   // Aprovado: credita pontos de fidelidade (idempotente pelo mp_payment_id).
   let pontos = 0;
-  if (email) {
-    pontos = await creditarPontos(email, valor, `mp-${paymentId}`);
+  if (emailConta) {
+    pontos = await creditarPontos(emailConta, valor, `mp-${paymentId}`);
   }
   await confirmarPagamentoMP(String(paymentId), pontos > 0);
 
+  // Cupom: consome APÓS a aprovação. É idempotente para cupons atribuídos.
+  if (ref.cupom) {
+    try {
+      await consumirCupomCheckout(ref.cupom, emailConta || undefined);
+    } catch (e: any) {
+      console.warn("[webhook-mp] falha ao consumir cupom:", e?.message || e);
+    }
+  }
+
   // Atualiza o pedido na Loja Integrada (site) para "Pago", se criamos um.
   try {
-    const espelho = await buscarPedidoMP(String(paymentId));
+    const espelho = espelhoAntes || (await buscarPedidoMP(String(paymentId)));
     const liPedido = espelho?.li_pedido ?? liPedidoFallback;
     if (liPedido) {
       await atualizarPedidoLI(liPedido, "pago", espelho?.li_dados ?? undefined);

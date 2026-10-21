@@ -11,6 +11,8 @@
 import crypto from "node:crypto";
 import { getSecret, creditarPontos, resgatarPontos, getRegrasFidelidade, getPontos, upsertPedidoMP, TETO_BENEFICIOS_PERC, concederMissao, creditarIndicacao, creditarFamilia, supabaseClient } from "./db.ts";
 import { criarPedidoLI, baixarEstoqueLI, atualizarPedidoLI, buscarPrecoLI } from "./liClient.ts";
+import { validarCupomCheckout, consumirCupomCheckout, type CupomCheckout } from "./cupom.ts";
+import { demoPermitido, permiteFallbackPreco } from "./ambiente.ts";
 
 const MP_API = "https://api.mercadopago.com";
 
@@ -18,49 +20,94 @@ export function gerarIdempotencyKey(): string {
   return crypto.randomUUID();
 }
 
-// Busca o preço REAL do produto na Loja Integrada (produção).
-// Em demo/local, aceita o valor enviado pelo front porém valida sanitização.
-async function obterValorAutorizado(items: { price: number; qty: number; sku?: string }[]): Promise<{
+// Consulta o status atual de um pagamento no Mercado Pago. Usado pelo site
+// para acompanhar PIX e cartão em análise sem expor o access_token.
+export async function consultarPagamentoMP(
+  id: string
+): Promise<{ status: string; status_detail?: string } | null> {
+  const token = (await getSecret("MP_ACCESS_TOKEN").catch(() => null)) || process.env.MP_ACCESS_TOKEN || "";
+  if (!token) return null;
+  const r = await fetch(`${MP_API}/v1/payments/${encodeURIComponent(id)}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!r.ok) return null;
+  const j: any = await r.json().catch(() => ({}));
+  return { status: String(j?.status || ""), status_detail: j?.status_detail };
+}
+
+interface ItemCheckout {
+  price: number;
+  qty: number;
+  sku?: string;
+  li_uri?: string;
+  nome?: string;
+  variacao?: string;
+}
+
+// Resolve o preço REAL de cada item na Loja Integrada e devolve os itens já
+// com o preço autorizado. Em produção, se não for possível confirmar o preço,
+// o checkout falha fechado — nunca cobra o valor arbitrário do front.
+async function obterValorAutorizado(items: ItemCheckout[]): Promise<{
   ok: boolean;
   total: number;
+  itens: ItemCheckout[];
   erro?: string;
 }> {
   if (!Array.isArray(items) || items.length === 0) {
-    return { ok: false, total: 0, erro: "Carrinho vazio." };
+    return { ok: false, total: 0, itens: [], erro: "Carrinho vazio." };
   }
+  const fallback = permiteFallbackPreco();
   let total = 0;
+  const itens: ItemCheckout[] = [];
+
   for (const it of items) {
     const p = Number(it.price);
     const q = Number(it.qty);
     if (!Number.isFinite(p) || p <= 0 || !Number.isFinite(q) || q <= 0 || q > 99) {
-      return { ok: false, total: 0, erro: "Item de carrinho inválido (preço/quantidade)." };
+      return { ok: false, total: 0, itens: [], erro: "Item de carrinho inválido (preço/quantidade)." };
     }
-    // Anti-fraude: se as chaves da LI estiverem configuradas, o preço REAL vem da
-    // Loja Integrada (por SKU) — nunca confiamos no valor enviado pelo front.
-    // Se a LI não responder / não houver chaves (demo), mantém o preço do front
-    // (com a sanitização acima) para não quebrar o fluxo.
-    const precoReal = await buscarPrecoLI(it.sku).catch(() => null);
+
+    const precoReal = await buscarPrecoLI(it.sku, it.li_uri).catch(() => null);
+    if (precoReal == null && !fallback) {
+      return {
+        ok: false,
+        total: 0,
+        itens: [],
+        erro: `Não foi possível confirmar o preço do produto ${it.sku || it.li_uri || ""}. Tente novamente ou fale com a loja.`,
+      };
+    }
     const preco = precoReal != null ? precoReal : p;
     if (precoReal != null && Math.abs(precoReal - p) > 0.01) {
-      console.warn(`[checkout] preço divergente sku=${it.sku}: front=${p} LI=${precoReal} — usando LI.`);
+      console.warn(`[checkout] preço divergente sku=${it.sku || it.li_uri}: front=${p} LI=${precoReal} — usando LI.`);
+    } else if (precoReal == null) {
+      console.warn(`[checkout] preço não confirmado na LI (fallback ${process.env.NODE_ENV || "?"}) sku=${it.sku || it.li_uri}.`);
     }
     total += preco * q;
+    itens.push({ ...it, price: preco });
   }
+
   if (total <= 0 || total > 1_000_000) {
-    return { ok: false, total: 0, erro: "Total fora da faixa permitida." };
+    return { ok: false, total: 0, itens: [], erro: "Total fora da faixa permitida." };
   }
-  return { ok: true, total: Number(total.toFixed(2)) };
+  return { ok: true, total: Number(total.toFixed(2)), itens };
 }
 
 // Cria cobrança PIX real no Mercado Pago.
-async function criarPixMP(accessToken: string, valor: number, descricao: string, email?: string) {
-  const idem = gerarIdempotencyKey();
-  const body = {
+async function criarPixMP(
+  accessToken: string,
+  valor: number,
+  descricao: string,
+  email?: string,
+  opts: { idempotencyKey?: string; externalReference?: string } = {}
+) {
+  const idem = opts.idempotencyKey || gerarIdempotencyKey();
+  const body: Record<string, unknown> = {
     transaction_amount: valor,
     description: descricao.slice(0, 120),
     payment_method_id: "pix",
     payer: email ? { email: email.slice(0, 120) } : { email: "comprador@dgriffe.com.br" },
   };
+  if (opts.externalReference) body.external_reference = opts.externalReference.slice(0, 250);
   const r = await fetch(`${MP_API}/v1/payments`, {
     method: "POST",
     headers: {
@@ -97,16 +144,25 @@ async function criarPixMP(accessToken: string, valor: number, descricao: string,
 
 // Cria cobrança por cartão (tokenizada no CLIENTE via SDK do MP).
 // O servidor recebe SÓ o card_token (nunca o número do cartão / CVV).
-async function criarCartaoMP(accessToken: string, valor: number, cardToken: string, email?: string, parcelas = 1) {
-  const idem = gerarIdempotencyKey();
-  const body = {
+async function criarCartaoMP(
+  accessToken: string,
+  valor: number,
+  cardToken: string,
+  email?: string,
+  parcelas = 1,
+  opts: { idempotencyKey?: string; externalReference?: string } = {}
+) {
+  const idem = opts.idempotencyKey || gerarIdempotencyKey();
+  const body: Record<string, unknown> = {
     transaction_amount: valor,
     description: "Ótica D'Griffe",
-    payment_method_id: "visa", // ajustado conforme token; o MP resolve pelo token
     token: cardToken,
     installments: parcelas,
     payer: { email: (email || "comprador@dgriffe.com.br").slice(0, 120) },
   };
+  // Sem `payment_method_id` fixo: o MP resolve a bandeira pelo token. O código
+  // antigo forçava "visa" e podia recusar Mastercard/Elo.
+  if (opts.externalReference) body.external_reference = opts.externalReference.slice(0, 250);
   const r = await fetch(`${MP_API}/v1/payments`, {
     method: "POST",
     headers: {
@@ -151,71 +207,113 @@ export interface CheckoutResult {
 }
 
 export async function processarCheckout(params: {
-  items: { price: number; qty: number; sku?: string; li_uri?: string; nome?: string; variacao?: string }[];
+  items: ItemCheckout[];
   meio: "pix" | "cartao";
   email?: string;
+  emailCliente?: string;
   card_token?: string;
   pontosResgate?: number;
-  cupom?: { codigo: string; tipo: string; valor: number; id: string };
+  cupom?: { codigo: string };
   observacoes?: string;
   formaEntrega?: "retirada" | "entrega";
   origem?: "app" | "site";
+  idempotencyKey?: string;
+  parcelas?: number;
+  indicadorEmail?: string;
 }): Promise<CheckoutResult> {
-  const { items, meio, email, card_token, pontosResgate, cupom, observacoes, formaEntrega = "retirada", origem = "site" } = params;
+  const {
+    items,
+    meio,
+    email,
+    emailCliente,
+    card_token,
+    pontosResgate,
+    cupom,
+    observacoes,
+    formaEntrega = "retirada",
+    origem = "site",
+  } = params;
 
   const autorizado = await obterValorAutorizado(items);
-  if (!autorizado.ok) throw new Error(autorizado.erro || "Valor inválido.");
-  let total = autorizado.total;
-
-  // Resgate de pontos (desconto) — só se o cliente tiver saldo suficiente.
-  let desconto = 0;
-  let usouPontos = 0;
+  if (!autorizado.ok) {
+    throw Object.assign(new Error(autorizado.erro || "Valor inválido."), { status: 400 });
+  }
+  const subtotal = autorizado.total;
   const e = (email || "").trim().toLowerCase();
-  if (pontosResgate && pontosResgate > 0 && e) {
+  const eCliente = (emailCliente || "").trim().toLowerCase();
+
+  // Cupom: valida no banco pelo código. `tipo`/`valor` do front são ignorados.
+  let cupomValidado: CupomCheckout | null = null;
+  if (cupom?.codigo) {
+    cupomValidado = await validarCupomCheckout(cupom.codigo, eCliente || undefined, subtotal);
+  }
+
+  // Teto de 20% de benefícios sobre o valor original (pontos + cupom).
+  const tetoMax = Number((subtotal * (TETO_BENEFICIOS_PERC / 100)).toFixed(2));
+  // O cupom entra primeiro no teto; os pontos usam o que sobrar.
+  const descontoCupom = cupomValidado ? Math.min(cupomValidado.desconto, tetoMax) : 0;
+
+  // Resgate de pontos: SÓ com identidade autenticada. O e-mail do body nunca
+  // serve para gastar pontos de outra pessoa.
+  let descontoPontos = 0;
+  if (pontosResgate && pontosResgate > 0) {
+    if (!eCliente) {
+      throw Object.assign(new Error("Faça login para usar seus pontos."), { status: 401 });
+    }
     const regras = await getRegrasFidelidade();
-    const saldoPontos = await getPontos(e);
-    const pontosUtilizaveis = Math.min(pontosResgate, saldoPontos);
-    // Regra: pontosPorDesconto pontos = R$ 10 (ex.: 100 pts = R$ 10).
-    desconto = Math.floor((pontosUtilizaveis / regras.pontosPorDesconto) * 10);
-    if (desconto > 0 && desconto < total) {
-      usouPontos = await resgatarPontos(e, pontosUtilizaveis);
-      if (usouPontos > 0) total = Number((total - desconto).toFixed(2));
-      else desconto = 0;
-    } else {
-      desconto = 0;
+    const pontosPorDesconto = regras.pontosPorDesconto || 100;
+    const saldoPontos = await getPontos(eCliente);
+    const pontosUtilizaveis = Math.min(Math.floor(pontosResgate), saldoPontos);
+    const descontoBruto = Math.floor((pontosUtilizaveis / pontosPorDesconto) * 10);
+    const descontoPermitido = Math.min(descontoBruto, Math.max(0, tetoMax - descontoCupom));
+    if (descontoPermitido > 0) {
+      // Converte de volta para pontos para não resgatar mais do que o desconto
+      // efetivamente aplicado (ex.: teto de 20%).
+      const pontosParaResgate = Math.min(
+        pontosUtilizaveis,
+        Math.floor((descontoPermitido / 10) * pontosPorDesconto)
+      );
+      if (pontosParaResgate > 0) {
+        const resgatados = await resgatarPontos(eCliente, pontosParaResgate);
+        if (resgatados > 0) {
+          descontoPontos = Math.min(
+            Math.floor((resgatados / pontosPorDesconto) * 10),
+            descontoPermitido
+          );
+        }
+      }
     }
   }
 
-  // Cupom
-  let descontoCupom = 0;
-  if (cupom?.valor && total > 0) {
-    if (cupom.tipo === "percentual") descontoCupom = Number((total * (Number(cupom.valor) / 100)).toFixed(2));
-    else descontoCupom = Number(cupom.valor);
-    descontoCupom = Math.min(descontoCupom, total);
-    total = Number((total - descontoCupom).toFixed(2));
-    desconto = Number((desconto + descontoCupom).toFixed(2));
+  const desconto = Number((descontoPontos + descontoCupom).toFixed(2));
+  let total = Number((subtotal - desconto).toFixed(2));
+  if (total <= 0) total = 0.01;
+
+  const mpToken = (await getSecret("MP_ACCESS_TOKEN").catch(() => null)) || process.env.MP_ACCESS_TOKEN || "";
+  const demoAtivo = demoPermitido();
+  // Fail-closed: em produção sem token do MP não há como cobrar. Nunca aprova
+  // pedido de graça só porque a chave sumiu.
+  if (!mpToken && !demoAtivo) {
+    throw Object.assign(
+      new Error("Pagamento indisponível: configure o Mercado Pago antes de vender."),
+      { status: 503 }
+    );
   }
 
-  // Regra do plano: teto de 20% de benefícios sobre o valor original.
-  // Benefícios = desconto de pontos + desconto de cupom. Se ultrapassar 20%,
-  // reduz o desconto pro teto (não estoura a margem).
-  const tetoMax = Number((autorizado.total * (TETO_BENEFICIOS_PERC / 100)).toFixed(2));
-  if (desconto > tetoMax) {
-    desconto = tetoMax;
-  }
-  total = Number((autorizado.total - desconto).toFixed(2));
-  if (total <= 0) total = 0.01;
-  // Em DEMO (sem token MP válido ou modo demo), mantém fluxo simulado.
-  const mpToken = (await getSecret("MP_ACCESS_TOKEN").catch(() => null)) || process.env.MP_ACCESS_TOKEN || "";
-  const demoAtivo = process.env.DEMO_MODE === "true" || !mpToken;
   if (demoAtivo) {
-    const idPedido = `DEMO-${Date.now().toString().slice(-8)}`;
+    const idPedido = `DEMO-${Date.now().toString().slice(-8)}-${crypto.randomBytes(2).toString("hex")}`;
     // No demo, creditamos pontos imediatamente (simula pagamento aprovado).
-    const pontos = e ? await creditarPontos(e, total, idPedido) : 0;
-    // Fase C: missão 1ª compra + indicação + clube família (só pontos, sem R$).
-    if (e && pontos > 0) {
-      try { await dispararFaseC(e, pontos, params.indicadorEmail); } catch (fcErr) {
+    const comprador = eCliente || e;
+    const pontos = comprador ? await creditarPontos(comprador, total, idPedido) : 0;
+    if (comprador && pontos > 0) {
+      try { await dispararFaseC(comprador, pontos, params.indicadorEmail); } catch (fcErr) {
         console.warn("[checkout-demo] Fase C (ignorado):", (fcErr as Error)?.message);
+      }
+    }
+    // Demo não tem webhook: consome o cupom aqui (uma vez).
+    if (cupomValidado) {
+      try { await consumirCupomCheckout(cupomValidado.codigo, comprador || undefined); } catch (cErr) {
+        console.warn("[checkout-demo] cupom não consumido:", (cErr as Error)?.message);
       }
     }
     // Cria o pedido na Loja Integrada (site) também em demo — garante que o
@@ -224,8 +322,8 @@ export async function processarCheckout(params: {
     let liDados: Record<string, unknown> | null = null;
     try {
       const criado = await criarPedidoLI({
-        email: email || "",
-        itens: items.map((it) => ({ li_uri: it.li_uri, sku: it.sku, nome: it.nome, preco: it.price, quantidade: it.qty, variacao: it.variacao })),
+        email: e,
+        itens: autorizado.itens.map((it) => ({ li_uri: it.li_uri, sku: it.sku, nome: it.nome, preco: it.price, quantidade: it.qty, variacao: it.variacao })),
         valor: total,
         meio,
         observacoes,
@@ -243,7 +341,7 @@ export async function processarCheckout(params: {
     try {
       await upsertPedidoMP({
         mp_payment_id: idPedido,
-        email: email || null,
+        email: comprador || null,
         valor: total,
         status: "aprovado",
         li_pedido: liPedido ?? undefined,
@@ -251,10 +349,12 @@ export async function processarCheckout(params: {
         pontos_creditados: pontos > 0,
       });
     } catch { /* ignora */ }
-    // Marca o pedido como pago na LI (se criamos um).
     if (liPedido) {
       try { await atualizarPedidoLI(liPedido, "pago", liDados ?? undefined); } catch { /* ignora */ }
     }
+    const cupomResp = cupomValidado
+      ? { codigo: cupomValidado.codigo, tipo: cupomValidado.tipo, valor: cupomValidado.valor }
+      : undefined;
     if (meio === "pix") {
       return {
         meio,
@@ -262,35 +362,76 @@ export async function processarCheckout(params: {
         li_pedido: liPedido,
         status: "pendente",
         valor_total: total,
-        valor_original: autorizado.total,
+        valor_original: subtotal,
         desconto_aplicado: desconto,
         pontos_creditados: pontos,
         pix_qr_base64:
           "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
         pix_copia_cola: `00020126BR.GOV.BCB.PIX-DEMO-${idPedido}-${total.toFixed(2)}5204000053039865802BR6009SAO PAULO62070503***6304DEMO`,
-        email: email || null,
+        email: comprador || null,
+        cupom: cupomResp,
         demo: true,
       };
     }
-    return { meio, id: idPedido, li_pedido: liPedido, status: "aprovado", valor_total: total, valor_original: autorizado.total, desconto_aplicado: desconto, pontos_creditados: pontos, email: email || null, demo: true };
+    return {
+      meio,
+      id: idPedido,
+      li_pedido: liPedido,
+      status: "aprovado",
+      valor_total: total,
+      valor_original: subtotal,
+      desconto_aplicado: desconto,
+      pontos_creditados: pontos,
+      email: comprador || null,
+      cupom: cupomResp,
+      demo: true,
+    };
   }
 
   // Produção: chama a API real do Mercado Pago.
+  const idem =
+    params.idempotencyKey && /^[A-Za-z0-9._:-]{8,128}$/.test(params.idempotencyKey)
+      ? params.idempotencyKey
+      : gerarIdempotencyKey();
+  // A referência carrega o cupom e o e-mail da conta (quando logado) para o
+  // webhook consumir o cupom e creditar pontos na conta correta.
+  // Mantém o JSON abaixo do limite de 250 caracteres do MP. Campos longos
+  // (e-mail/idempotencyKey) são truncados para o JSON continuar parseável no
+  // webhook; a referência completa fica no espelho `pedidos`.
+  const externalReference = JSON.stringify({
+    ref: idem.slice(0, 40),
+    cupom: cupomValidado?.codigo ? cupomValidado.codigo.slice(0, 40) : null,
+    cliente: eCliente ? eCliente.slice(0, 80) : null,
+  });
+
   let resultado: CheckoutResult;
   if (meio === "pix") {
-    resultado = await criarPixMP(mpToken, total, "Ótica D'Griffe", email);
+    resultado = await criarPixMP(mpToken, total, "Ótica D'Griffe", eCliente || e, {
+      idempotencyKey: idem,
+      externalReference,
+    });
   } else {
     if (!card_token || typeof card_token !== "string" || card_token.length < 10) {
-      throw new Error("Token de cartão inválido (deve ser gerado pelo SDK do Mercado Pago no cliente).");
+      throw Object.assign(
+        new Error("Token de cartão inválido (deve ser gerado pelo SDK do Mercado Pago no cliente)."),
+        { status: 400 }
+      );
     }
-    resultado = await criarCartaoMP(mpToken, total, card_token, email);
+    const parcelas = Math.max(1, Math.min(12, Math.floor(Number(params.parcelas) || 1)));
+    resultado = await criarCartaoMP(mpToken, total, card_token, eCliente || e, parcelas, {
+      idempotencyKey: idem,
+      externalReference,
+    });
   }
+
   // Cria o pedido na Loja Integrada (site) com status "Em aberto". Não-bloqueante:
   // se a LI falhar, a compra no app continua funcionando normalmente.
+  let liPedido: number | string | null = null;
+  let liDados: Record<string, unknown> | null = null;
   try {
     const criado = await criarPedidoLI({
-      email: email || "",
-      itens: items.map((it) => ({ li_uri: it.li_uri, sku: it.sku, nome: it.nome, preco: it.price, quantidade: it.qty })),
+      email: e,
+      itens: autorizado.itens.map((it) => ({ li_uri: it.li_uri, sku: it.sku, nome: it.nome, preco: it.price, quantidade: it.qty, variacao: it.variacao })),
       valor: total,
       meio,
       observacoes,
@@ -298,25 +439,37 @@ export async function processarCheckout(params: {
       origem,
     });
     if (criado) {
+      liPedido = criado.id;
+      liDados = criado.corpo;
       resultado.li_pedido = criado.id;
-      // Espelha no Supabase já com o li_pedido (e o corpo para atualizações),
-      // para o webhook saber o que atualizar.
-      await upsertPedidoMP({
-        mp_payment_id: String(resultado.id),
-        email: email || null,
-        valor: total,
-        status: "pendente",
-        li_pedido: criado.id,
-        li_dados: criado.corpo,
-      }).catch(() => {});
     }
-  } catch (e: any) {
-    console.warn("[checkout] pedido LI não criado:", e?.message || e);
+  } catch (err: any) {
+    console.warn("[checkout] pedido LI não criado:", err?.message || err);
+  }
+  // Espelha SEMPRE, mesmo se a LI falhar: o webhook e a consulta de status
+  // precisam da linha para confirmar o pagamento e validar o dono do pedido.
+  // Usamos o e-mail da conta (quando logado) para que a consulta de status
+  // continue funcionando mesmo se o cliente digitar outro e-mail de contato.
+  try {
+    await upsertPedidoMP({
+      mp_payment_id: String(resultado.id),
+      email: eCliente || e || null,
+      valor: total,
+      status: String(resultado.status || "pendente"),
+      external_reference: externalReference,
+      li_pedido: liPedido ?? undefined,
+      li_dados: liDados ?? undefined,
+    });
+  } catch (err: any) {
+    console.warn("[checkout] falha ao espelhar pedido:", err?.message || err);
   }
   // Crédito de pontos ocorre quando o MP confirmar (webhook). Aqui registramos
   // a intenção; o webhook/poll chamará creditarPontos após status "approved".
-  resultado.valor_original = autorizado.total;
+  resultado.valor_original = subtotal;
   resultado.desconto_aplicado = desconto;
+  if (cupomValidado) {
+    resultado.cupom = { codigo: cupomValidado.codigo, tipo: cupomValidado.tipo, valor: cupomValidado.valor };
+  }
   return resultado;
 }
 

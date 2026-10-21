@@ -34,7 +34,7 @@ import {
   demoAdminSituacoes,
 } from "./demo.mjs";
 import * as segredos from "./db.ts";
-import { processarCheckout } from "./pagamento.ts";
+import { processarCheckout, consultarPagamentoMP } from "./pagamento.ts";
 import { processarWebhookMP } from "./webhook.ts";
 import { atualizarPedidoLISituacao } from "./liClient.ts";
 import { listarVideosRecentes } from "./youtube.ts";
@@ -142,8 +142,18 @@ function registrarTentativaSucesso(ip) {
   tentativas.delete(ip);
 }
 
+// Comparação de segredos em tempo constante. Hash primeiro para igualar o
+// tamanho (timingSafeEqual exige buffers do mesmo tamanho).
+function compararSegredo(a: string, b: string): boolean {
+  const ha = crypto.createHash("sha256").update(String(a)).digest();
+  const hb = crypto.createHash("sha256").update(String(b)).digest();
+  return crypto.timingSafeEqual(ha, hb);
+}
+
 function ipDo(req) {
-  return (req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket.remoteAddress || "desconhecido");
+  // Com `trust proxy` configurado, req.ip já é o primeiro IP não confiável
+  // (o cliente real), em vez do x-forwarded-for cru (falsificável).
+  return req.ip || req.socket?.remoteAddress || "desconhecido";
 }
 
 // ---------------------------------------------------------------------------
@@ -343,6 +353,9 @@ const RECURSOS_PERMITIDOS = new Set([
 const RECURSOS_ESCRITA_PERMITIDOS = new Set<string>();
 
 const app = express();
+// Confia em UM proxy (Render/Cloudflare) para que req.ip seja o IP real do
+// cliente. Sem isso, `x-forwarded-for` é usado cru e pode ser falsificado.
+app.set("trust proxy", 1);
 app.use(express.json({ limit: "512kb", verify: (req, _res, buf) => { req.rawBody = buf.toString("utf8"); } }));
 app.disable("x-powered-by");
 
@@ -449,7 +462,7 @@ app.post("/api/admin/login", async (req, res) => {
     registrarTentativaFalha(ip);
     return res.status(401).json({ erro: "Senha inválida." });
   }
-  if (senha !== ADMIN_PASSWORD) {
+  if (!compararSegredo(senha, ADMIN_PASSWORD)) {
     registrarTentativaFalha(ip);
     log.warn("Falha de login admin", { ip });
     return res.status(401).json({ erro: "Senha inválida." });
@@ -1088,11 +1101,8 @@ app.get("/api/mp-public-key", async (_req, res) => {
 // Saldo de fidelidade do cliente (por e-mail) + regras para o front calcular desconto.
 // Usa o e-mail do token de cliente quando houver; evita IDOR por querystring.
 app.get("/api/fidelidade", async (req, res) => {
-  const tokenEmail = await requireCliente(req, res);
-  const email = String(tokenEmail || req.query.email || "").trim().toLowerCase();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.status(400).json({ erro: "E-mail inválido." });
-  }
+  const email = await requireCliente(req, res);
+  if (!email) return;
   try {
     const [pontos, regras, niveis, historicoFidelidade] = await Promise.all([
       segredos.getPontos(email).catch((e) => { console.error("[fidelidade] getPontos:", e?.message); return 0; }),
@@ -1131,11 +1141,8 @@ app.get("/api/fidelidade", async (req, res) => {
 // Histórico de fidelidade (créditos/resgates) do cliente.
 // Isolado pelo e-mail do token de cliente quando disponível.
 app.get("/api/fidelidade/historico", async (req, res) => {
-  const tokenEmail = await requireCliente(req, res);
-  const email = String(tokenEmail || req.query.email || "").trim().toLowerCase();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    return res.status(400).json({ erro: "E-mail inválido." });
-  }
+  const email = await requireCliente(req, res);
+  if (!email) return;
   try {
     const historico = await segredos.getHistoricoFidelidade(email);
     return res.json({ email, historico });
@@ -1149,8 +1156,8 @@ app.get("/api/fidelidade/historico", async (req, res) => {
 // INDICAÇÃO — código único + crédito R$50 + 200pts por conversão.
 // ---------------------------------------------------------------------------
 app.get("/api/indicacao/codigo", async (req, res) => {
-  const email = String(req.query.email || "").trim().toLowerCase();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ erro: "E-mail inválido." });
+  const email = await requireCliente(req, res);
+  if (!email) return;
   try {
     const codigo = await gerarCodigoIndicacao(email);
     const indicacoes = await getIndicacoes(email);
@@ -1167,9 +1174,8 @@ app.get("/api/indicacao/codigo", async (req, res) => {
 
 // GET /api/fidelidade/missao — lista as 5 missões com progresso do cliente.
 app.get("/api/fidelidade/missao", async (req, res) => {
-  const email = String(req.query.email || "").trim().toLowerCase();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-    return res.status(400).json({ erro: "E-mail inválido." });
+  const email = await requireCliente(req, res);
+  if (!email) return;
   try {
     const pontos = await segredos.getPontos(email);
     const historico = await segredos.getHistoricoFidelidade(email, 100);
@@ -1189,10 +1195,7 @@ app.get("/api/fidelidade/missao", async (req, res) => {
 });
 
 // GET /api/fidelidade/validade — regras de validade de pontos e cashback.
-app.get("/api/fidelidade/validade", async (req, res) => {
-  const email = String(req.query.email || "").trim().toLowerCase();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-    return res.status(400).json({ erro: "E-mail inválido." });
+app.get("/api/fidelidade/validade", async (_req, res) => {
   try {
     const pontos = VALIDADE_PONTOS_MESES_SEM_MOV * 30; // approx
     const cashbackExpiraMeses = 12 + Math.floor(VALIDADE_CASHBACK_DIAS_ADICIONAIS / 30);
@@ -1210,9 +1213,8 @@ app.get("/api/fidelidade/validade", async (req, res) => {
 
 // GET /api/fidelidade/mensagens — mensagens automáticas para o cliente.
 app.get("/api/fidelidade/mensagens", async (req, res) => {
-  const email = String(req.query.email || "").trim().toLowerCase();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
-    return res.status(400).json({ erro: "E-mail inválido." });
+  const email = await requireCliente(req, res);
+  if (!email) return;
   try {
     const mensagens: string[] = [];
     const pontos = await segredos.getPontos(email).catch((e) => { console.error("[mensagens] getPontos:", e?.message); return 0; });
@@ -1229,10 +1231,9 @@ app.get("/api/fidelidade/mensagens", async (req, res) => {
 // POST /api/fidelidade/missao/concluir — registra conclusão de missão (ex.: avaliação).
 // Usa o e-mail do token de cliente quando disponível e só aceita body se não houver token.
 app.post("/api/fidelidade/missao/concluir", async (req, res) => {
-  const tokenEmail = await requireCliente(req, res);
-  const { email, tipo } = req.body || {};
-  const e = (tokenEmail || email || "").toString().trim().toLowerCase();
-  if (!e || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) return res.status(400).json({ ok: false, erro: "E-mail inválido." });
+  const e = await requireCliente(req, res);
+  if (!e) return;
+  const { tipo } = req.body || {};
   if (!tipo) return res.status(400).json({ ok: false, erro: "Informe o tipo da missão." });
   try {
     const pontos = await segredos.concederMissao(e, tipo);
@@ -1243,20 +1244,28 @@ app.post("/api/fidelidade/missao/concluir", async (req, res) => {
   }
 });
 
-app.post("/api/indicacao/converter", async (req, res) => {
-  const { indicadorEmail, indicadoEmail } = req.body || {};
-  if (!indicadorEmail || !indicadoEmail)
-    return res.status(400).json({ ok: false, erro: "Informe indicador e indicado." });
-  try {
-    const r = await creditarIndicacao(indicadorEmail, indicadoEmail);
-    return res.json({ ok: true, creditoRs: r.creditoRs, pontos: r.pontos });
-  } catch (e) {
-    return res.status(502).json({ ok: false, erro: "Falha ao converter indicação." });
-  }
+// Conversão de indicação: NÃO é mais pública. O crédito só pode ocorrer após
+// uma compra paga e verificável. Até existir esse fluxo com consentimento, a
+// rota fica desativada — antes qualquer um creditava R$50/200pts a qualquer
+// e-mail sem compra nenhuma.
+app.post("/api/indicacao/converter", async (_req, res) => {
+  return res.status(410).json({
+    ok: false,
+    erro: "A conversão de indicação é feita automaticamente após uma compra paga.",
+  });
 });
 
 app.post("/api/indicacao/registrar", async (req, res) => {
-  const { indicadorEmail, indicadoEmail } = req.body || {};
+  // Só o próprio indicado (autenticado) pode registrar que foi indicado.
+  const indicadoEmail = await requireCliente(req, res);
+  if (!indicadoEmail) return;
+  const indicadorEmail = String(req.body?.indicadorEmail || "").trim().toLowerCase();
+  if (!indicadorEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(indicadorEmail)) {
+    return res.status(400).json({ ok: false, erro: "Informe o e-mail de quem indicou." });
+  }
+  if (indicadorEmail === indicadoEmail) {
+    return res.status(400).json({ ok: false, erro: "Você não pode indicar a si mesmo." });
+  }
   try {
     const r = await registrarIndicacao(indicadorEmail, indicadoEmail);
     if (!r.ok) return res.status(400).json({ ok: false, erro: r.erro });
@@ -1270,8 +1279,8 @@ app.post("/api/indicacao/registrar", async (req, res) => {
 // CLUBE FAMÍLIA — membros + créditos.
 // ---------------------------------------------------------------------------
 app.get("/api/familia", async (req, res) => {
-  const email = String(req.query.email || "").trim().toLowerCase();
-  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ erro: "E-mail inválido." });
+  const email = await requireCliente(req, res);
+  if (!email) return;
   try {
     const membros = await getClubeFamilia(email);
     const creditos = await getCreditosFamilia(email);
@@ -1281,15 +1290,15 @@ app.get("/api/familia", async (req, res) => {
   }
 });
 
-app.post("/api/familia/adicionar", async (req, res) => {
-  const { responsavelEmail, membroEmail } = req.body || {};
-  try {
-    const r = await adicionarFamiliar(responsavelEmail, membroEmail);
-    if (!r.ok) return res.status(400).json({ ok: false, erro: r.erro });
-    return res.json({ ok: true });
-  } catch (e) {
-    return res.status(502).json({ ok: false, erro: "Falha ao adicionar membro." });
-  }
+// Adição de membro exige consentimento do membro (que hoje não existe). Um
+// endpoint público permitia adicionar QUALQUER vítima como membro e desviar
+// 20% dos pontos dela para o responsável. Desativado até haver fluxo de convite
+// + aceite autenticado.
+app.post("/api/familia/adicionar", async (_req, res) => {
+  return res.status(410).json({
+    ok: false,
+    erro: "A gestão do Clube Família está temporariamente disponível apenas pelo atendimento.",
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1440,8 +1449,8 @@ app.post("/api/admin/notificar", requireAdmin, async (req, res) => {
 
 // Cliente logado lista suas notificações.
 app.get("/api/notificacoes", async (req, res) => {
-  const email = String((req.query.email as string) || "").trim().toLowerCase();
-  if (!email) return res.status(400).json({ erro: "Informe o e-mail." });
+  const email = await requireCliente(req, res);
+  if (!email) return;
   try {
     const notifs = await listarNotificacoes(email);
     const naoLidas = notifs.filter((n) => !n.lida).length;
@@ -1453,8 +1462,8 @@ app.get("/api/notificacoes", async (req, res) => {
 
 // Cliente marca como lida.
 app.post("/api/notificacoes/:id/lida", async (req, res) => {
-  const email = String((req.query.email as string) || "").trim().toLowerCase();
-  if (!email) return res.status(400).json({ erro: "Informe o e-mail." });
+  const email = await requireCliente(req, res);
+  if (!email) return;
   try {
     await marcarNotificacaoLida(email, req.params.id);
     return res.json({ ok: true });
@@ -1507,9 +1516,9 @@ app.get("/api/notificacoes/push-config", async (_req, res) => {
 
 // Cliente salva a subscription do dispositivo (associada ao e-mail).
 app.post("/api/notificacoes/subscribe", async (req, res) => {
-  const email = String((req.body?.email || "").trim().toLowerCase());
+  const email = await requireCliente(req, res);
+  if (!email) return;
   const sub = req.body?.subscription;
-  if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return res.status(400).json({ erro: "E-mail inválido." });
   if (!sub?.endpoint || !sub?.keys?.p256dh || !sub?.keys?.auth) return res.status(400).json({ erro: "Subscription inválida." });
   try {
     await salvarPushSubscription(email, { endpoint: sub.endpoint, keys: { p256dh: sub.keys.p256dh, auth: sub.keys.auth } });
@@ -1522,9 +1531,10 @@ app.post("/api/notificacoes/subscribe", async (req, res) => {
 
 // Cliente cancela a subscription de um dispositivo.
 app.post("/api/notificacoes/unsubscribe", async (req, res) => {
-  const email = String((req.body?.email || "").trim().toLowerCase());
+  const email = await requireCliente(req, res);
+  if (!email) return;
   const endpoint = String(req.body?.endpoint || "");
-  if (!email || !endpoint) return res.status(400).json({ erro: "Dados incompletos." });
+  if (!endpoint) return res.status(400).json({ erro: "Dados incompletos." });
   try {
     await removerPushSubscription(email, endpoint);
     return res.json({ ok: true });
@@ -1608,21 +1618,45 @@ app.post("/api/checkout", async (req, res) => {
     return res.status(400).json({ erro: "Observações muito longas (máx. 500 caracteres)." });
   }
 
+  // Identidade autenticada (opcional para comprar como convidado, mas
+  // OBRIGATÓRIA para usar pontos e para cupons atribuídos). Nunca usamos o
+  // e-mail do body para gastar pontos de outra pessoa.
+  const emailToken = await emailClienteDoToken(req);
+  let emailPontos: string | undefined;
+  if (Number(pontosResgate || 0) > 0) {
+    if (!emailToken) {
+      return res.status(401).json({ erro: "Faça login para usar seus pontos." });
+    }
+    emailPontos = emailToken;
+  }
+  const cupomCodigo =
+    cupom && typeof cupom === "object" && typeof cupom.codigo === "string"
+      ? cupom.codigo.trim()
+      : "";
+  const idemBruta =
+    typeof body.idempotencyKey === "string" ? body.idempotencyKey.trim() : "";
+  if (idemBruta && !/^[A-Za-z0-9._:-]{8,120}$/.test(idemBruta)) {
+    return res.status(400).json({ erro: "idempotencyKey inválida." });
+  }
+  const idempotencyKey = idemBruta || undefined;
+
   try {
-    // Salva perfil/endereço do cliente (Supabase) quando informados — o pedido
-    // na LI é criado com esses dados (buyer + endereço), e o admin os exibe.
-    if (dadosCliente.nome || dadosCliente.telefone) {
+    // Perfil e endereço só são gravados na conta AUTENTICADA. O e-mail do body
+    // é apenas contato da cobrança: usá-lo aqui permitiria sobrescrever o
+    // perfil/endereço de outra pessoa. Convidado não tem conta para salvar.
+    const emailConta = emailToken || null;
+    if (emailConta && (dadosCliente.nome || dadosCliente.telefone)) {
       await salvarPerfil({
-        email,
+        email: emailConta,
         nome: dadosCliente.nome || undefined,
         telefone: dadosCliente.telefone || undefined,
       }).catch((err) => console.warn("[checkout] falha ao salvar perfil:", err?.message));
     }
     const end = dadosCliente.endereco;
-    if (dadosCliente.forma_entrega === "entrega" && end?.endereco && end?.cidade && end?.estado && end?.cep) {
+    if (emailConta && dadosCliente.forma_entrega === "entrega" && end?.endereco && end?.cidade && end?.estado && end?.cep) {
       await salvarEndereco({
-        email,
-        nome: dadosCliente.nome || email.split("@")[0],
+        email: emailConta,
+        nome: dadosCliente.nome || emailConta.split("@")[0],
         endereco: String(end.endereco),
         numero: end.numero ? String(end.numero) : "",
         complemento: end.complemento ? String(end.complemento) : undefined,
@@ -1635,15 +1669,25 @@ app.post("/api/checkout", async (req, res) => {
     }
 
     const resultado = await processarCheckout({
-      items: items.map((it) => ({ price: Number(it.price), qty: Number(it.qty), sku: String(it.sku || it.product_id || ""), nome: it.nome })),
+      items: items.map((it) => ({
+        price: Number(it.price),
+        qty: Number(it.qty ?? it.quantity),
+        sku: String(it.sku || it.product_id || ""),
+        li_uri: typeof it.li_uri === "string" ? it.li_uri : undefined,
+        nome: typeof it.nome === "string" ? it.nome : undefined,
+        variacao: typeof it.variacao === "string" ? it.variacao : undefined,
+      })),
       meio,
       email,
+      emailCliente: emailToken || emailPontos,
       card_token,
       pontosResgate: Number(pontosResgate || 0) || undefined,
-      cupom: cupom || undefined,
+      cupom: cupomCodigo ? { codigo: cupomCodigo } : undefined,
       observacoes: dadosCliente.observacoes || undefined,
       formaEntrega: dadosCliente.forma_entrega || "retirada",
       origem,
+      idempotencyKey,
+      parcelas: Number(body.parcelas || 1) || 1,
     });
 
     // Baixa automática de estoque conforme os itens vendidos.
@@ -1677,6 +1721,36 @@ app.post("/api/checkout", async (req, res) => {
     const status = typeof e?.status === "number" ? e.status : 502;
     log.error("Falha no checkout", { meio, ip: req.ip, msg });
     return res.status(status).json({ erro: msg });
+  }
+});
+
+// Consulta autenticada do status de um pagamento (PIX ou cartão em análise).
+// Exige o token do cliente e confere se o pedido pertence ao e-mail do token.
+// Sem isso, qualquer pessoa poderia consultar o status de pagamentos alheios
+// apenas variando o id.
+app.get("/api/checkout/status/:id", async (req, res) => {
+  const email = await requireCliente(req, res);
+  if (!email) return;
+  const id = String(req.params.id || "").trim();
+  if (!/^\d{5,}$/.test(id)) {
+    return res.status(400).json({ erro: "Pagamento inválido." });
+  }
+  try {
+    const sb = supabaseClient();
+    if (sb) {
+      const { data } = await sb.from("pedidos").select("email").eq("mp_payment_id", id).maybeSingle();
+      if (!data) return res.status(404).json({ erro: "Pagamento não encontrado." });
+      const dono = String(data.email || "").trim().toLowerCase();
+      if (dono && dono !== email) {
+        return res.status(403).json({ erro: "Pagamento não pertence a esta conta." });
+      }
+    }
+    const st = await consultarPagamentoMP(id);
+    if (!st) return res.status(502).json({ erro: "Não foi possível consultar o pagamento." });
+    return res.json(st);
+  } catch (err: any) {
+    console.warn("[checkout/status] falha:", err?.message || err);
+    return res.status(502).json({ erro: "Falha ao consultar o pagamento." });
   }
 });
 
@@ -2677,7 +2751,7 @@ app.post("/api/cliente/cadastro", async (req, res) => {
   const bloq = checarBloqueio(ip);
   if (bloq.bloqueado) return res.status(429).json({ erro: `Muitas tentativas. Tente em ${bloq.resta}s.` });
 
-  const { email, nome, telefone, cpf } = req.body || {};
+  const { email } = req.body || {};
   const e = (email || "").trim().toLowerCase();
   if (!e || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) {
     return res.status(400).json({ erro: "E-mail inválido." });
@@ -2695,7 +2769,11 @@ app.post("/api/cliente/cadastro", async (req, res) => {
       email: e,
       options: {
         shouldCreateUser: true,
-        data: { nome: nome || "", telefone: telefone || "", cpf: cpf || "" },
+        // NÃO envia nome/telefone/CPF no metadata aqui: este endpoint é público
+        // e, para um e-mail já cadastrado, o Supabase pode sobrescrever o
+        // metadata do usuário existente antes de qualquer prova de posse do
+        // e-mail. Os dados são gravados em /api/cliente/verificar, somente
+        // depois que o OTP confirma que quem está ali é o dono da caixa.
         emailRedirectTo: siteUrl,
       },
     });
@@ -2707,41 +2785,10 @@ app.post("/api/cliente/cadastro", async (req, res) => {
       return res.status(400).json({ erro: otpErr.message });
     }
 
-    // 2) Se o usuário acabou de ser criado, garantimos o perfil e a sincronização LI.
-    //    (Para usuários já existentes, o perfil é atualizado na verificação do OTP.)
-    let userId: string | undefined;
-    try {
-      const list = await sb.auth.admin.listUsers();
-      userId = list.data?.users?.find((u) => u.email === e)?.id;
-    } catch { /* ignora */ }
-
-    if (userId) {
-      try {
-        await sb.from("profiles").upsert({
-          id: userId,
-          email: e,
-          nome: nome || null,
-          telefone: telefone || null,
-          cpf: cpf || null,
-          aceite_lgpd: Boolean(req.body?.aceiteLgpd) || false,
-          aceite_lgpd_em: Boolean(req.body?.aceiteLgpd) ? new Date().toISOString() : null,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "id" });
-      } catch (profileErr) {
-        console.warn("[cadastro] falha ao salvar perfil (ignorado):", (profileErr as Error)?.message);
-      }
-
-      // 3) Sincroniza com a Loja Integrada (se houver credenciais configuradas).
-      try {
-        const { LI_APP_KEY, LI_API_KEY } = await getSecretsLI();
-        if (LI_APP_KEY && LI_API_KEY) {
-          await criarClienteLI(e, { nome, telefone, cpf });
-        }
-      } catch (liErr) {
-        console.warn("[cadastro] falha ao sincronizar com Loja Integrada (ignorado):", (liErr as Error)?.message);
-      }
-    }
-
+    // 2) O perfil e a sincronização com a Loja Integrada são gravados somente
+    //    após a verificação do OTP (em /api/cliente/verificar), quando temos o
+    //    id do usuário autenticado. Antes usávamos admin.listUsers() aqui, o
+    //    que carregava a base inteira de usuários a cada cadastro.
     return res.json({ ok: true, mensagem: "Enviamos um código de verificação para seu e-mail." });
   } catch (err) {
     console.error("[cadastro] erro:", err);
@@ -2755,10 +2802,20 @@ app.post("/api/cliente/verificar", async (req, res) => {
   const bloq = checarBloqueio(ip);
   if (bloq.bloqueado) return res.status(429).json({ erro: `Muitas tentativas. Tente em ${bloq.resta}s.` });
 
-  const { email, token } = req.body || {};
+  const { email, token, nome, telefone, cpf, aceiteLgpd } = req.body || {};
   const e = (email || "").trim().toLowerCase();
   if (!e || !token || !/^\d{6}$/.test(String(token))) {
     return res.status(400).json({ erro: "E-mail e código de 6 dígitos são obrigatórios." });
+  }
+  // Dados de perfil só podem ser gravados DEPOIS da prova de posse do e-mail.
+  if (nome !== undefined && (typeof nome !== "string" || nome.length > 120)) {
+    return res.status(400).json({ erro: "Nome inválido." });
+  }
+  if (telefone !== undefined && (typeof telefone !== "string" || telefone.length > 30)) {
+    return res.status(400).json({ erro: "Telefone inválido." });
+  }
+  if (cpf !== undefined && cpf && (typeof cpf !== "string" || !/^[\d. -]{11,14}$/.test(cpf))) {
+    return res.status(400).json({ erro: "CPF inválido." });
   }
   const sb = supabaseClient();
   if (!sb) return res.status(503).json({ erro: "Banco de dados indisponível (modo demo)." });
@@ -2769,6 +2826,38 @@ app.post("/api/cliente/verificar", async (req, res) => {
       return res.status(401).json({ erro: error.message });
     }
     registrarTentativaSucesso(ip);
+    // Garante o perfil com os dados enviados na verificação (ou no metadata
+    // legado, para compatibilidade). Só grava campos presentes para não apagar
+    // dados de quem já tinha perfil. A sincronização com a LI também ocorre
+    // somente depois da verificação do e-mail.
+    try {
+      const u = data.user;
+      if (u?.id) {
+        const meta: any = u.user_metadata || {};
+        const nomeFinal = typeof nome === "string" && nome.trim() ? nome.trim() : (meta.nome || "");
+        const telefoneFinal = typeof telefone === "string" && telefone.trim() ? telefone.trim() : (meta.telefone || "");
+        const cpfFinal = typeof cpf === "string" && cpf.trim() ? cpf.trim() : (meta.cpf || "");
+        const perfil: any = { id: u.id, email: e, updated_at: new Date().toISOString() };
+        if (nomeFinal) perfil.nome = nomeFinal;
+        if (telefoneFinal) perfil.telefone = telefoneFinal;
+        if (cpfFinal) perfil.cpf = cpfFinal;
+        // O aceite é registrado no momento da prova de posse do e-mail, não no
+        // cadastro (que é uma rota pública e não confirma quem é o titular).
+        if (aceiteLgpd === true || meta.aceite_lgpd === true) {
+          perfil.aceite_lgpd = true;
+          perfil.aceite_lgpd_em = new Date().toISOString();
+        }
+        await sb.from("profiles").upsert(perfil, { onConflict: "id" });
+        if (nomeFinal || telefoneFinal || cpfFinal) {
+          const { LI_APP_KEY, LI_API_KEY } = await getSecretsLI();
+          if (LI_APP_KEY && LI_API_KEY) {
+            await criarClienteLI(e, { nome: nomeFinal, telefone: telefoneFinal, cpf: cpfFinal });
+          }
+        }
+      }
+    } catch (pErr) {
+      console.warn("[verificar] falha ao salvar perfil/sincronizar LI (ignorado):", (pErr as Error)?.message);
+    }
     // Fase B: concede a missão "cadastro completo" (idempotente — só 1x).
     try { await segredos.concederMissao(e, "cadastro_completo"); } catch (mErr) {
       console.warn("[verificar] falha ao conceder missão de cadastro (ignorado):", (mErr as Error)?.message);
@@ -2834,7 +2923,8 @@ app.post("/api/cliente/confirmar-link", async (req, res) => {
 
 // POST /api/cliente/login-password -> cria usuário com senha ou faz login
 // Ideal para testes: o cliente digita email + senha e entra direto.
-// Se o usuário não existir, cria com senha. Se existir, loga ou define senha.
+// Se o usuário existir, faz login estrito (NUNCA redefine a senha). Se não
+// existir, cria a conta com senha.
 app.post("/api/cliente/login-password", async (req, res) => {
   const ip = ipDo(req);
   const bloq = checarBloqueio(ip);
@@ -2853,34 +2943,28 @@ app.post("/api/cliente/login-password", async (req, res) => {
   if (!sb) return res.status(503).json({ erro: "Banco de dados indisponível." });
 
   try {
-    // Verifica se já existe — se sim, só loga.
-    let listUser: string | null = null;
-    try {
-      const list = await sb.auth.admin.listUsers();
-      listUser = list.data?.users?.find((u) => u.email === e)?.id || null;
-    } catch { /* ignora */ }
-
-    if (listUser) {
-      // Login ESTRITO: nunca redefine a senha de uma conta existente. O código
-      // antigo fazia fallback de `admin.updateUserById({ password })` após uma
-      // falha de login — qualquer pessoa que soubesse o e-mail tomava a conta.
-      const { data, error: loginErr } = await sb.auth.signInWithPassword({ email: e, password: s });
-      if (loginErr || !data?.session || !data.user) {
-        registrarTentativaFalha(ip);
-        if (loginErr && /email not confirmed|not confirmed/i.test(loginErr.message)) {
-          return res.status(403).json({ erro: "Confirme seu e-mail antes de entrar." });
-        }
-        return res.status(401).json({ erro: "E-mail ou senha inválidos." });
-      }
+    // 1) Tenta login primeiro. Não usamos admin.listUsers() — ele carregava a
+    //    base inteira de usuários a cada tentativa, sem necessidade.
+    const { data: loginData, error: loginErr } = await sb.auth.signInWithPassword({ email: e, password: s });
+    if (!loginErr && loginData?.session && loginData.user) {
       registrarTentativaSucesso(ip);
       try {
-        const perfil: any = { id: data.user.id, email: e, updated_at: new Date().toISOString() };
+        const perfil: any = { id: loginData.user.id, email: e, updated_at: new Date().toISOString() };
         if (nome) perfil.nome = nome;
         await sb.from("profiles").upsert(perfil, { onConflict: "id" });
       } catch (pErr) {
         console.warn("[login-password] falha ao salvar perfil (ignorado):", (pErr as Error)?.message);
       }
-      return res.json({ ok: true, session: data.session, user: data.user, mensagem: "Login OK" });
+      return res.json({ ok: true, session: loginData.session, user: loginData.user, mensagem: "Login OK" });
+    }
+    if (loginErr && /email not confirmed|not confirmed/i.test(loginErr.message)) {
+      return res.status(403).json({ erro: "Confirme seu e-mail antes de entrar." });
+    }
+    // Só segue para o cadastro quando as credenciais são inválidas (conta
+    // inexistente ou senha errada). Erros de infraestrutura não criam conta.
+    if (loginErr && !/invalid login credentials/i.test(loginErr.message)) {
+      console.error("[login-password] signIn erro:", loginErr.message);
+      return res.status(500).json({ erro: "Falha ao entrar. Tente novamente." });
     }
 
     // Cadastro: usa o fluxo do Supabase Auth (envia confirmação de e-mail quando
@@ -2906,7 +2990,8 @@ app.post("/api/cliente/login-password", async (req, res) => {
     if (error) {
       console.error("[register-password] signUp erro:", error.message);
       if (/already|registered|exists/i.test(error.message)) {
-        return res.status(409).json({ erro: "Já existe uma conta com este e-mail. Faça login." });
+        registrarTentativaFalha(ip);
+        return res.status(401).json({ erro: "E-mail ou senha inválidos." });
       }
       return res.status(400).json({ erro: "Não foi possível criar a conta." });
     }
@@ -2916,7 +3001,8 @@ app.post("/api/cliente/login-password", async (req, res) => {
     // Supabase devolve um usuário "obfuscado" (sem identities) quando o e-mail
     // já existe e a confirmação está habilitada.
     if (Array.isArray((data.user as any).identities) && (data.user as any).identities.length === 0) {
-      return res.status(409).json({ erro: "Já existe uma conta com este e-mail. Faça login." });
+      registrarTentativaFalha(ip);
+      return res.status(401).json({ erro: "E-mail ou senha inválidos." });
     }
     registrarTentativaSucesso(ip);
 
@@ -2971,17 +3057,9 @@ app.post("/api/cliente/login", async (req, res) => {
   if (!sb) return res.status(503).json({ erro: "Banco de dados indisponível." });
 
   try {
-    // Verifica se o usuário já existe (sign-in, não sign-up).
-    let existente: string | null = null;
-    try {
-      const list = await sb.auth.admin.listUsers();
-      existente = list.data?.users?.find((u) => u.email === e)?.id || null;
-    } catch { /* ignora */ }
-
-    if (!existente) {
-      return res.status(404).json({ erro: "E-mail não cadastrado. Faça seu cadastro primeiro." });
-    }
-
+    // Não usamos admin.listUsers() para checar existência (carregava a base
+    // inteira a cada tentativa). O próprio Supabase decide; shouldCreateUser:false
+    // não cria conta nova. Se o e-mail não existir, tratamos o erro abaixo.
     registrarTentativaSucesso(ip);
     const siteUrl = FRONTEND_ORIGIN.split(",")[0].trim();
 
@@ -2996,6 +3074,9 @@ app.post("/api/cliente/login", async (req, res) => {
     if (otpErr) {
       if (/rate limit/i.test(otpErr.message)) {
         return res.status(429).json({ erro: "Muitas tentativas. Aguarde alguns minutos." });
+      }
+      if (/user not found|signups not allowed|not found/i.test(otpErr.message)) {
+        return res.status(404).json({ erro: "E-mail não cadastrado. Faça seu cadastro primeiro." });
       }
       return res.status(400).json({ erro: otpErr.message });
     }
@@ -3145,6 +3226,23 @@ async function requireCliente(req: express.Request, res: express.Response): Prom
     return null;
   }
   return email;
+}
+
+// Versão não-estrita para o checkout: devolve o e-mail quando houver um Bearer
+// válido e null quando não houver token (compra como convidado) ou quando o
+// token for inválido. Não escreve resposta — quem chama decide.
+async function emailClienteDoToken(req: express.Request): Promise<string | null> {
+  const auth = (req.headers.authorization || "").replace(/^Bearer\s+/i, "").trim();
+  if (!auth) return null;
+  const sb = supabaseClient();
+  if (!sb) return null;
+  try {
+    const { data: { user } } = await sb.auth.getUser(auth);
+    const email = (user?.email || "").trim().toLowerCase();
+    return email && /@/.test(email) ? email : null;
+  } catch {
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------------------

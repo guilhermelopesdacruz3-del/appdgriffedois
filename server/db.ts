@@ -440,8 +440,31 @@ export async function creditarPontos(email: string, valorGasto: number, ref?: st
   if (sb) {
     // Supabase é a fonte de verdade em produção — não usar espelho local efêmero.
     try {
+      // Idempotência: o MP pode reenviar o mesmo webhook. Se este pagamento já
+      // gerou crédito (mesmo `ref`), não credita de novo.
+      if (ref) {
+        const { data: ja } = await sb
+          .from("fidelidade_historico")
+          .select("id")
+          .eq("ref", ref)
+          .limit(1)
+          .maybeSingle();
+        if (ja) return 0;
+      }
+
       const { error } = await sb.rpc("creditar_pontos", { p_email: e, p_pontos: pontos, p_ref: ref || null });
       if (error) {
+        // A RPC pode ter commitado e só a resposta falhou; recheca antes do
+        // fallback para não creditar em dobro.
+        if (ref) {
+          const { data: jaAgora } = await sb
+            .from("fidelidade_historico")
+            .select("id")
+            .eq("ref", ref)
+            .limit(1)
+            .maybeSingle();
+          if (jaAgora) return pontos;
+        }
         const { data } = await sb.from("fidelidade").select("pontos").eq("email", e).single();
         const atual = (data?.pontos || 0) + pontos;
         await sb.from("fidelidade").upsert({ email: e, pontos: atual, updated_at: new Date().toISOString() }, { onConflict: "email" });
@@ -475,18 +498,27 @@ export interface PedidoMP {
   updated_at?: string;
 }
 
-// true se já processamos este pagamento (evita crédito duplo de pontos).
+// true se este pagamento JÁ FOI APROVADO e processado (evita crédito duplo de
+// pontos). A mera existência da linha não basta: o checkout cria o espelho
+// antes da confirmação, com status "pendente". Se usássemos só a existência,
+// o webhook descartaria o pagamento aprovado como "duplicado" e os pontos
+// nunca seriam creditados.
 export async function jaProcessadoMP(mpPaymentId: string): Promise<boolean> {
   if (!sb) return false;
-  const { data } = await sb.from("pedidos").select("mp_payment_id").eq("mp_payment_id", mpPaymentId).single();
-  return Boolean(data);
+  const { data } = await sb
+    .from("pedidos")
+    .select("status,pontos_creditados")
+    .eq("mp_payment_id", mpPaymentId)
+    .maybeSingle();
+  if (!data) return false;
+  return data.status === "aprovado" || data.pontos_creditados === true;
 }
 
 // Busca o pedido espelhado pelo mp_payment_id (para recuperar o li_pedido e o corpo).
-export async function buscarPedidoMP(mpPaymentId: string): Promise<{ li_pedido: number | null; li_dados?: Record<string, unknown> | null } | null> {
+export async function buscarPedidoMP(mpPaymentId: string): Promise<{ email?: string | null; li_pedido: number | null; li_dados?: Record<string, unknown> | null } | null> {
   if (!sb) return null;
-  const { data } = await sb.from("pedidos").select("li_pedido,li_dados").eq("mp_payment_id", mpPaymentId).single();
-  return data ? { li_pedido: data.li_pedido ?? null, li_dados: data.li_dados ?? null } : null;
+  const { data } = await sb.from("pedidos").select("email,li_pedido,li_dados").eq("mp_payment_id", mpPaymentId).single();
+  return data ? { email: data.email ?? null, li_pedido: data.li_pedido ?? null, li_dados: data.li_dados ?? null } : null;
 }
 
 // Busca o espelho pelo id do pedido na Loja Integrada (li_pedido). Usado pelo
@@ -510,22 +542,28 @@ export async function upsertPedidoMP(p: PedidoMP): Promise<void> {
     valor: p.valor,
     status: p.status,
     external_reference: p.external_reference ?? null,
-    pontos_creditados: p.pontos_creditados ?? false,
     updated_at: agora,
   };
+  // Só toca em pontos_creditados quando o chamador informa. undefined = manter
+  // o valor atual (um upsert de status pendente não pode "desmarcar" pontos de
+  // um pagamento já creditado).
+  if (p.pontos_creditados !== undefined) row.pontos_creditados = p.pontos_creditados;
   if (p.li_pedido !== undefined) row.li_pedido = p.li_pedido;
   if (p.li_dados !== undefined) row.li_dados = p.li_dados;
   await sb.from("pedidos").upsert(row, { onConflict: "mp_payment_id" });
 }
 
 // Marca o pedido como aprovado e registra que os pontos foram creditados.
+// Não rebaixa `pontos_creditados` para false: em um reenvio do webhook o
+// crédito idempotente devolve 0, mas o pedido continua marcado como creditado.
 export async function confirmarPagamentoMP(mpPaymentId: string, creditouPontos: boolean): Promise<void> {
   if (!sb) return;
-  await sb.from("pedidos").update({
+  const patch: Record<string, unknown> = {
     status: "aprovado",
-    pontos_creditados: creditouPontos,
     updated_at: new Date().toISOString(),
-  }).eq("mp_payment_id", mpPaymentId);
+  };
+  if (creditouPontos) patch.pontos_creditados = true;
+  await sb.from("pedidos").update(patch).eq("mp_payment_id", mpPaymentId);
 }
 
 // Resgata pontos (desconto no checkout). Retorna os pontos usados ou 0 se insuficiente.

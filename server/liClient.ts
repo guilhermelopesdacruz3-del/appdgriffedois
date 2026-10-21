@@ -18,17 +18,17 @@
 // no app não pode quebrar só porque a LI recusou algo.
 
 import { getSecret, buscarPerfil, listarEnderecos } from "./db.ts";
+import { demoPermitido } from "./ambiente.ts";
 
 const LI_API_BASE = "https://api.awsli.com.br/api/v1";
 const LI_SALES_BASE = "https://api.awsli.com.br/v1/integration/sales";
-const DEMO = process.env.DEMO_MODE === "true";
 
 // Chama um recurso da API clássica da LI (/api/v1/...) com query params.
 async function chamarLI(method: string, resource: string, id?: string | number, query?: Record<string, string>, body?: unknown) {
   const APP_KEY = (await getSecret("LI_APP_KEY").catch(() => null)) || process.env.LOJA_INTEGRADA_APP_KEY || "";
   const API_KEY = (await getSecret("LI_API_KEY").catch(() => null)) || process.env.LOJA_INTEGRADA_API_KEY || "";
   if (!APP_KEY || !API_KEY) {
-    if (DEMO) {
+    if (demoPermitido()) {
       // Em modo demo, simula respostas da LI sem chamar a API real.
       if (method === "POST" && resource === "cliente") return { status: 200, payload: { id: 1, email: (body as any)?.email } };
       if (method === "POST" && resource === "pedido") return { status: 200, payload: { pedido: { id: Math.floor(Math.random() * 900000) + 100000 } } };
@@ -101,7 +101,7 @@ async function chamarSalesLI(
   const APP_KEY = (await getSecret("LI_APP_KEY").catch(() => null)) || process.env.LOJA_INTEGRADA_APP_KEY || "";
   const API_KEY = (await getSecret("LI_API_KEY").catch(() => null)) || process.env.LOJA_INTEGRADA_API_KEY || "";
   if (!APP_KEY || !API_KEY) {
-    if (DEMO) {
+    if (demoPermitido()) {
       // Em modo demo sem chaves, simula respostas da LI sem chamar a API real.
       if (method === "POST") {
         const fakeId = Math.floor(Math.random() * 900000000) + 100000000;
@@ -364,18 +364,86 @@ export async function atualizarPedidoLISituacao(
   }
 }
 
-// Busca o preço REAL de um produto na LI por SKU. Retorna null se não houver
-// chaves, o produto não existir, ou a LI não responder — nesses casos o chamador
-// deve manter o comportamento anterior (não quebra o checkout).
-export async function buscarPrecoLI(sku?: string): Promise<number | null> {
-  if (!sku) return null;
-  try {
-    const { status, payload } = await chamarLI("GET", "produto", undefined, { sku: String(sku), limit: "1" });
-    if (status !== 200) return null;
-    const p = Array.isArray(payload?.objects) ? payload.objects[0] : null;
-    const preco = Number(p?.preco_promocional || p?.preco_cheio || p?.preco || 0);
-    return Number.isFinite(preco) && preco > 0 ? Number(preco.toFixed(2)) : null;
-  } catch {
-    return null;
+// Cache curto de preço: um carrinho pode ter vários itens e o mesmo produto
+// pode aparecer em tentativas seguidas. Evita bater na LI a cada item.
+const precoCache = new Map<string, { preco: number | null; expira: number }>();
+const PRECO_CACHE_TTL_MS = 60_000;
+
+function precoDoProduto(obj: any): number | null {
+  if (!obj || typeof obj !== "object") return null;
+  // Produto sob consulta não tem preço público — o checkout deve recusar.
+  if (obj.preco_sob_consulta === true) return null;
+  const n = Number(obj.preco_promocional || obj.preco_cheio || obj.preco || 0);
+  return Number.isFinite(n) && n > 0 ? Number(n.toFixed(2)) : null;
+}
+
+function objetoProduto(payload: any): any {
+  if (Array.isArray(payload?.objects)) return payload.objects[0] || null;
+  if (payload?.produto) return payload.produto;
+  return payload && typeof payload === "object" ? payload : null;
+}
+
+function idDaUri(uri: unknown): number | null {
+  const m = String(uri || "").match(/(\d+)\/?$/);
+  return m ? Number(m[1]) : null;
+}
+
+async function precoPorProdutoId(id: number): Promise<number | null> {
+  const { status, payload } = await chamarLI("GET", "produto", id, {});
+  if (status !== 200) return null;
+  let obj = objetoProduto(payload);
+  let preco = precoDoProduto(obj);
+  // Produtos pai (tipo "atributo") não têm preço próprio: o preço real está
+  // no primeiro filho (variação), como já é feito no catálogo/admin.
+  if (preco == null && Array.isArray(obj?.filhos) && obj.filhos.length > 0) {
+    const filho = obj.filhos[0];
+    const filhoId =
+      typeof filho === "number"
+        ? filho
+        : filho && typeof filho === "object"
+          ? Number((filho as any).id) || null
+          : idDaUri(filho);
+    if (filhoId) {
+      const resp = await chamarLI("GET", "produto", filhoId, {});
+      if (resp.status === 200) preco = precoDoProduto(objetoProduto(resp.payload));
+    }
   }
+  return preco;
+}
+
+// Busca o preço REAL de um produto na LI.
+//
+// O app envia `sku = String(product.id)` (ID numérico da LI), então a busca
+// antiga por `?sku=` falhava e o servidor acabava usando o preço do cliente.
+// Aceitamos as três formas: `li_uri` (preferencial), SKU numérico (ID) e SKU
+// textual. Retorna null quando não há como confirmar — o chamador decide entre
+// falhar fechado (produção) ou usar fallback (dev/demo).
+export async function buscarPrecoLI(identificador?: string, liUri?: string): Promise<number | null> {
+  const sku = String(identificador || "").trim();
+  const uri = String(liUri || "").trim();
+  if (!sku && !uri) return null;
+
+  const chave = uri ? `uri:${uri}` : `sku:${sku}`;
+  const agora = Date.now();
+  const cached = precoCache.get(chave);
+  if (cached && cached.expira > agora) return cached.preco;
+
+  let preco: number | null = null;
+  try {
+    const id = idDaUri(uri) ?? (/^\d+$/.test(sku) ? Number(sku) : null);
+    if (id) preco = await precoPorProdutoId(id);
+    // SKU textual (não numérico): busca pela listagem da LI.
+    if (preco == null && sku && !/^\d+$/.test(sku)) {
+      const { status, payload } = await chamarLI("GET", "produto", undefined, { sku, limit: "1" });
+      if (status === 200) preco = precoDoProduto(objetoProduto(payload));
+    }
+  } catch {
+    preco = null;
+  }
+
+  precoCache.set(chave, { preco, expira: agora + PRECO_CACHE_TTL_MS });
+  if (precoCache.size > 500) {
+    for (const [k, v] of precoCache) if (v.expira <= agora) precoCache.delete(k);
+  }
+  return preco;
 }
