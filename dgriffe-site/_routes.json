@@ -1,5 +1,0 @@
-{
-  "version": 1,
-  "include": ["/*"],
-  "exclude": ["/api/*", "/manifest.webmanifest", "/sw.js", "/icon-192.png", "/icon-512.png", "/maskable-192.png", "/maskable-512.png", "/favicon.ico", "/images/*", "/assets/*"]
-}

@@ -93,21 +93,30 @@ jobs:
         env:
           VITE_API_URL: https://appdgriffedois.onrender.com
       - name: Publicar site no Cloudflare Pages
+        working-directory: dgriffe-site
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: a4d6e3cfe8dde83c8cda8c79ad77202a
-        run: node scripts/deploy-cf.mjs dgriffe-site/dist dgriffe-site
-      - name: Resumo do deploy
-        if: always()
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CF_ACCOUNT_ID: a4d6e3cfe8dde83c8cda8c79ad77202a
+        # Sem --branch: branch de produção. O CLI implementa o fluxo oficial de
+        # Direct Upload (check-missing -> assets/upload -> upsert-hashes ->
+        # deployment só com o manifest). Enviar os arquivos direto no endpoint
+        # de deployments cria um deployment vazio.
+        run: npx cloudflare-pages-direct-uploader dgriffe-site dist
+      - name: Verificar site publicado
+        working-directory: dgriffe-site
         run: |
-          if [ -f deploy-result.json ]; then
-            {
-              echo '### Cloudflare Pages'
-              echo '```json'
-              cat deploy-result.json
-              echo '```'
-            } >> "$GITHUB_STEP_SUMMARY"
-          fi
+          EXPECTED=$(basename "$(ls dist/assets/index-*.js | head -1)")
+          for i in $(seq 1 12); do
+            HTML=$(curl -fsSL "https://dgriffe-site.pages.dev/?v=$RANDOM")
+            if echo "$HTML" | grep -q "$EXPECTED"; then
+              echo "Site atualizado: $EXPECTED"
+              exit 0
+            fi
+            echo "Aguardando propagação ($i/12)..."
+            sleep 5
+          done
+          echo "::error::O site ainda serve o bundle antigo (esperado: $EXPECTED)"
+          exit 1
 
   deploy-backend:
     needs: [test, sync-supabase]
