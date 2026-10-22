@@ -75,8 +75,9 @@ export default function Footer() {
             <ul className="space-y-3">
               <li><Link to="/historia" className="text-sm text-neutral-400 hover:text-white transition-colors">Sobre Nós</Link></li>
               <li><a href="mailto:contato@dgriffe.com.br" className="text-sm text-neutral-400 hover:text-white transition-colors">Trabalhe Conosco</a></li>
-              <li><a href="mailto:contato@dgriffe.com.br" className="text-sm text-neutral-400 hover:text-white transition-colors">Política de Privacidade</a></li>
-              <li><a href="mailto:contato@dgriffe.com.br" className="text-sm text-neutral-400 hover:text-white transition-colors">Termos de Uso</a></li>
+              <li><Link to="/privacidade" className="text-sm text-neutral-400 hover:text-white transition-colors">Política de Privacidade</Link></li>
+              <li><Link to="/termos" className="text-sm text-neutral-400 hover:text-white transition-colors">Termos de Uso</Link></li>
+              <li><Link to="/excluir-conta" className="text-sm text-neutral-400 hover:text-white transition-colors">Excluir minha conta</Link></li>
               <li><a href="mailto:contato@dgriffe.com.br" className="text-sm text-neutral-400 hover:text-white transition-colors">Trocas e Devoluções</a></li>
             </ul>
           </div>

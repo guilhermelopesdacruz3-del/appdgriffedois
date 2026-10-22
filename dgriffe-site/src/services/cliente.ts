@@ -145,6 +145,7 @@ export async function cadastrarCliente(data: {
   nome: string;
   telefone?: string;
   cpf?: string;
+  aceiteLgpd?: boolean;
 }): Promise<{ ok: boolean; session?: Session; user?: Cliente; mensagem?: string }> {
   return api('/api/cliente/login-password', {
     method: 'POST',

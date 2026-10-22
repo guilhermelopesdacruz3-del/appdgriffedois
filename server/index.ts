@@ -2914,11 +2914,13 @@ app.post("/api/cliente/confirmar-link", async (req, res) => {
     try {
       const uid = data.user?.id;
       if (uid) {
-        await sb.from("profiles").upsert({
-          id: uid,
-          email: data.user?.email || "",
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "id" });
+        const perfilUpsert: any = { id: uid, email: data.user?.email || "", updated_at: new Date().toISOString() };
+        const meta: any = (data.user as any)?.user_metadata || {};
+        if (meta.aceite_lgpd === true) {
+          perfilUpsert.aceite_lgpd = true;
+          perfilUpsert.aceite_lgpd_em = new Date().toISOString();
+        }
+        await sb.from("profiles").upsert(perfilUpsert, { onConflict: "id" });
       }
     } catch (pErr) {
       console.warn("[confirmar-link] falha ao garantir perfil (ignorado):", (pErr as Error)?.message);
@@ -2939,7 +2941,7 @@ app.post("/api/cliente/login-password", async (req, res) => {
   const bloq = checarBloqueio(ip);
   if (bloq.bloqueado) return res.status(429).json({ erro: `Muitas tentativas. Tente em ${bloq.resta}s.` });
 
-  const { email, senha, nome, telefone, cpf } = req.body || {};
+  const { email, senha, nome, telefone, cpf, aceiteLgpd } = req.body || {};
   const e = (email || "").trim().toLowerCase();
   const s = String(senha || "").trim();
   if (!e || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) {
@@ -2992,7 +2994,15 @@ app.post("/api/cliente/login-password", async (req, res) => {
       email: e,
       password: s,
       options: {
-        data: { nome: nome || "", telefone: telefone || "" },
+        // Aceite LGPD vai no user_metadata (via junto com o cadastro; é copiado
+        // para o perfil no confirmar-link, quando o e-mail é confirmado).
+        data: {
+          nome: nome || "",
+          telefone: telefone || "",
+          ...(aceiteLgpd === true
+            ? { aceite_lgpd: true, aceite_lgpd_em: new Date().toISOString() }
+            : {}),
+        },
         ...(redirectPermitido ? { emailRedirectTo: redirectPermitido } : {}),
       },
     });
@@ -3031,6 +3041,10 @@ app.post("/api/cliente/login-password", async (req, res) => {
       if (nome) perfil.nome = nome;
       if (telefone) perfil.telefone = telefone;
       if (cpf) perfil.cpf = cpf;
+      if (aceiteLgpd === true) {
+        perfil.aceite_lgpd = true;
+        perfil.aceite_lgpd_em = new Date().toISOString();
+      }
       await sb.from("profiles").upsert(perfil, { onConflict: "id" });
     } catch (pErr) {
       console.warn("[register-password] falha ao salvar perfil (ignorado):", (pErr as Error)?.message);
@@ -3193,6 +3207,13 @@ app.post("/api/cliente/excluir-confirmar", async (req, res) => {
       await sb.from("notificacoes").delete().eq("email", e);
     } catch (pErr) {
       console.warn("[exclusao] falha ao limpar tabelas (ignorado):", (pErr as Error)?.message);
+    }
+
+    // 5b) Remove as subscriptions de push (store_config: chave PUSH_SUB_<email>).
+    try {
+      await sb.from("store_config").delete().eq("key", `PUSH_SUB_${e}`);
+    } catch (pushErr) {
+      console.warn("[exclusao] falha ao remover push subscription (ignorado):", (pushErr as Error)?.message);
     }
 
     // 6) Deleta o usuário de autenticação (remove o acesso).

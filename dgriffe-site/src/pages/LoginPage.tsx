@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { cadastrarCliente, loginCliente, setClienteSession } from '../services/cliente';
 
 export default function LoginPage() {
@@ -12,6 +12,7 @@ export default function LoginPage() {
   const [isCadastro, setIsCadastro] = useState(false);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [aceitoLgpd, setAceitoLgpd] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -19,7 +20,7 @@ export default function LoginPage() {
     setErro(null);
     try {
       const res = isCadastro
-        ? await cadastrarCliente({ email, senha, nome, telefone, cpf })
+        ? await cadastrarCliente({ email, senha, nome, telefone, cpf, aceiteLgpd: true })
         : await loginCliente({ email, senha });
 
       if (res.ok && res.session) {
@@ -113,9 +114,31 @@ export default function LoginPage() {
 
           {erro && <p className="text-xs text-red-500">{erro}</p>}
 
+          {isCadastro && (
+            <label className="flex items-start gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={aceitoLgpd}
+                onChange={(e) => setAceitoLgpd(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-neutral-900"
+              />
+              <span className="text-xs text-neutral-500 leading-snug">
+                Li e concordo com a{' '}
+                <Link to="/privacidade" target="_blank" className="text-neutral-700 font-semibold underline">
+                  Política de Privacidade
+                </Link>{' '}
+                e com os{' '}
+                <Link to="/termos" target="_blank" className="text-neutral-700 font-semibold underline">
+                  Termos de Uso
+                </Link>{' '}
+                (LGPD — Lei 13.709/2018).
+              </span>
+            </label>
+          )}
+
           <button
             type="submit"
-            disabled={loading || !email || !senha || senha.length < 6}
+            disabled={loading || !email || !senha || senha.length < 6 || (isCadastro && !aceitoLgpd)}
             className="w-full h-11 btn-primary disabled:opacity-50"
           >
             {loading ? 'Entrando...' : isCadastro ? 'Criar Conta' : 'Entrar'}
@@ -134,7 +157,11 @@ export default function LoginPage() {
         </form>
 
         <p className="text-center text-xs text-neutral-400 mt-4">
-          Ao continuar, você concorda com os termos de uso e política de privacidade.
+          Ao continuar, você concorda com os{' '}
+          <Link to="/termos" target="_blank" className="underline hover:text-neutral-600">termos de uso</Link> e{' '}
+          <Link to="/privacidade" target="_blank" className="underline hover:text-neutral-600">política de privacidade</Link>.
+          Já tem conta e quer sair?{' '}
+          <Link to="/excluir-conta" target="_blank" className="underline hover:text-neutral-600">Excluir conta</Link>.
         </p>
       </div>
     </div>

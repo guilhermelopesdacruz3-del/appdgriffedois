@@ -10,6 +10,8 @@ import CartPage from './pages/CartPage';
 import CheckoutPage from './pages/CheckoutPage';
 import LoginPage from "./pages/LoginPage";
 import AuthCallbackPage from "./pages/AuthCallbackPage";
+import TermosPage from "./pages/TermosPage";
+import ExcluirContaPage from "./pages/ExcluirContaPage";
 
 export default function App() {
   return (
@@ -27,6 +29,9 @@ export default function App() {
             <Route path="/checkout" element={<CheckoutPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/auth/callback" element={<AuthCallbackPage />} />
+            <Route path="/termos" element={<TermosPage modo="termos" />} />
+            <Route path="/privacidade" element={<TermosPage modo="privacidade" />} />
+            <Route path="/excluir-conta" element={<ExcluirContaPage />} />
           </Routes>
         </main>
         <Footer />
