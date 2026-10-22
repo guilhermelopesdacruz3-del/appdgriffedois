@@ -1,13 +1,13 @@
 #!/usr/bin/env node
 // Deploy to Cloudflare Pages via direct API (multipart).
-// Usage: node scripts/deploy-cf.mjs <deploy-dir>
+// Usage: node scripts/deploy-cf.mjs <deploy-dir> [project-name]
 import fs from 'fs';
 import path from 'path';
 import crypto from 'crypto';
 
 const TOK = process.env.CLOUDFLARE_API_TOKEN;
 const ACCT = process.env.CLOUDFLARE_ACCOUNT_ID || 'a4d6e3cfe8dde83c8cda8c79ad77202a';
-const PROJECT = 'appdgriffedois';
+const PROJECT = process.argv[3] || 'appdgriffedois';
 const dir = process.argv[2];
 
 if (!TOK) { console.error('CLOUDFLARE_API_TOKEN ausente'); process.exit(1); }

@@ -70,6 +70,37 @@ jobs:
   # O _routes.json é copiado para public/ -> dist/ no build, então o Cloudflare o aplica.
   # Mantemos o test+build para validação de CI.
 
+  # O site (dgriffe-site) é um projeto Cloudflare Pages separado e não está
+  # conectado ao GitHub como o app. Sem este job, o push atualiza o código mas
+  # a produção continua servindo o bundle antigo. O upload usa a API oficial
+  # com o token do repositório; nenhum segredo é impresso no log.
+  deploy-site:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: dgriffe-site/package-lock.json
+      - name: Instalar dependências do site
+        run: npm ci
+        working-directory: dgriffe-site
+      - name: Build do site
+        run: npm run build
+        working-directory: dgriffe-site
+        env:
+          VITE_API_URL: https://appdgriffedois.onrender.com
+      - name: Incluir rotas do Cloudflare Pages
+        run: cp _routes.json dist/_routes.json
+        working-directory: dgriffe-site
+      - name: Publicar site no Cloudflare Pages
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: a4d6e3cfe8dde83c8cda8c79ad77202a
+        run: node scripts/deploy-cf.mjs dgriffe-site/dist dgriffe-site
+
   deploy-backend:
     needs: [test, sync-supabase]
     runs-on: ubuntu-latest
