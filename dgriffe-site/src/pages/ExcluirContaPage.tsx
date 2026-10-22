@@ -27,7 +27,9 @@ export default function ExcluirContaPage() {
         body: JSON.stringify({ email: email.trim() }),
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body?.erro || `Falha ao enviar código (${res.status})`);
+      // Contrato 2026-10: falhas chegam como 200 + { ok:false, erro } (a LB do
+      // host substitui corpos de 5xx) — o flag manda, não o status HTTP.
+      if (!res.ok || body?.ok === false) throw new Error(body?.erro || `Falha ao enviar código (${res.status})`);
       setEtapa('codigo');
       setAviso('Enviamos um código de confirmação para o seu e-mail.');
     } catch (err: any) {
@@ -48,7 +50,7 @@ export default function ExcluirContaPage() {
         body: JSON.stringify({ email: email.trim(), token: codigo.trim() }),
       });
       const body = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(body?.erro || `Falha ao confirmar exclusão (${res.status})`);
+      if (!res.ok || body?.ok === false) throw new Error(body?.erro || `Falha ao confirmar exclusão (${res.status})`);
       logoutCliente();
       setEtapa('concluido');
     } catch (err: any) {
