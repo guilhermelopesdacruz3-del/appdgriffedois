@@ -551,7 +551,9 @@ export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNav
         body: JSON.stringify({ email: cliente?.email }),
       });
       const j = await r.json();
-      if (!r.ok) { setExErr(j.erro || "Falha ao solicitar exclusão."); return; }
+      // O servidor devolve erros como HTTP 200 + ok:false (a LB do host
+      // substitui corpos de 5xx) — checa os dois caminhos.
+      if (!r.ok || j.ok === false) { setExErr(j.erro || "Falha ao solicitar exclusão."); return; }
       setExEnviado(true);
       setExCd(60); // botão de reenvio trava por 60s (server também valida)
       setExMsg(j.mensagem || "Código enviado para seu e-mail (verifique também o spam).");
@@ -571,7 +573,7 @@ export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNav
         body: JSON.stringify({ email: cliente?.email, token: exOtp }),
       });
       const j = await r.json();
-      if (!r.ok) { setExErr(j.erro || "Falha ao excluir conta."); return; }
+      if (!r.ok || j.ok === false) { setExErr(j.erro || "Falha ao excluir conta."); return; }
       setExMsg(j.mensagem || "Conta excluída.");
       await sair();
       setExModal(false);

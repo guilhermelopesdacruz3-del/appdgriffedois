@@ -3143,21 +3143,20 @@ app.post("/api/cliente/excluir-solicitar", async (req, res) => {
   try {
     const r = await solicitarCodigoExclusao(e);
     if (r.status === "cooldown") {
-      return res.status(429).json({ erro: `Aguarde ${r.segundos}s para solicitar um novo código.` });
+      return res.status(429).json({ ok: false, erro: `Aguarde ${r.segundos}s para solicitar um novo código.` });
     }
     if (r.status !== "ok") {
       console.warn("[exclusao] erro ao solicitar código:", r.erro);
-      // ⚠️ TEMPORÁRIO (diagnóstico): resposta 200 com detalhe a laser.
-      // A LB do hospede acha que RES.status(5xx) responde com "error code: 502" próprio,
-      // ento o app/classes do instalador respondem no status 200 para vermos a
-      // mensagem real na frente.
-      return res.status(200).json({ ok: false, teste: "otp-diag", detalhe: r.erro || "Desconhecido" });
+      // Contrato da plataforma: a LB do hospede acha que RESPOSTAS 5xx (substitui o
+      // corpo por "error code: 502"), então erros de envio/config viagem toda como
+      // 200 + ok:false — o cliente decide pelo flag, não pelo HTTP status.
+      return res.status(200).json({ ok: false, erro: "Falha ao enviar o e-mail com o código. Tente novamente em instantes." });
     }
     return res.json({ ok: true, mensagem: "Enviamos um código de confirmação para seu e-mail." });
   } catch (err) {
     // Sem exceções escapando: resposta sempre JSON.
     console.error("[exclusao] solicitar:", err);
-    return res.status(200).json({ ok: false, teste: "otp-diag-catch", detalhe: (err as Error)?.message || String(err) });
+    return res.status(200).json({ ok: false, erro: "Falha ao enviar o e-mail com o código. Tente novamente em instantes." });
   }
 });
 
@@ -3251,7 +3250,8 @@ app.post("/api/cliente/excluir-confirmar", async (req, res) => {
   } catch (err) {
     registrarTentativaFalha(ip);
     console.error("[exclusao] erro:", err);
-    return res.status(500).json({ erro: "Falha ao excluir conta." });
+    // 200 + ok:false: a LB do hospede substitui corpos de 5xx (ver solicitar).
+    return res.status(200).json({ ok: false, erro: "Falha ao excluir conta." });
   }
 });
 
