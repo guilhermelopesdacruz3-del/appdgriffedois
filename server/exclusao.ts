@@ -88,12 +88,21 @@ export async function enviarEmailCodigo(email: string, codigo: string): Promise<
     `Expira em 10 minutos e so pode ser usado uma vez.\n` +
     `Se voce NAO solicitou a exclusao, ignore este e-mail — sua conta nao sera afetada.`;
 
-  const r = await fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ from, to: [email], subject: assunto, html, text: texto }),
-    signal: AbortSignal.timeout(15000),
-  });
+  let r: Response;
+  try {
+    r = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ from, to: [email], subject: assunto, html, text: texto }),
+      signal: AbortSignal.timeout(15000),
+    });
+  } catch (errRede) {
+    // Falha de rede/timeout da fetch JAMAIS pode derrubar a rota (Express 4
+    // não captura promises rejeitadas → request pendura → proxy devolve 502).
+    const e = errRede as { name?: string; message?: string };
+    const timeout = e?.name === "TimeoutError" || e?.name === "AbortError";
+    return { ok: false, erro: timeout ? "timeout ao contatar o Resend" : `falha de rede ao enviar e-mail: ${e?.message || "desconhecida"}` };
+  }
   if (!r.ok) {
     const j: any = await r.json().catch(() => ({}));
     return { ok: false, erro: j?.message || `Resend respondeu ${r.status}` };

@@ -3132,15 +3132,27 @@ app.post("/api/cliente/excluir-solicitar", async (req, res) => {
   // Sem verificação de existência aqui — responde sempre "enviado" para não
   // permitir enumeration de e-mails; de quem não tem conta, o código não
   // encontra nada para excluir e a confirmação resulta em no-op seguro.
-  const r = await solicitarCodigoExclusao(e);
-  if (r.status === "cooldown") {
-    return res.status(429).json({ erro: `Aguarde ${r.segundos}s para solicitar um novo código.` });
-  }
-  if (r.status !== "ok") {
-    console.warn("[exclusao] erro ao solicitar código:", r.erro);
+  // ✅ Todo o await desta rota vive dentro de try/catch: uma promessa rejeitada
+  // aqui derruba a request no Express 4 (não há catch-all async) e o proxy
+  // externo devolve "error code: 502" com corpo vazio — pior DX possível.
+  try {
+    const r = await solicitarCodigoExclusao(e);
+    if (r.status === "cooldown") {
+      return res.status(429).json({ erro: `Aguarde ${r.segundos}s para solicitar um novo código.` });
+    }
+    if (r.status !== "ok") {
+      console.warn("[exclusao] erro ao solicitar código:", r.erro);
+      if (r.erro?.includes("segredo de OTP ausente")) {
+        return res.status(503).json({ erro: "Verificação temporariamente indisponível (configuração do servidor pendente)." });
+      }
+      return res.status(502).json({ erro: "Falha ao enviar o e-mail com o código. Tente novamente em instantes." });
+    }
+    return res.json({ ok: true, mensagem: "Enviamos um código de confirmação para seu e-mail." });
+  } catch (err) {
+    // Sem exceções escapando: resposta sempre JSON.
+    console.error("[exclusao] solicitar:", err);
     return res.status(502).json({ erro: "Falha ao enviar o e-mail com o código. Tente novamente em instantes." });
   }
-  return res.json({ ok: true, mensagem: "Enviamos um código de confirmação para seu e-mail." });
 });
 
 app.post("/api/cliente/excluir-confirmar", async (req, res) => {
