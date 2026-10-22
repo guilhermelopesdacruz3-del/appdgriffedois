@@ -122,6 +122,10 @@ console.log(JSON.stringify(summary, null, 2));
 // Anotação pública no check run: permite conferir environment/URL sem expor
 // token e sem depender do log (que exige admin no repositório).
 console.log(`::notice title=Cloudflare site deploy::environment=${dep.environment} url=${dep.url} aliases=${(dep.aliases || []).join(',')} branch=${branch} stage=${dep.latest_stage?.status} files=${files.length}`);
+const bc = project.build_config || {};
+console.log(`::notice title=Build config::root=${bc.root_dir || ''} dest=${bc.destination_dir || ''} cmd=${bc.build_command || ''}`);
+console.log(`::notice title=Manifest::${Object.keys(manifest).join(',')}`);
+if (logs) console.log(`::notice title=Cloudflare logs::${JSON.stringify(logs).slice(0, 900)}`);
 
 if (dep.latest_stage?.status === 'failure') {
   console.error('O deployment terminou com falha.');
