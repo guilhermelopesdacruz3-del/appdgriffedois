@@ -91,7 +91,7 @@ jobs:
         run: npm run build
         working-directory: dgriffe-site
         env:
-          VITE_API_URL: https://appdgriffedois.onrender.com
+          VITE_API_URL: https://appdgriffedois.hospedeaqui.cloud
       - name: Publicar site no Cloudflare Pages
         working-directory: dgriffe-site
         env:

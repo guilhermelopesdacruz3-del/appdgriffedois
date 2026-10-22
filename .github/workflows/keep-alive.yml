@@ -15,4 +15,4 @@ jobs:
       - name: Ping no /health do Render
         run: |
           curl -fsS -o /dev/null -w "health_status=%{http_code} tempo=%{time_total}s\n" \
-            --max-time 60 "https://appdgriffedois.onrender.com/health" || exit 0
+            --max-time 60 "https://appdgriffedois.hospedeaqui.cloud/health" || exit 0

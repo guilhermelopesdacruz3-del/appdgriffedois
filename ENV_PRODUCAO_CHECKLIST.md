@@ -22,7 +22,7 @@ PORT=10000                   # o Render injeta em runtime
 VITE_SUPABASE_URL=https://unpbvztvscuisqnzofqp.supabase.co
 VITE_SUPABASE_ANON=sb_publishable_olC8FxBz8o2jlTNgQmT9vw_Q_UhfDOY
 VITE_SUPABASE_FUNCTIONS=https://unpbvztvscuisqnzofqp.supabase.co/functions/v1
-VITE_LOJA_INTEGRADA_PROXY_URL=https://appdgriffedois.onrender.com/api/loja-integrada
+VITE_LOJA_INTEGRADA_PROXY_URL=https://appdgriffedois.hospedeaqui.cloud/api/loja-integrada
 
 # ---- Supabase Edge Function (opcional: li-proxy) ----
 # A função li-proxy agora é fechada por padrão. Se NÃO for usada, não configure

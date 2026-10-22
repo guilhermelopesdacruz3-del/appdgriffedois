@@ -5,8 +5,8 @@
 // próprio API_BASE; se a URL mudasse, dava para esquecer um e quebrar.
 //
 // - Em produção (Cloudflare Pages) a URL vem de VITE_API_URL (build-time),
-//   apontando para o Render: https://appdgriffedois.onrender.com
-// - Sem VITE_API_URL definida, cai no Render por padrão (backend canônico).
+//   apontando para o backend canônico: https://appdgriffedois.hospedeaqui.cloud
+// - Sem VITE_API_URL definida, cai no backend canônico por padrão.
 export const API_BASE: string =
   (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ||
-  "https://appdgriffedois.onrender.com";
+  "https://appdgriffedois.hospedeaqui.cloud";

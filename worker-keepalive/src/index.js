@@ -1,9 +1,10 @@
-// Mantém o backend do Render acordado (plano free dorme após ~15 min sem
-// tráfego; cold start >30s estoura o limite do Pages Function -> 502 no admin).
+// Ping periódico no /health do backend (Hospede Aqui). O plano dele não dorme
+// como o free do Render, então este keepalive perdeu a função — se quiser
+// desativar, remova o cron trigger do wrangler.toml e rode `wrangler deploy`.
 export default {
   async scheduled(controller, env, ctx) {
     ctx.waitUntil(
-      fetch("https://appdgriffedois.onrender.com/health", {
+      fetch("https://appdgriffedois.hospedeaqui.cloud/health", {
         signal: AbortSignal.timeout(30000),
       })
         .then((r) => r.text())

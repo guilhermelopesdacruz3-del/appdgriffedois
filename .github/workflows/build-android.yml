@@ -89,7 +89,7 @@ jobs:
         run: npm ci
       - name: Build do front (injeta URL do proxy)
         env:
-          VITE_LOJA_INTEGRADA_PROXY_URL: ${{ secrets.PROXY_URL || 'https://exemplo.onrender.com/api/loja-integrada' }}
+          VITE_LOJA_INTEGRADA_PROXY_URL: ${{ secrets.PROXY_URL || 'https://appdgriffedois.hospedeaqui.cloud/api/loja-integrada' }}
         run: npm run build
       - name: Capacitor add + sync android
         run: |
@@ -159,7 +159,7 @@ jobs:
         run: npm ci
       - name: Build do front (injeta URL do proxy)
         env:
-          VITE_LOJA_INTEGRADA_PROXY_URL: ${{ secrets.PROXY_URL || 'https://exemplo.onrender.com/api/loja-integrada' }}
+          VITE_LOJA_INTEGRADA_PROXY_URL: ${{ secrets.PROXY_URL || 'https://appdgriffedois.hospedeaqui.cloud/api/loja-integrada' }}
         run: npm run build
       - name: Capacitor add + sync android
         run: |
