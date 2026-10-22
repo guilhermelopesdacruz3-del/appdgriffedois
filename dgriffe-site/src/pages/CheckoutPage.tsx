@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { clearCart, getCart } from '../services/cart';
 import type { CartItem } from '../services/cart';
-import { getCliente, getClienteEmail, getClienteToken, isClienteLogado } from '../services/cliente';
+import { getCliente, getClienteEmail, isClienteLogado, obterTokenValido } from '../services/cliente';
 import { API_BASE } from '../config';
 import { formatPrice } from '../utils/format';
 import { Lock, CreditCard, QrCode, Copy, Check, ArrowLeft } from 'lucide-react';
@@ -368,7 +368,7 @@ export default function CheckoutPage() {
   });
 
   const chamarCheckout = async (meioAtual: Meio, extra: Record<string, unknown> = {}): Promise<PagamentoResp> => {
-    const token = getClienteToken();
+    const token = await obterTokenValido();
     const res = await fetch(`${API_BASE}/api/checkout`, {
       method: 'POST',
       headers: {
@@ -436,7 +436,7 @@ export default function CheckoutPage() {
     let ativo = true;
     const consultar = async () => {
       try {
-        const token = getClienteToken();
+        const token = await obterTokenValido();
         const res = await fetch(`${API_BASE}/api/checkout/status/${encodeURIComponent(pagamento.id)}`, {
           headers: token ? { Authorization: `Bearer ${token}` } : {},
         });

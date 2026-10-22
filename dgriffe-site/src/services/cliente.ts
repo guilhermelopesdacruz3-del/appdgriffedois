@@ -55,6 +55,49 @@ export function logoutCliente() {
   localStorage.removeItem(CLIENTE_REFRESH_KEY);
 }
 
+// --- Renovação de sessão ---
+
+// Renova a sessão com o refresh_token (o access_token do Supabase expira em
+// ~1h). Retorna true se a nova sessão foi recebida e salva no localStorage.
+export async function renovarSessao(): Promise<boolean> {
+  const rt = getClienteRefreshToken();
+  if (!rt) return false;
+  try {
+    const res = await fetch(`${API_BASE}/api/cliente/renovar`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: rt }),
+    });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok || !body?.session?.access_token) return false;
+    setClienteSession(body.session as Session);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Token pronto para uso: renova proativamente quando faltam <60s para expirar
+// (evita 401 no meio do fluxo de compra) e devolve o token atual.
+export async function obterTokenValido(): Promise<string | null> {
+  const token = getClienteToken();
+  if (!token) return null;
+  try {
+    const payload = token.split('.')[1];
+    if (payload) {
+      const json = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')));
+      const exp = Number(json?.exp || 0);
+      if (exp && Date.now() / 1000 > exp - 60) {
+        await renovarSessao();
+        return getClienteToken();
+      }
+    }
+  } catch {
+    /* payload ilegível: usa o token como está */
+  }
+  return token;
+}
+
 // --- API calls ---
 
 import { API_BASE } from '../config';
@@ -64,6 +107,19 @@ async function api<T>(path: string, opts: RequestInit = {}): Promise<T> {
     headers: { 'Content-Type': 'application/json', ...opts.headers },
     ...opts,
   });
+  if (res.status === 401 && path !== '/api/cliente/renovar' && getClienteRefreshToken()) {
+    // Sessão expirada no servidor: renova uma vez e repete a chamada.
+    if (await renovarSessao()) {
+      const retryHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      Object.assign(retryHeaders, opts.headers as Record<string, string> | undefined);
+      const novoToken = getClienteToken();
+      if (novoToken) retryHeaders.Authorization = `Bearer ${novoToken}`;
+      const retry = await fetch(`${API_BASE}${path}`, { ...opts, headers: retryHeaders });
+      const retryBody = await retry.json().catch(() => ({}));
+      if (!retry.ok) throw new Error((retryBody as any).erro || `API ${retry.status}`);
+      return retryBody as T;
+    }
+  }
   const body = await res.json().catch(() => ({}));
   if (!res.ok) {
     throw new Error((body as any).erro || `API ${res.status}`);
@@ -98,7 +154,7 @@ export async function cadastrarCliente(data: {
 
 // Dados do cliente logado
 export async function getCliente(): Promise<{ ok: boolean; cliente: Cliente }> {
-  const token = getClienteToken();
+  const token = await obterTokenValido();
   if (!token) throw new Error('Não autenticado');
   return api('/api/cliente/me', {
     headers: { Authorization: `Bearer ${token}` },
