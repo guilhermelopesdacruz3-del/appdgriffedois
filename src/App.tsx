@@ -16,6 +16,7 @@ import LoyaltyPage from "./pages/LoyaltyPage";
 import ProfilePage from "./pages/ProfilePage";
 import { ErrorBoundary } from "./components/layout/ErrorBoundary";
 import ClienteCadastro from "./pages/ClienteCadastro";
+import TermosPrivacidade from "./pages/TermosPrivacidade";
 import AdminPage from "./pages/AdminPage";
 import { ClienteProvider, useCliente } from "./hooks/useCliente";
 import { useFidelidade } from "./hooks/useFidelidade";
@@ -280,7 +281,8 @@ function AppInner() {
             <ProfilePage onNavigate={handleNavigate} fidelidade={fid.info} />
           </ErrorBoundary>
         )}
-        {currentPage === "cadastro" && <ClienteCadastro onVoltar={() => setCurrentPage("profile")} />}
+        {currentPage === "cadastro" && <ClienteCadastro onVoltar={() => setCurrentPage("profile")} onTermos={() => setCurrentPage("termos")} />}
+        {currentPage === "termos" && <TermosPrivacidade onVoltar={() => setCurrentPage("cadastro")} />}
       </main>
 
       {!isProductPage && <BottomNav activePage={currentPage} onNavigate={handleNavigate} dark={dark} />}

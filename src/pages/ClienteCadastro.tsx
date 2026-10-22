@@ -3,7 +3,7 @@ import { registrarComSenha, loginComSenha } from "../services/cliente";
 import { salvarClienteSessao } from "../utils/cookies";
 import { buscarClientePorEmail } from "../services/lojaIntegrada";
 
-export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) {
+export default function ClienteCadastro({ onVoltar, onTermos }: { onVoltar: () => void; onTermos?: () => void }) {
   const [etapa, setEtapa] = useState<"cadastro" | "login">("cadastro");
   const [email, setEmail] = useState("");
   const [nome, setNome] = useState("");
@@ -11,9 +11,11 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [mensagem, setMensagem] = useState<string | null>(null);
+  // LGPD: aceite obrigatório no cadastro (rastreado no backend com data/hora).
+  const [aceitoLgpd, setAceitoLgpd] = useState(false);
 
   const limpar = () => {
-    setEmail(""); setNome(""); setSenha(""); setErro(null); setMensagem(null);
+    setEmail(""); setNome(""); setSenha(""); setErro(null); setMensagem(null); setAceitoLgpd(false);
   };
 
   const enviarCadastro = async (e: React.FormEvent) => {
@@ -30,7 +32,7 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
     }
     setLoading(true);
     try {
-      const r = await registrarComSenha(email.trim().toLowerCase(), senha, nome);
+      const r = await registrarComSenha(email.trim().toLowerCase(), senha, nome, true);
       if (r.ok) {
         // Cadastro com confirmação de e-mail pendente: não há sessão ainda.
         // Não gravamos cliente local nem fingimos login — orientamos a confirmar.
@@ -164,9 +166,38 @@ export default function ClienteCadastro({ onVoltar }: { onVoltar: () => void }) 
               placeholder="Senha (mín. 6 caracteres)"
               className="w-full h-12 px-4 rounded-2xl border border-gray-200 text-sm focus:outline-none focus:border-gold"
             />
+            {/* LGPD: aceite explícito, livre e informado (checkbox, não pré-marcado) */}
+            <div className="flex items-start gap-2.5 pt-1">
+              <input
+                type="checkbox"
+                id="aceite-lgpd"
+                checked={aceitoLgpd}
+                onChange={(e) => setAceitoLgpd(e.target.checked)}
+                className="mt-0.5 w-4 h-4 accent-gold flex-shrink-0 cursor-pointer"
+              />
+              <label htmlFor="aceite-lgpd" className="text-[11px] text-gray-500 leading-snug">
+                Li e concordo com a{" "}
+                <button
+                  type="button"
+                  onClick={onTermos}
+                  className="text-gray-700 font-semibold underline"
+                >
+                  Política de Privacidade
+                </button>{" "}
+                e com os{" "}
+                <button
+                  type="button"
+                  onClick={onTermos}
+                  className="text-gray-700 font-semibold underline"
+                >
+                  Termos de Uso
+                </button>{" "}
+                (LGPD — Lei 13.709/2018).
+              </label>
+            </div>
             <button
               type="submit"
-              disabled={loading || senha.length < 6 || !nome.trim() || !email.trim()}
+              disabled={loading || senha.length < 6 || !nome.trim() || !email.trim() || !aceitoLgpd}
               className="w-full h-12 bg-luxury-black text-white text-xs font-bold rounded-2xl disabled:opacity-50 active:scale-[0.98] transition-all"
             >
               {loading ? "Cadastrando..." : "Criar conta"}

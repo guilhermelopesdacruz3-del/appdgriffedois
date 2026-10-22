@@ -7,12 +7,21 @@ function sbUrl(): string {
 export async function registrarComSenha(
   email: string,
   senha: string,
-  nome?: string
+  nome?: string,
+  aceiteLgpd?: boolean
 ): Promise<{ ok: boolean; mensagem?: string; session?: unknown; user?: unknown }> {
   const r = await fetch(`/api/cliente/login-password`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, senha, nome }),
+    body: JSON.stringify({
+      email,
+      senha,
+      nome,
+      // LGPD: o aceite vai no user_metadata do cadastro e é copiado para o
+      // perfil quando o e-mail é confirmado (prova de posse). Sem aceite,
+      // o campo simplesmente não é enviado.
+      ...(aceiteLgpd ? { aceiteLgpd: true } : {}),
+    }),
   });
   const json = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(json.erro || `Falha no cadastro (${r.status})`);
