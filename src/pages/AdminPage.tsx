@@ -67,9 +67,6 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
   const [relatorio, setRelatorio] = useState<RelatorioAdmin | null>(null);
   const [clientes, setClientes] = useState<ClienteRelatorio[]>([]);
 
-  const [afiliados, setAfiliados] = useState<any[]>([]);
-  const [carregandoAfiliados, setCarregandoAfiliados] = useState(false);
-
   const [logs, setLogs] = useState<any[]>([]);
   const [logsLoading, setLogsLoading] = useState(false);
   const [logsFiltroEmail, setLogsFiltroEmail] = useState("");
@@ -117,22 +114,12 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
     }
   }, []);
 
-  const carregarAfiliados = useCallback(async () => {
-    setCarregandoAfiliados(true);
-    try {
-      const autorizacao = `Bearer ${getAdminToken()}`;
-      const res = await fetch("/api/admin/afiliados", {
-        headers: { Authorization: autorizacao },
-      });
-      const json = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(json?.erro || `Falha ao carregar afiliados (${res.status})`);
-      setAfiliados(json.afiliados || []);
-    } catch (e) {
-      setErro((e as Error).message);
-    } finally {
-      setCarregandoAfiliados(false);
-    }
-  }, []);
+  useEffect(() => {
+    if (!token) return;
+    carregarPedidos();
+    carregarSituacoes();
+    carregarRelatorio();
+  }, [token, carregarPedidos, carregarSituacoes, carregarRelatorio]);
 
   const carregarLogs = useCallback(async () => {
     setLogsLoading(true);
@@ -172,18 +159,6 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
     a.click();
     URL.revokeObjectURL(url);
   };
-
-  useEffect(() => {
-    if (!token) return;
-    carregarPedidos();
-    carregarSituacoes();
-    carregarRelatorio();
-  }, [token, carregarPedidos, carregarSituacoes, carregarRelatorio]);
-
-  useEffect(() => {
-    if (!token || aba !== "site") return;
-    carregarAfiliados();
-  }, [token, aba, carregarAfiliados]);
 
   const fazerLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -444,6 +419,7 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                           <th className="p-3 font-semibold">Pedido Nº</th>
                           <th className="p-3 font-semibold">Cliente</th>
                           <th className="p-3 font-semibold">Data</th>
+                          <th className="p-3 font-semibold">Canal</th>
                           <th className="p-3 font-semibold">Status</th>
                           <th className="p-3 font-semibold text-right">Total</th>
                           <th className="p-3 font-semibold text-right">Ação</th>
@@ -462,6 +438,9 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                               <p className="text-[9px] text-slate-400 truncate max-w-[140px]">{p.cliente_email}</p>
                             </td>
                             <td className="p-3 text-[11px] text-slate-600 whitespace-nowrap">{p.data}</td>
+                            <td className="p-3">
+                              <span className={`inline-block px-2 py-0.5 text-[9px] font-bold rounded-full border ${p.canal === "app" ? "bg-violet-50 text-violet-600 border-violet-200" : "bg-indigo-50 text-indigo-600 border-indigo-200"}`}>{p.canal === "app" ? "App" : "Site"}</span>
+                            </td>
                             <td className="p-3">
                               <span className={`inline-block px-2 py-0.5 text-[9px] font-bold rounded-full border ${p.status === "Entregue" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : p.status === "Em produção" ? "bg-violet-50 text-violet-600 border-violet-200" : "bg-slate-50 text-slate-500 border-slate-200"}`}>{p.status}</span>
                             </td>
@@ -637,84 +616,6 @@ export default function AdminPage({ onExit }: { onExit: () => void }) {
                 <ImagensAdmin token={token || ''} />
               </div>
 
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-sm">
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <h3 className="text-sm font-bold text-slate-800">Afiliados do Site</h3>
-                    <p className="text-[11px] text-slate-400">Cadastros realizados no site dgriffe-site.pages.dev</p>
-                  </div>
-                  <button onClick={carregarAfiliados} disabled={carregandoAfiliados} className="h-9 px-4 rounded-xl border border-violet-200 text-violet-600 text-[11px] font-bold hover:bg-violet-50 active:scale-95 transition-all">
-                    {carregandoAfiliados ? "Carregando..." : "Atualizar"}
-                  </button>
-                </div>
-
-                {/* KPIs */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
-                    <p className="text-[9px] text-slate-400 uppercase tracking-wider">Total</p>
-                    <p className="text-xl font-bold text-slate-800">{afiliados.length}</p>
-                  </div>
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
-                    <p className="text-[9px] text-slate-400 uppercase tracking-wider">Ativos</p>
-                    <p className="text-xl font-bold text-emerald-600">{afiliados.filter(a => a.ativo).length}</p>
-                  </div>
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
-                    <p className="text-[9px] text-slate-400 uppercase tracking-wider">Vendas</p>
-                    <p className="text-xl font-bold text-slate-800">{afiliados.reduce((s, a) => s + (a.total_vendas || 0), 0)}</p>
-                  </div>
-                  <div className="bg-slate-50 border border-slate-100 rounded-xl p-3 text-center">
-                    <p className="text-[9px] text-slate-400 uppercase tracking-wider">Comissão</p>
-                    <p className="text-xl font-bold text-violet-600">R$ {afiliados.reduce((s, a) => s + Number(a.total_comissao || 0), 0).toFixed(2)}</p>
-                  </div>
-                </div>
-
-                {/* Tabela de afiliados */}
-                {carregandoAfiliados && (
-                  <div className="flex justify-center py-10">
-                    <div className="w-7 h-7 border-2 border-violet-500 border-t-transparent rounded-full animate-spin" />
-                  </div>
-                )}
-
-                {!carregandoAfiliados && afiliados.length === 0 && (
-                  <div className="text-center py-10">
-                    <svg className="mx-auto mb-3 text-slate-300" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 00-3-3.87" /><path d="M16 3.13a4 4 0 010 7.75" /></svg>
-                    <p className="text-xs text-slate-400">Nenhum afiliado cadastrado no site ainda.</p>
-                  </div>
-                )}
-
-                {!carregandoAfiliados && afiliados.length > 0 && (
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                      <thead>
-                        <tr className="text-[9px] uppercase tracking-wide text-slate-400 border-b border-slate-100 bg-slate-50">
-                          <th className="p-3 font-semibold">Nome</th>
-                          <th className="p-3 font-semibold">E-mail</th>
-                          <th className="p-3 font-semibold">Telefone</th>
-                          <th className="p-3 font-semibold text-right">Vendas</th>
-                          <th className="p-3 font-semibold text-right">Comissão</th>
-                          <th className="p-3 font-semibold">Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {afiliados.map((a) => (
-                          <tr key={a.id} className="border-b border-slate-50 last:border-0 hover:bg-slate-50 transition-colors">
-                            <td className="p-3 text-xs font-semibold text-slate-800">{a.nome}</td>
-                            <td className="p-3 text-[11px] text-slate-500">{a.email}</td>
-                            <td className="p-3 text-[11px] text-slate-500">{a.telefone || "—"}</td>
-                            <td className="p-3 text-right text-xs text-slate-600">{a.total_vendas || 0}</td>
-                            <td className="p-3 text-right text-xs font-semibold text-violet-600">R$ {Number(a.total_comissao || 0).toFixed(2)}</td>
-                            <td className="p-3">
-                              <span className={`inline-block px-2 py-0.5 text-[9px] font-bold rounded-full border ${a.ativo ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-slate-50 text-slate-500 border-slate-200"}`}>
-                                {a.ativo ? "Ativo" : "Inativo"}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                )}
-              </div>
             </div>
           )}
 

@@ -68,7 +68,9 @@ export default function PedidoDetalhe({ pedido, onClose, onStatusChange }: Props
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-slate-100 px-6 py-4 flex items-center justify-between rounded-t-3xl z-10">
           <div>
-            <h2 className="text-lg font-bold text-slate-800">Pedido #{pedido.numero}</h2>
+            <h2 className="text-lg font-bold text-slate-800 flex items-center gap-2">Pedido #{pedido.numero}
+              <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border !mt-0 ${pedido.canal === "app" ? "bg-violet-50 text-violet-600 border-violet-200" : "bg-indigo-50 text-indigo-600 border-indigo-200"}`}>{pedido.canal === "app" ? "App" : "Site"}</span>
+            </h2>
             <p className="text-xs text-slate-400">{pedido.data}</p>
           </div>
           <button

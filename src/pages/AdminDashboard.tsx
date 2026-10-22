@@ -340,6 +340,7 @@ export default function AdminDashboard({ token, onAbrirPedido, onIrPedidos, onIr
                 <div className="min-w-0">
                   <p className="font-semibold text-slate-800 flex items-center gap-1.5">
                     #{p.numero}
+                    <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full border ${p.canal === "app" ? "bg-violet-50 text-violet-600 border-violet-200" : "bg-indigo-50 text-indigo-600 border-indigo-200"}`}>{p.canal === "app" ? "App" : "Site"}</span>
                     {ehHoje(p.data) && <span className="w-1.5 h-1.5 rounded-full bg-violet-600 inline-block" title="Hoje" />}
                   </p>
                   <p className="text-slate-400 truncate">{p.cliente_nome} · {p.cliente_email}</p>

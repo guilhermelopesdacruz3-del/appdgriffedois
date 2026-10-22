@@ -257,7 +257,7 @@ export async function criarPedidoLI(opts: {
 
   const formaEntrega = opts.formaEntrega || "retirada";
   const comentarios = [
-    `Pedido do app D'Griffe (${opts.meio})`,
+    `Pedido do ${opts.origem === "site" ? "site" : "app"} D'Griffe (${opts.meio})`,
     formaEntrega === "entrega" ? "Entrega no endereço informado" : "Retirada na loja",
     opts.observacoes ? `Obs: ${opts.observacoes}` : null,
   ]
@@ -291,7 +291,7 @@ export async function criarPedidoLI(opts: {
     info: {
       status: SITUACAO_INICIAL,
       marketPlaceId: null,
-      reference: `dgriffe-app/${timestamp}`,
+      reference: `dgriffe-${opts.origem === "site" ? "site" : "app"}/${timestamp}`,
       comment: comentarios,
     },
     integration_data: {

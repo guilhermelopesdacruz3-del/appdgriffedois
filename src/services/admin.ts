@@ -82,6 +82,7 @@ export interface AdminPedido {
   }>;
   pagamento?: string | null;
   pagamento_status?: string | null;
+  canal?: "app" | "site" | null;
   envio?: string | null;
   envio_status?: string | null;
   envio_rastreio?: string | null;
@@ -135,6 +136,7 @@ function mapAdminPedido(p: PedidoComVerificacao): AdminPedido {
     itens,
     pagamento: pagamento?.forma_pagamento?.nome ?? null,
     pagamento_status: pagamento?.status ?? null,
+    canal: ((p as any).canal === "app" ? "app" : (p as any).canal === "site" ? "site" : null) as "app" | "site" | null,
     pagamento_detalhes: pagamento
       ? [
           pagamento.valor ? `R$ ${Number(pagamento.valor).toFixed(2)}` : null,

@@ -615,6 +615,7 @@ app.get("/api/admin/pedidos", requireAdmin, async (req, res) => {
       // A LI expõe `id` (interno) e `resource_uri` (ex.: /api/v1/pedido/1) —
       // o id usado em GET/PUT individuais é o da resource_uri, não o campo id.
       id_api: extrairIdDaUri(p.resource_uri) ?? p.id,
+      canal: canalDoPedido(p),
       verificado: Boolean(estado.verificacoes[String(p.id)]),
       verificado_em: estado.verificacoes[String(p.id)] ? estado.verificacoes[String(p.id)].em : null,
     })));
@@ -656,9 +657,9 @@ app.get("/api/admin/pedidos/:id", requireAdmin, async (req, res) => {
         verificado_em: estado.verificacoes[String(p.id)] ? estado.verificacoes[String(p.id)].em : null,
       })));
       const pedidos = objects || [];
-      const header = ["numero", "cliente", "email", "data", "status", "total", "itens", "verificado"];
+      const header = ["numero", "cliente", "email", "data", "status", "canal", "total", "itens", "verificado"];
       const linhas = pedidos.map((p) =>
-        [p.numero, p.cliente_nome, p.cliente_email, p.data, p.status, Number(p.total || 0).toFixed(2), p.items, p.verificado ? "sim" : "nao"]
+        [p.numero, p.cliente_nome, p.cliente_email, p.data, p.status, canalDoPedido(p), Number(p.total || 0).toFixed(2), p.items, p.verificado ? "sim" : "nao"]
           .map((v) => `"${String(v ?? "").replace(/"/g, '""')}"`)
           .join(",")
       );
@@ -712,6 +713,7 @@ app.get("/api/admin/pedidos/:id", requireAdmin, async (req, res) => {
       cliente_nome,
       cliente_email,
       id_api: extrairIdDaUri(obj.resource_uri) ?? obj.id,
+      canal: canalDoPedido(obj),
       verificado: Boolean(estado.verificacoes[String(obj.id)]),
       verificado_em: estado.verificacoes[String(obj.id)] ? estado.verificacoes[String(obj.id)].em : null,
     });
@@ -941,6 +943,20 @@ async function anexarClientesPedidos(objects: any[]): Promise<any[]> {
   });
 }
 
+// Canal de origem do pedido (app vs site). Pedidos criados pelo nosso checkout
+// chegam à LI com integration_data.marketplace = "app"|"site"; pedidos antigos
+// criados direto na loja caem em "site" (mesma regra do relatório /porCanal).
+function canalDoPedido(p: any): "app" | "site" {
+  const integ = p?.integration_data && typeof p.integration_data === "object" ? p.integration_data : {};
+  const marketplace = String(integ.marketplace || "").toLowerCase();
+  const integrator = String(integ.integrator || "").toLowerCase();
+  if (marketplace === "app" || marketplace === "site") return marketplace as "app" | "site";
+  if (integrator === "dgriffe-app") return "app";
+  const fallback = String(p?.plataforma_pedido || p?.origem || p?.canal || "").toLowerCase();
+  if (fallback.includes("app") || fallback.includes("mobile") || fallback.includes("aplicativo")) return "app";
+  return "site";
+}
+
 app.get("/api/admin/relatorio", requireAdmin, async (req, res) => {
   try {
     const objects = await buscarTodosPedidos();
@@ -951,14 +967,7 @@ app.get("/api/admin/relatorio", requireAdmin, async (req, res) => {
     // Pedidos antigos/criados direto na loja não trazem isso → "site".
     let porCanal = { site: 0, app: 0 };
     for (const p of objects) {
-      const integ = p.integration_data && typeof p.integration_data === "object" ? p.integration_data : {};
-      const marketplace = String(integ.marketplace || "").toLowerCase();
-      const integrator = String(integ.integrator || "").toLowerCase();
-      let canal = "";
-      if (marketplace === "app" || marketplace === "site") canal = marketplace;
-      else if (integrator === "dgriffe-app") canal = "app";
-      else canal = String(p.plataforma_pedido || p.origem || p.canal || "").toLowerCase();
-      if (canal.includes("app") || canal.includes("mobile") || canal.includes("aplicativo")) porCanal.app += 1;
+      if (canalDoPedido(p) === "app") porCanal.app += 1;
       else porCanal.site += 1;
     }
     // Se nenhum pedido trouxe canal, mostra tudo como "site" (comportamento defensivo).
