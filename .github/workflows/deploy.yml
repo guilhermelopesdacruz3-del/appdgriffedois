@@ -92,9 +92,6 @@ jobs:
         working-directory: dgriffe-site
         env:
           VITE_API_URL: https://appdgriffedois.onrender.com
-      - name: Incluir rotas do Cloudflare Pages
-        run: cp _routes.json dist/_routes.json
-        working-directory: dgriffe-site
       - name: Publicar site no Cloudflare Pages
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
