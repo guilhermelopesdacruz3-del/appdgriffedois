@@ -31,9 +31,10 @@ console.log(`Enviando ${files.length} arquivos...`);
 
 const auth = { Authorization: `Bearer ${TOK}` };
 
-// O endpoint de deploy só promove para produção quando o branch enviado é o
-// branch de produção do projeto. Sem isso, o upload fica como preview e o
-// alias *.pages.dev continua servindo o bundle antigo.
+// IMPORTANTE: em Direct Upload NÃO envie o campo `branch`. Com ele, o
+// Cloudflare trata o request como deploy de Git e ignora os arquivos do
+// manifest (o deployment sobe vazio). Sem `branch`, ele usa o branch de
+// produção do projeto e publica os arquivos enviados.
 const projectRes = await fetch(API, { headers: auth });
 const projectJson = await projectRes.json();
 const project = projectJson?.result;
@@ -51,9 +52,6 @@ const add = (s) => { body = Buffer.concat([body, Buffer.from(s)]); };
 add(`--${boundary}\r\n`);
 add(`Content-Disposition: form-data; name="manifest"\r\n\r\n`);
 add(JSON.stringify(manifest) + '\r\n');
-add(`--${boundary}\r\n`);
-add(`Content-Disposition: form-data; name="branch"\r\n\r\n`);
-add(branch + '\r\n');
 for (const f of files) {
   const buf = fs.readFileSync(f.full);
   add(`--${boundary}\r\n`);
