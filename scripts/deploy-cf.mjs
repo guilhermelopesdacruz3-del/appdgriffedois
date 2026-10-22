@@ -119,6 +119,10 @@ const summary = {
 fs.writeFileSync(path.join(process.cwd(), 'deploy-result.json'), JSON.stringify(summary, null, 2));
 console.log(JSON.stringify(summary, null, 2));
 
+// Anotação pública no check run: permite conferir environment/URL sem expor
+// token e sem depender do log (que exige admin no repositório).
+console.log(`::notice title=Cloudflare site deploy::environment=${dep.environment} url=${dep.url} aliases=${(dep.aliases || []).join(',')} branch=${branch} stage=${dep.latest_stage?.status} files=${files.length}`);
+
 if (dep.latest_stage?.status === 'failure') {
   console.error('O deployment terminou com falha.');
   process.exit(1);
