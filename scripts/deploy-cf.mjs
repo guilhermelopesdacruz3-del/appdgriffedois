@@ -27,9 +27,26 @@ const manifest = {};
 for (const f of files) manifest[f.rel] = crypto.createHash('sha256').update(fs.readFileSync(f.full)).digest('hex');
 console.log(`Enviando ${files.length} arquivos...`);
 
+// O endpoint de deploy só promove para produção quando o branch enviado é o
+// branch de produção do projeto. Sem isso, o upload fica como preview e o
+// alias *.pages.dev continua servindo o bundle antigo.
+const projectRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${ACCT}/pages/projects/${PROJECT}`, {
+  headers: { Authorization: `Bearer ${TOK}` },
+});
+const projectJson = await projectRes.json();
+const branch = projectJson?.result?.production_branch;
+if (!projectJson.success || !branch) {
+  console.error('Não foi possível ler o branch de produção do projeto:', JSON.stringify(projectJson.errors || projectJson));
+  process.exit(1);
+}
+console.log(`Projeto ${PROJECT}, branch de produção: ${branch}`);
+
 const boundary = '----HermesDeploy' + Date.now();
 let body = Buffer.alloc(0);
 const add = (s) => { body = Buffer.concat([body, Buffer.from(s)]); };
+add(`--${boundary}\r\n`);
+add(`Content-Disposition: form-data; name="branch"\r\n\r\n`);
+add(branch + '\r\n');
 add(`--${boundary}\r\n`);
 add(`Content-Disposition: form-data; name="manifest"\r\n\r\n`);
 add(JSON.stringify(manifest) + '\r\n');
