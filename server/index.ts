@@ -3147,16 +3147,17 @@ app.post("/api/cliente/excluir-solicitar", async (req, res) => {
     }
     if (r.status !== "ok") {
       console.warn("[exclusao] erro ao solicitar código:", r.erro);
-      if (r.erro?.includes("segredo de OTP ausente")) {
-        return res.status(503).json({ erro: "Verificação temporariamente indisponível (configuração do servidor pendente)." });
-      }
-      return res.status(502).json({ erro: "Falha ao enviar o e-mail com o código. Tente novamente em instantes." });
+      // ⚠️ TEMPORÁRIO (diagnóstico): resposta 200 com detalhe a laser.
+      // A LB do hospede acha que RES.status(5xx) responde com "error code: 502" próprio,
+      // ento o app/classes do instalador respondem no status 200 para vermos a
+      // mensagem real na frente.
+      return res.status(200).json({ ok: false, teste: "otp-diag", detalhe: r.erro || "Desconhecido" });
     }
     return res.json({ ok: true, mensagem: "Enviamos um código de confirmação para seu e-mail." });
   } catch (err) {
     // Sem exceções escapando: resposta sempre JSON.
     console.error("[exclusao] solicitar:", err);
-    return res.status(502).json({ erro: "Falha ao enviar o e-mail com o código. Tente novamente em instantes." });
+    return res.status(200).json({ ok: false, teste: "otp-diag-catch", detalhe: (err as Error)?.message || String(err) });
   }
 });
 
