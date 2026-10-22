@@ -532,6 +532,15 @@ export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNav
   const [exMsg, setExMsg] = useState<string | null>(null);
   const [exErr, setExErr] = useState<string | null>(null);
   const [exEnviado, setExEnviado] = useState(false);
+  const [exModal, setExModal] = useState(false); // modal aberto/fechado (≠ busy)
+  const [exCd, setExCd] = useState(0); // cooldown de reenvio (segundos)
+
+  // Cooldown de 60s para "Reenviar código" (também reforçado no servidor).
+  useEffect(() => {
+    if (exCd <= 0) return;
+    const t = setTimeout(() => setExCd((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [exCd]);
 
   const exSolicitar = async () => {
     setExErr(null); setExMsg(null); setExcluindo(true);
@@ -544,7 +553,8 @@ export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNav
       const j = await r.json();
       if (!r.ok) { setExErr(j.erro || "Falha ao solicitar exclusão."); return; }
       setExEnviado(true);
-      setExMsg(j.mensagem || "Código enviado para seu e-mail.");
+      setExCd(60); // botão de reenvio trava por 60s (server também valida)
+      setExMsg(j.mensagem || "Código enviado para seu e-mail (verifique também o spam).");
     } catch {
       setExErr("Falha de conexão. Tente novamente.");
     } finally {
@@ -564,6 +574,8 @@ export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNav
       if (!r.ok) { setExErr(j.erro || "Falha ao excluir conta."); return; }
       setExMsg(j.mensagem || "Conta excluída.");
       await sair();
+      setExModal(false);
+      setExCd(0);
       setSubTela(null);
     } catch {
       setExErr("Falha de conexão. Tente novamente.");
@@ -1128,7 +1140,7 @@ export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNav
         {/* Excluir minha conta (LGPD / Política de Dados do Google Play) */}
         <div className="px-4 mt-4 mb-8">
         <button
-        onClick={() => { setExErr(null); setExMsg(null); setExEnviado(false); setExOtp(""); setExcluindo(true); }}
+        onClick={() => { setExErr(null); setExMsg(null); setExEnviado(false); setExOtp(""); setExModal(true); }}
         className="w-full h-11 bg-red-50 text-red-500 text-xs font-bold rounded-xl active:scale-95 transition-all"
         >
         Excluir minha conta
@@ -1139,8 +1151,8 @@ export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNav
         </div>
 
         {/* Modal de exclusão de conta */}
-        {excluindo && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center px-6" onClick={() => setExcluindo(false)}>
+        {exModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center px-6" onClick={() => setExModal(false)}>
         <div className="w-full max-w-sm bg-white rounded-3xl p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
           <h3 className="text-base font-bold text-luxury-black mb-1">Excluir conta</h3>
           <p className="text-[11px] text-gray-500 mb-4">
@@ -1165,16 +1177,18 @@ export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNav
               />
               <button
                 onClick={exConfirmar}
-                disabled={exOtp.length !== 6}
+                disabled={exOtp.length !== 6 || excluindo}
                 className="w-full h-11 bg-red-500 text-white text-xs font-bold rounded-xl active:scale-95 transition-all disabled:opacity-50 mb-2"
               >
-                Confirmar exclusão
+                {excluindo ? "Excluindo..." : "Confirmar exclusão"}
               </button>
+              {/* Reenvio com cooldown de 60s (o servidor reforça 429 no código antigo) */}
               <button
-                onClick={() => setExEnviado(false)}
-                className="w-full h-10 text-gray-400 text-[11px] font-bold rounded-xl"
+                onClick={exSolicitar}
+                disabled={exCd > 0 || excluindo}
+                className="w-full h-10 text-gray-500 text-[11px] font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
               >
-                Reenviar código
+                {exCd > 0 ? `Reenviar código (${exCd}s)` : "Reenviar código"}
               </button>
             </>
           )}

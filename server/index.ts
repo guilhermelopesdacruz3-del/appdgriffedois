@@ -35,6 +35,7 @@ import {
 import * as segredos from "./db.ts";
 import { processarCheckout, consultarPagamentoMP } from "./pagamento.ts";
 import { processarWebhookMP } from "./webhook.ts";
+import { solicitarCodigoExclusao, confirmarCodigoExclusao } from "./exclusao.ts";
 import { atualizarPedidoLISituacao } from "./liClient.ts";
 import { listarVideosRecentes } from "./youtube.ts";
 import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade, salvarNotificacao, listarNotificacoes, marcarNotificacaoLida, limparNotificacoesAntigas, salvarPerfil, buscarPerfil, listarEnderecos, salvarEndereco, excluirEndereco, salvarPreferencias, buscarPreferencias, getNiveis, NIVEIS_PADRAO, calcularNivel, calcularCashback, BENEFICIO_BASE, TETO_BENEFICIOS_PERC, CASHBACK_BASE, gerarCodigoIndicacao, registrarIndicacao, creditarIndicacao, getIndicacoes, getClubeFamilia, adicionarFamiliar, creditarFamilia, getCreditosFamilia, MISSOES, VALIDADE_PONTOS_MESES_SEM_MOV, VALIDADE_PONTOS_MESES_EXPIRACAO, VALIDADE_CASHBACK_MESES_SEM_MOV, VALIDADE_CASHBACK_DIAS_ADICIONAIS, getSecret, invalidarCacheChave, salvarPushSubscription, removerPushSubscription, listarPushSubscriptions, upsertEstoque, registrarMovimentoEstoque, getEstoque, listarEstoqueBaixo, listarMovimentosEstoque } from "./db.ts";
@@ -3124,24 +3125,20 @@ app.post("/api/cliente/excluir-solicitar", async (req, res) => {
   }
   const sb = supabaseClient();
   if (!sb) return res.status(503).json({ erro: "Banco de dados indisponível (modo demo)." });
-  // Envia o OTP de exclusão. Usa shouldCreateUser:true para cobrir clientes que
-  // se cadastraram só pela Loja Integrada (sem conta no Supabase Auth) — o
-  // usuario sera criado e imediatamente deletado no confirmar. Sem isso, o
-  // Supabase barra com "Signups not allowed" e a exclusao nunca acontece (P1).
-  const siteUrl = FRONTEND_ORIGIN.split(",")[0].trim();
-  const { error } = await sb.auth.signInWithOtp({
-    email: e,
-    options: { shouldCreateUser: true, data: { __exclusao: true }, emailRedirectTo: siteUrl },
-  });
-  if (error) {
-    // Se o usuário não existe, não vaza a informação — mas também não envia OTP.
-    if (/user not found/i.test(error.message)) {
-      return res.status(404).json({ erro: "Nenhuma conta encontrada com este e-mail." });
-    }
-    if (/rate limit/i.test(error.message)) {
-      return res.status(429).json({ erro: "Muitas tentativas. Aguarde alguns minutos e tente de novo." });
-    }
-    return res.status(400).json({ erro: error.message });
+  // NOVO FLUXO (2026-10-22): OTP próprio, auto-hospedado.
+  // (Antes: Supabase signInWithOtp + link mágico — dependia de clicar num link
+  // que abria o app, o que falhava. Agora o server gera o código, guarda o
+  // HASH na tabela otp_exclusao e envia o código puro por e-mail via Resend.)
+  // Sem verificação de existência aqui — responde sempre "enviado" para não
+  // permitir enumeration de e-mails; de quem não tem conta, o código não
+  // encontra nada para excluir e a confirmação resulta em no-op seguro.
+  const r = await solicitarCodigoExclusao(e);
+  if (r.status === "cooldown") {
+    return res.status(429).json({ erro: `Aguarde ${r.segundos}s para solicitar um novo código.` });
+  }
+  if (r.status !== "ok") {
+    console.warn("[exclusao] erro ao solicitar código:", r.erro);
+    return res.status(502).json({ erro: "Falha ao enviar o e-mail com o código. Tente novamente em instantes." });
   }
   return res.json({ ok: true, mensagem: "Enviamos um código de confirmação para seu e-mail." });
 });
@@ -3158,17 +3155,28 @@ app.post("/api/cliente/excluir-confirmar", async (req, res) => {
   const sb = supabaseClient();
   if (!sb) return res.status(503).json({ erro: "Banco de dados indisponível (modo demo)." });
   try {
-    // 1) Valida o OTP (type email).
-    const { data, error } = await sb.auth.verifyOtp({ email: e, token: String(token), type: "email" });
-    if (error) {
+    // 1) Valida o OTP PRÓPRIO (tabela otp_exclusao, HMAC, uso único).
+    const r = await confirmarCodigoExclusao(e, String(token));
+    if (!r.ok) {
       registrarTentativaFalha(ip);
-      return res.status(401).json({ erro: error.message });
+      if (r.motivo === "expirado") {
+        return res.status(401).json({ erro: "Código expirado. Solicite um novo." });
+      }
+      if (r.motivo === "bloqueado") {
+        return res.status(401).json({ erro: "Muitas tentativas inválidas. Solicite um novo código." });
+      }
+      return res.status(401).json({ erro: "Código inválido." });
     }
     registrarTentativaSucesso(ip);
 
-    // 2) Busca o id do usuário para deleção em cascata.
-    const userId = data.user?.id || data.session?.user?.id;
-    if (!userId) return res.status(401).json({ erro: "Sessão inválida." });
+    // 2) Busca o id do usuário Auth vinculado ao e-mail (pode não existir para
+    // clientes criados só na Loja Integrada) — a deleção em cascata por e-mail
+    // continua cobrindo esses casos.
+    let userId: string | undefined;
+    try {
+      const prof = await sb.from("profiles").select("id").eq("email", e).maybeSingle();
+      userId = (prof.data as any)?.id || undefined;
+    } catch { /* perfil ausente → segue sem userId */ }
 
     // 3) Remove da Loja Integrada (se as chaves estiverem configuradas).
     try {
@@ -3197,12 +3205,15 @@ app.post("/api/cliente/excluir-confirmar", async (req, res) => {
     // 5) Remove perfis, favoritos, receitas, enderecos, notificacoes vinculados.
     // Deleta por userId (Auth) E por email (clientes via LI sem Auth, onde o
     // profiles.enderecos.fidelidade usam email como chave e id pode ser nulo).
+    // ⚠️ user_id é opcional: jamais chamar .delete().eq("user_id", undefined).
     try {
-      await sb.from("profiles").delete().eq("id", userId);
       await sb.from("profiles").delete().eq("email", e);
+      if (userId) await sb.from("profiles").delete().eq("id", userId);
       await sb.from("enderecos").delete().eq("email", e);
-      await sb.from("favoritos").delete().eq("user_id", userId);
-      await sb.from("receitas").delete().eq("user_id", userId);
+      if (userId) {
+        await sb.from("favoritos").delete().eq("user_id", userId);
+        await sb.from("receitas").delete().eq("user_id", userId);
+      }
       await sb.from("notificacoes").delete().eq("email", e);
     } catch (pErr) {
       console.warn("[exclusao] falha ao limpar tabelas (ignorado):", (pErr as Error)?.message);
@@ -3215,8 +3226,8 @@ app.post("/api/cliente/excluir-confirmar", async (req, res) => {
       console.warn("[exclusao] falha ao remover push subscription (ignorado):", (pushErr as Error)?.message);
     }
 
-    // 6) Deleta o usuário de autenticação (remove o acesso).
-    await sb.auth.admin.deleteUser(userId);
+    // 6) Deleta o usuário de autenticação (remove o acesso) — se houver conta Auth.
+    if (userId) await sb.auth.admin.deleteUser(userId);
 
     return res.json({ ok: true, mensagem: "Sua conta foi excluída com sucesso." });
   } catch (err) {
