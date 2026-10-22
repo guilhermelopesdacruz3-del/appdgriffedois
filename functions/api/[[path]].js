@@ -8,7 +8,7 @@ export async function onRequest(context) {
     return new Response("NOT API", { status: 404 });
   }
 
-  const target = new URL("https://appdgriffedois.onrender.com");
+  const target = new URL("https://appdgriffedois.hospedeaqui.cloud");
   target.pathname = pathname;
   target.search = url.search;
 
