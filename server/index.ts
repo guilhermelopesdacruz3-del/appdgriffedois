@@ -408,9 +408,14 @@ app.use((req, res, next) => {
   next();
 });
 
+// SHA do build injetado por esbuild (define no build.mjs). Em dev sem build,
+// degrada para um marcador qualquer — nunca quebra runtime.
+declare const __BUILD_SHA__: string;
+
 app.get("/health", (_req, res) =>
   res.json({
     ok: true,
+    build: __BUILD_SHA__, // hash do commit no momento do build (visibilidade de deploy)
     sync: syncState.progresso,
     syncOffsets: syncState.offsets,
     totalLi: syncState.totalLi,

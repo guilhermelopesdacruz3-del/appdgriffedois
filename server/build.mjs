@@ -5,8 +5,18 @@
 import { build } from "esbuild";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// SHA do commit no momento do build — exposto em GET /health para que sempre
+// seja possível verificar qual código está rodando no host (deploy visível).
+let sha = "sem-git";
+try {
+  sha = execFileSync("git", ["rev-parse", "--short", "HEAD"], { cwd: path.join(__dirname, "..") })
+    .toString()
+    .trim();
+} catch {}
 
 await build({
   entryPoints: [path.join(__dirname, "start.ts")],
@@ -19,6 +29,7 @@ await build({
   loader: { ".ts": "ts", ".mjs": "ts" },
   // packages nativos/node builtins ficam externos (resolvidos por npm install)
   external: ["express", "cors", "dotenv", "@supabase/supabase-js", "web-push"],
+  define: { __BUILD_SHA__: JSON.stringify(sha) },
   logLevel: "info",
 });
 
