@@ -97,6 +97,17 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: a4d6e3cfe8dde83c8cda8c79ad77202a
         run: node scripts/deploy-cf.mjs dgriffe-site/dist dgriffe-site
+      - name: Resumo do deploy
+        if: always()
+        run: |
+          if [ -f deploy-result.json ]; then
+            {
+              echo '### Cloudflare Pages'
+              echo '```json'
+              cat deploy-result.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
 
   deploy-backend:
     needs: [test, sync-supabase]
