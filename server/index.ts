@@ -35,7 +35,7 @@ import {
 import * as segredos from "./db.ts";
 import { processarCheckout, consultarPagamentoMP } from "./pagamento.ts";
 import { processarWebhookMP } from "./webhook.ts";
-import { solicitarCodigoExclusao, confirmarCodigoExclusao } from "./exclusao.ts";
+import { verificarCredenciaisExclusao, estadoLimite } from "./exclusao.ts";
 import { atualizarPedidoLISituacao } from "./liClient.ts";
 import { listarVideosRecentes } from "./youtube.ts";
 import { getHistoricoFidelidade, registrarLog, supabaseClient, setarPontos, salvarRegrasFidelidade, salvarNotificacao, listarNotificacoes, marcarNotificacaoLida, limparNotificacoesAntigas, salvarPerfil, buscarPerfil, listarEnderecos, salvarEndereco, excluirEndereco, salvarPreferencias, buscarPreferencias, getNiveis, NIVEIS_PADRAO, calcularNivel, calcularCashback, BENEFICIO_BASE, TETO_BENEFICIOS_PERC, CASHBACK_BASE, gerarCodigoIndicacao, registrarIndicacao, creditarIndicacao, getIndicacoes, getClubeFamilia, adicionarFamiliar, creditarFamilia, getCreditosFamilia, MISSOES, VALIDADE_PONTOS_MESES_SEM_MOV, VALIDADE_PONTOS_MESES_EXPIRACAO, VALIDADE_CASHBACK_MESES_SEM_MOV, VALIDADE_CASHBACK_DIAS_ADICIONAIS, getSecret, invalidarCacheChave, salvarPushSubscription, removerPushSubscription, listarPushSubscriptions, upsertEstoque, registrarMovimentoEstoque, getEstoque, listarEstoqueBaixo, listarMovimentosEstoque } from "./db.ts";
@@ -3116,84 +3116,52 @@ app.post("/api/cliente/login", async (req, res) => {
 });
 
 // EXCLUSÃO DE CONTA (LGPD / Política de Dados do Google Play) — self-service.
-// Fluxo em 2 passos com OTP por e-mail (mesmo padrão do cadastro/verificar):
-//   1) POST /api/cliente/excluir-solicitar  -> envia OTP
-//   2) POST /api/cliente/excluir-confirmar  -> valida OTP e apaga tudo
-app.post("/api/cliente/excluir-solicitar", async (req, res) => {
-  const ip = ipDo(req);
-  const bloq = checarBloqueio(ip);
-  if (bloq.bloqueado) return res.status(429).json({ erro: `Muitas tentativas. Tente em ${bloq.resta}s.` });
-  const { email } = req.body || {};
-  const e = (email || "").trim().toLowerCase();
-  if (!e || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(e)) {
-    return res.status(400).json({ erro: "E-mail inválido." });
-  }
-  const sb = supabaseClient();
-  if (!sb) return res.status(503).json({ erro: "Banco de dados indisponível (modo demo)." });
-  // NOVO FLUXO (2026-10-22): OTP próprio, auto-hospedado.
-  // (Antes: Supabase signInWithOtp + link mágico — dependia de clicar num link
-  // que abria o app, o que falhava. Agora o server gera o código, guarda o
-  // HASH na tabela otp_exclusao e envia o código puro por e-mail via Resend.)
-  // Sem verificação de existência aqui — responde sempre "enviado" para não
-  // permitir enumeration de e-mails; de quem não tem conta, o código não
-  // encontra nada para excluir e a confirmação resulta em no-op seguro.
-  // ✅ Todo o await desta rota vive dentro de try/catch: uma promessa rejeitada
-  // aqui derruba a request no Express 4 (não há catch-all async) e o proxy
-  // externo devolve "error code: 502" com corpo vazio — pior DX possível.
-  try {
-    const r = await solicitarCodigoExclusao(e);
-    if (r.status === "cooldown") {
-      return res.status(429).json({ ok: false, erro: `Aguarde ${r.segundos}s para solicitar um novo código.` });
-    }
-    if (r.status !== "ok") {
-      console.warn("[exclusao] erro ao solicitar código:", r.erro);
-      // Contrato da plataforma: a LB do hospede acha que RESPOSTAS 5xx (substitui o
-      // corpo por "error code: 502"), então erros de envio/config viagem toda como
-      // 200 + ok:false — o cliente decide pelo flag, não pelo HTTP status.
-      return res.status(200).json({ ok: false, erro: "Falha ao enviar o e-mail com o código. Tente novamente em instantes." });
-    }
-    return res.json({ ok: true, mensagem: "Enviamos um código de confirmação para seu e-mail." });
-  } catch (err) {
-    // Sem exceções escapando: resposta sempre JSON.
-    console.error("[exclusao] solicitar:", err);
-    return res.status(200).json({ ok: false, erro: "Falha ao enviar o e-mail com o código. Tente novamente em instantes." });
-  }
-});
-
+// Fluxo POR SENHA (2026-10): POST /api/cliente/excluir-confirmar com {email,
+// senha}. O servidor valida as credenciais na Autenticação (mesmo critério do
+// login) e apaga tudo em cascata. NÃO usa mais e-mail/OTP (sem Resend, sem
+// DNS de domínio). Força bruta travada por IP (checarBloqueio) + por e-mail
+// (exclusao.ts, 5 erros → 15 min).
 app.post("/api/cliente/excluir-confirmar", async (req, res) => {
   const ip = ipDo(req);
   const bloq = checarBloqueio(ip);
   if (bloq.bloqueado) return res.status(429).json({ erro: `Muitas tentativas. Tente em ${bloq.resta}s.` });
-  const { email, token } = req.body || {};
+  const { email, senha } = req.body || {};
   const e = (email || "").trim().toLowerCase();
-  if (!e || !token || !/^\d{6}$/.test(String(token))) {
-    return res.status(400).json({ erro: "E-mail e código de 6 dígitos são obrigatórios." });
+  const s = String(senha || "");
+  if (!e || !s) {
+    return res.status(400).json({ erro: "Informe e-mail e senha para excluir a conta." });
   }
   const sb = supabaseClient();
   if (!sb) return res.status(503).json({ erro: "Banco de dados indisponível (modo demo)." });
   try {
-    // 1) Valida o OTP PRÓPRIO (tabela otp_exclusao, HMAC, uso único).
-    const r = await confirmarCodigoExclusao(e, String(token));
+    // 1) Verifica as credenciais (Autenticação). Sem enumeration: conta
+    //    inexistente e senha errada devolvem a mesma mensagem.
+    const r = await verificarCredenciaisExclusao(e, s);
     if (!r.ok) {
       registrarTentativaFalha(ip);
-      if (r.motivo === "expirado") {
-        return res.status(401).json({ erro: "Código expirado. Solicite um novo." });
-      }
       if (r.motivo === "bloqueado") {
-        return res.status(401).json({ erro: "Muitas tentativas inválidas. Solicite um novo código." });
+        const lim = estadoLimite(e);
+        const minutos = Math.max(1, Math.ceil(lim.restaMs / 60000));
+        return res.status(429).json({ erro: `Muitas tentativas inválidas. Aguarde ${minutos} min.` });
       }
-      return res.status(401).json({ erro: "Código inválido." });
+      if (r.motivo === "infra") {
+        // 200 + ok:false: a LB do hospede substitui corpos de 5xx.
+        return res.status(200).json({ ok: false, erro: "Falha ao excluir conta. Tente novamente em instantes." });
+      }
+      return res.status(401).json({ erro: r.erro || "E-mail ou senha inválidos." });
     }
     registrarTentativaSucesso(ip);
 
-    // 2) Busca o id do usuário Auth vinculado ao e-mail (pode não existir para
-    // clientes criados só na Loja Integrada) — a deleção em cascata por e-mail
-    // continua cobrindo esses casos.
-    let userId: string | undefined;
-    try {
-      const prof = await sb.from("profiles").select("id").eq("email", e).maybeSingle();
-      userId = (prof.data as any)?.id || undefined;
-    } catch { /* perfil ausente → segue sem userId */ }
+    // 2) Id do usuário Auth vindo da VERIFICAÇÃO (fonte de verdade — não confere
+    //    o e-mail que o cliente mandou). Clientes criados só na Loja Integrada
+    //    não têm conta Auth: a cascata por e-mail continua cobrindo esses casos.
+    let userId: string | undefined = r.userId || undefined;
+    if (!userId) {
+      try {
+        const prof = await sb.from("profiles").select("id").eq("email", e).maybeSingle();
+        userId = (prof.data as any)?.id || undefined;
+      } catch { /* perfil ausente → segue sem userId */ }
+    }
 
     // 3) Remove da Loja Integrada (se as chaves estiverem configuradas).
     try {

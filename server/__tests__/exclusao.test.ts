@@ -1,69 +1,62 @@
-// Testes das primitivas de OTP de exclusão (hash/expiração/geração).
-// As funções de banco (solicitar/confirmar) dependem de Supabase — cobertas
-// manualmente em staging; aqui testamos o que é puro (fail-closed garantido).
+// Testes das primitivas da exclusão POR SENHA (limite de tentativas por e-mail).
+// A verificação de credenciais em si depende de Supabase — coberta manualmente
+// em produção; aqui testamos o limitador de força bruta (tempo injetável) e a
+// normalização de e-mail.
 
-import { beforeAll, describe, expect, it } from "vitest";
-import { hashCodigo, expirou, gerarCodigo } from "../exclusao.ts";
-import crypto from "node:crypto";
+import { describe, expect, it } from "vitest";
+import {
+  EXCLUIR_BLOQUEIO_MS,
+  EXCLUIR_FALHAS_MAX,
+  estadoLimite,
+  limparFalhasCredencial,
+  normalizarEmail,
+  registrarFalhaCredencial,
+} from "../exclusao.ts";
 
-beforeAll(() => {
-  // segredo de teste server-only (só para o HMAC dos testes)
-  process.env.OTP_SALT = process.env.OTP_SALT || "test-salt-opcional-apenas-em-testes";
-});
-
-describe("gerarCodigo", () => {
-  it("sempre gera 6 dígitos entre 100000 e 999999", () => {
-    for (let i = 0; i < 200; i++) {
-      const c = gerarCodigo();
-      expect(/^\d{6}$/.test(c)).toBe(true);
-      expect(Number(c)).toBeGreaterThanOrEqual(100000);
-      expect(Number(c)).toBeLessThanOrEqual(999999);
-    }
+describe("normalizarEmail", () => {
+  it("trim + lowercase", () => {
+    expect(normalizarEmail("  Cliente@Exemplo.COM ")).toBe("cliente@exemplo.com");
   });
 });
 
-describe("hashCodigo", () => {
-  it("é determinístico para o mesmo par (código, e-mail)", () => {
-    expect(hashCodigo("123456", "a@b.com")).toBe(hashCodigo("123456", "a@b.com"));
+describe("limite de tentativas por e-mail (força bruta)", () => {
+  const t0 = 1_000_000;
+  const email = "teste-bruteforce@example.com";
+
+  it("começa sem bloqueio", () => {
+    expect(estadoLimite(email, t0)).toEqual({ bloqueado: false, restaMs: 0 });
   });
 
-  it("liga o hash ao e-mail (mesmo código, outro e-mail = outro hash)", () => {
-    expect(hashCodigo("123456", "a@b.com")).not.toBe(hashCodigo("123456", "c@d.com"));
+  it("até 4 falhas NÃO bloqueiam", () => {
+    for (let i = 0; i < EXCLUIR_FALHAS_MAX - 1; i++) registrarFalhaCredencial(email, t0 + i * 1000);
+    expect(estadoLimite(email, t0 + 10_000).bloqueado).toBe(false);
   });
 
-  it("é um HMAC-SHA256 hex de 64 caracteres", () => {
-    expect(hashCodigo("123456", "a@b.com")).toHaveLength(64);
-    const esperado = crypto
-      .createHmac("sha256", "test-salt-opcional-apenas-em-testes")
-      .update("a@b.com:123456")
-      .digest("hex");
-    expect(hashCodigo("123456", "A@B.COM")).toBe(esperado); // e-mail normalizado
+  it("a 5ª falha bloqueia por EXCLUIR_BLOQUEIO_MS", () => {
+    registrarFalhaCredencial(email, t0 + 4 * 1000 + 1);
+    const st = estadoLimite(email, t0 + 5_000);
+    expect(st.bloqueado).toBe(true);
+    expect(st.restaMs).toBeGreaterThan(0);
+    expect(st.restaMs).toBeLessThanOrEqual(EXCLUIR_BLOQUEIO_MS);
   });
 
-  it("sempre lança sem segredo server-only", () => {
-    const antiga = process.env.OTP_SALT;
-    const antigoAdm = process.env.ADMIN_SECRET;
-    delete process.env.OTP_SALT;
-    delete process.env.ADMIN_SECRET;
-    try {
-      expect(() => hashCodigo("123456", "a@b.com")).toThrow();
-    } finally {
-      if (antiga) process.env.OTP_SALT = antiga;
-      if (antigoAdm) process.env.ADMIN_SECRET = antigoAdm;
-    }
+  it("o bloqueio expira sozinho", () => {
+    expect(estadoLimite(email, t0 + 5_000 + EXCLUIR_BLOQUEIO_MS).bloqueado).toBe(false);
   });
-});
 
-describe("expirou", () => {
-  it("data no futuro = válido", () => {
-    expect(expirou(new Date(Date.now() + 60_000).toISOString())).toBe(false);
+  it("falhas FORA da janela de 15 min não somam", () => {
+    const outro = "janela-afora@example.com";
+    // 4 falhas antigas (acima da janela) + falha única agora → não bloqueia.
+    for (let i = 0; i < EXCLUIR_FALHAS_MAX - 1; i++) registrarFalhaCredencial(outro, 5_000_000 + i * 1000);
+    registrarFalhaCredencial(outro, 5_000_000 + 20 * 60 * 1000); // 20 min depois — janela estourada
+    expect(estadoLimite(outro, 5_000_000 + 20 * 60 * 1000).bloqueado).toBe(false);
   });
-  it("data no passado = expirado", () => {
-    expect(expirou(new Date(Date.now() - 60_000).toISOString())).toBe(true);
-  });
-  it("fail-closed: valor ausente/inválido = expirado", () => {
-    expect(expirou(undefined)).toBe(true);
-    expect(expirou("")).toBe(true);
-    expect(expirou("não-é-uma-data")).toBe(true);
+
+  it("limparFalhasCredencial desbloqueia na hora (uso no sucesso)", () => {
+    const alvo = "sucesso-zera@example.com";
+    for (let i = 0; i < EXCLUIR_FALHAS_MAX; i++) registrarFalhaCredencial(alvo, 7_000_000 + i * 1000);
+    expect(estadoLimite(alvo, 7_001_000).bloqueado).toBe(true);
+    limparFalhasCredencial(alvo);
+    expect(estadoLimite(alvo, 7_001_000).bloqueado).toBe(false);
   });
 });

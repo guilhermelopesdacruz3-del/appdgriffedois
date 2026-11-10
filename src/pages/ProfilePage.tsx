@@ -527,57 +527,33 @@ export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNav
   const { pedido, loading: loadingPedidoDetalhe } = usePedidoDetalhe(pedidoSelecionado);
 
   // Estado de exclusão de conta (LGPD / Política de Dados do Google Play).
+  // Fluxo por SENHA (sem e-mail): valida credenciais + digitação de "EXCLUIR".
   const [excluindo, setExcluindo] = useState(false);
-  const [exOtp, setExOtp] = useState("");
+  const [exSenha, setExSenha] = useState("");
+  const [exConf, setExConf] = useState("");
   const [exMsg, setExMsg] = useState<string | null>(null);
   const [exErr, setExErr] = useState<string | null>(null);
-  const [exEnviado, setExEnviado] = useState(false);
   const [exModal, setExModal] = useState(false); // modal aberto/fechado (≠ busy)
-  const [exCd, setExCd] = useState(0); // cooldown de reenvio (segundos)
-
-  // Cooldown de 60s para "Reenviar código" (também reforçado no servidor).
-  useEffect(() => {
-    if (exCd <= 0) return;
-    const t = setTimeout(() => setExCd((s) => s - 1), 1000);
-    return () => clearTimeout(t);
-  }, [exCd]);
-
-  const exSolicitar = async () => {
-    setExErr(null); setExMsg(null); setExcluindo(true);
-    try {
-      const r = await fetch("/api/cliente/excluir-solicitar", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: cliente?.email }),
-      });
-      const j = await r.json();
-      // O servidor devolve erros como HTTP 200 + ok:false (a LB do host
-      // substitui corpos de 5xx) — checa os dois caminhos.
-      if (!r.ok || j.ok === false) { setExErr(j.erro || "Falha ao solicitar exclusão."); return; }
-      setExEnviado(true);
-      setExCd(60); // botão de reenvio trava por 60s (server também valida)
-      setExMsg(j.mensagem || "Código enviado para seu e-mail (verifique também o spam).");
-    } catch {
-      setExErr("Falha de conexão. Tente novamente.");
-    } finally {
-      setExcluindo(false);
-    }
-  };
 
   const exConfirmar = async () => {
+    if (exConf.trim().toUpperCase() !== "EXCLUIR") {
+      setExErr("Digite EXCLUIR para confirmar.");
+      return;
+    }
     setExErr(null); setExMsg(null); setExcluindo(true);
     try {
       const r = await fetch("/api/cliente/excluir-confirmar", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: cliente?.email, token: exOtp }),
+        body: JSON.stringify({ email: cliente?.email, senha: exSenha }),
       });
       const j = await r.json();
+      // O servidor devolve erros de infra como HTTP 200 + ok:false (a LB do host
+      // substitui corpos de 5xx) — checa os dois caminhos.
       if (!r.ok || j.ok === false) { setExErr(j.erro || "Falha ao excluir conta."); return; }
       setExMsg(j.mensagem || "Conta excluída.");
       await sair();
       setExModal(false);
-      setExCd(0);
       setSubTela(null);
     } catch {
       setExErr("Falha de conexão. Tente novamente.");
@@ -1142,13 +1118,13 @@ export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNav
         {/* Excluir minha conta (LGPD / Política de Dados do Google Play) */}
         <div className="px-4 mt-4 mb-8">
         <button
-        onClick={() => { setExErr(null); setExMsg(null); setExEnviado(false); setExOtp(""); setExModal(true); }}
+        onClick={() => { setExErr(null); setExMsg(null); setExSenha(""); setExConf(""); setExModal(true); }}
         className="w-full h-11 bg-red-50 text-red-500 text-xs font-bold rounded-xl active:scale-95 transition-all"
         >
         Excluir minha conta
         </button>
         <p className="text-[10px] text-gray-400 text-center mt-2 px-2">
-        Remove seus dados de forma definitiva. Enviaremos um código de confirmação por e-mail.
+        Remove seus dados de forma definitiva. Confirmação com sua senha de acesso.
         </p>
         </div>
 
@@ -1161,39 +1137,27 @@ export default function ProfilePage({ onNavigate, fidelidade: fidInfo }: { onNav
             Esta ação é irreversível e remove todos os seus dados (pedidos, favoritos, pontos e acesso).
           </p>
 
-          {!exEnviado ? (
-            <button
-              onClick={exSolicitar}
-              className="w-full h-11 bg-red-500 text-white text-xs font-bold rounded-xl active:scale-95 transition-all mb-2"
-            >
-              Enviar código de confirmação
-            </button>
-          ) : (
-            <>
-              <input
-                value={exOtp}
-                onChange={(e) => setExOtp(e.target.value.replace(/\D/g, "").slice(0, 6))}
-                inputMode="numeric"
-                placeholder="Código de 6 dígitos"
-                className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm text-center tracking-widest mb-2"
-              />
-              <button
-                onClick={exConfirmar}
-                disabled={exOtp.length !== 6 || excluindo}
-                className="w-full h-11 bg-red-500 text-white text-xs font-bold rounded-xl active:scale-95 transition-all disabled:opacity-50 mb-2"
-              >
-                {excluindo ? "Excluindo..." : "Confirmar exclusão"}
-              </button>
-              {/* Reenvio com cooldown de 60s (o servidor reforça 429 no código antigo) */}
-              <button
-                onClick={exSolicitar}
-                disabled={exCd > 0 || excluindo}
-                className="w-full h-10 text-gray-500 text-[11px] font-bold rounded-xl disabled:opacity-40 disabled:cursor-not-allowed"
-              >
-                {exCd > 0 ? `Reenviar código (${exCd}s)` : "Reenviar código"}
-              </button>
-            </>
-          )}
+          <input
+            type="password"
+            value={exSenha}
+            onChange={(e) => setExSenha(e.target.value)}
+            autoComplete="current-password"
+            placeholder="Sua senha de acesso"
+            className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm mb-2"
+          />
+          <input
+            value={exConf}
+            onChange={(e) => setExConf(e.target.value.toUpperCase().slice(0, 10))}
+            placeholder="Digite EXCLUIR para confirmar"
+            className="w-full h-11 px-3 rounded-xl border border-gray-200 text-sm text-center tracking-wider mb-2"
+          />
+          <button
+            onClick={exConfirmar}
+            disabled={!exSenha || exConf.trim().toUpperCase() !== "EXCLUIR" || excluindo}
+            className="w-full h-11 bg-red-500 text-white text-xs font-bold rounded-xl active:scale-95 transition-all disabled:opacity-50 mb-2"
+          >
+            {excluindo ? "Excluindo..." : "Excluir minha conta definitivamente"}
+          </button>
 
           {exMsg && <p className="text-[11px] text-green-600 text-center mt-2">{exMsg}</p>}
           {exErr && <p className="text-[11px] text-red-500 text-center mt-2">{exErr}</p>}

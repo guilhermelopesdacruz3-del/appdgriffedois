@@ -1,225 +1,101 @@
-// OTP self-hosted para exclusão de conta (LGPD / Política de Dados do Google Play).
+// Exclusão de conta self-service (LGPD / Política de Dados do Google Play) —
+// fluxo por SENHA (versão 2026-10 suave): o cliente informa e-mail + senha da
+// própria conta, digita a palavra de confirmação no front e os dados são
+// apagados em cascata (o critério de identidade é o MESMO do login).
 //
-// Substitui o fluxo antigo (Supabase signInWithOtp → link mágico no template de
-// e-mail), que dependia do link abrir no app. Agora:
-//   1) geramos um código de 6 dígitos com crypto.randomInt (seguro)
-//   2) guardamos SÓ o hash (HMAC-SHA256) no banco, com validade de 10 min
-//   3) enviamos o e-mail pelo Resend contendo apenas o código + aviso de expiração
-//   4) na confirmação, comparamos em tempo constante e apagamos o registro
-//      (uso único). 5 tentativas erradas invalidam o código (força bruta).
+// Esta versão NÃO usa e-mail/OTP (a anterior exigia Resend + DNS do domínio):
+// a verificação de posse da conta é a própria senha. Quem sabe email+senha é
+// o dono — mesma prova exigida para entrar no app.
 //
-// Os códigos ficam na tabela `otp_exclusao` (RLS habilitado, SEM policies —
-// só o backend com service_role acessa; anon/authenticated não leem nem escrevem).
+// Anti força bruta (por e-mail, em memória): 5 credenciais erradas dentro de
+// 15 min bloqueiam verificações para aquele e-mail por 15 min. Complementa o
+// limitador por IP do index.ts (checarBloqueio/registrarTentativaFalha).
+// Falhas de infraestrutura NÃO contam como tentativa errada.
 
-import crypto from "node:crypto";
-import { supabaseClient, getSecret } from "./db.ts";
-import { demoPermitido } from "./ambiente.ts";
+import { supabaseClient } from "./db.ts";
 
-export const CODIGO_VALIDADE_MS = 10 * 60 * 1000; // 10 minutos
-export const CODIGO_TENTATIVAS_MAX = 5; // código errado >= 5x → invalidado
-export const REENVIO_SEGUNDOS = 60; // cooldown entre envios
+export const EXCLUIR_FALHAS_MAX = 5;
+export const EXCLUIR_JANELA_MS = 15 * 60 * 1000; // janela de contagem das falhas
+export const EXCLUIR_BLOQUEIO_MS = 15 * 60 * 1000; // tempo bloqueado ao estourar
 
-// ------------------------------------------------------------------
-// Primitivas puras (testáveis) — usam secret do servidor, nunca saem.
-// ------------------------------------------------------------------
-
-// Segredo do HMAC: OTP_SALT se definido, senão ADMIN_SECRET (ambos server-only).
-function segredoHash(): string {
-  return process.env.OTP_SALT || process.env.ADMIN_SECRET || "";
+export function normalizarEmail(email: string): string {
+  return email.trim().toLowerCase();
 }
 
-/**
- * Hash HMAC-SHA256 do código vinculado ao e-mail (mesmo código com e-mail
- * diferente gera hash diferente — evita reuso entre contas).
- */
-export function hashCodigo(codigo: string, email: string): string {
-  const seg = segredoHash();
-  if (!seg) throw new Error("segredo de OTP ausente (defina OTP_SALT ou ADMIN_SECRET)");
-  return crypto.createHmac("sha256", seg).update(`${email.trim().toLowerCase()}:${codigo}`).digest("hex");
-}
+type EstadoEmail = { falhas: number[]; bloqueadoAte: number };
+const estados = new Map<string, EstadoEmail>();
 
-/** fail-closed: data inválida/ausente = expirado. */
-export function expirou(expiraEm: unknown): boolean {
-  const t = Date.parse(String(expiraEm || ""));
-  if (!Number.isFinite(t)) return true;
-  return Date.now() >= t;
-}
-
-/** Código de 6 dígitos cryptograficamente aleatório (100000–999999). */
-export function gerarCodigo(): string {
-  return String(crypto.randomInt(100000, 1000000)); // nunca começa com 0
-}
-
-function igualSeguro(a: string, b: string): boolean {
-  const ba = Buffer.from(a);
-  const bb = Buffer.from(b);
-  if (ba.length !== bb.length) return false;
-  return crypto.timingSafeEqual(ba, bb);
-}
-
-// ------------------------------------------------------------------
-// E-mail via Resend (API REST, sem dependências novas)
-// ------------------------------------------------------------------
-
-export async function enviarEmailCodigo(email: string, codigo: string): Promise<{ ok: boolean; erro?: string }> {
-  // Chave: store_config primeiro (getSecret), env como fallback.
-  const apiKey = (await getSecret("RESEND_API_KEY").catch(() => null)) || process.env.RESEND_API_KEY || "";
-  if (!apiKey) return { ok: false, erro: "RESEND_API_KEY não configurada" };
-
-  // "From" precisa ser um domínio VERIFICADO na Resend (cascata: env → config → sandbox).
-  const from =
-    process.env.RESEND_FROM ||
-    (await getSecret("RESEND_FROM").catch(() => null)) ||
-    "D'Griffe <onboarding@resend.dev>";
-  // sandbox (onboarding@resend.dev) só entrega para o dono da conta Resend.
-
-  const assunto = "Código para excluir sua conta — D'Griffe";
-  const html =
-    `<div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#111">` +
-    `<p style="font-size:14px;margin:0 0 12px">Recebeu uma solicitação para <b>excluir sua conta</b> na D'Griffe.</p>` +
-    `<p style="font-size:14px;margin:0 0 8px">Seu código de confirmação:</p>` +
-    `<p style="font-size:34px;letter-spacing:8px;font-weight:bold;margin:12px 0;color:#111">${codigo}</p>` +
-    `<p style="font-size:13px;color:#555;margin:0 0 12px">Este código <b>expira em 10 minutos</b> e só pode ser usado uma vez.</p>` +
-    `<p style="font-size:13px;color:#555;margin:0">Se <b>você não</b> solicitou a exclusão, ignore este e-mail — sua conta não será afetada.</p>` +
-    `</div>`;
-  const texto =
-    `Recebeu uma solicitacao para EXCLUIR SUA CONTA na D'Griffe.\n\n` +
-    `Seu codigo de confirmacao: ${codigo}\n\n` +
-    `Expira em 10 minutos e so pode ser usado uma vez.\n` +
-    `Se voce NAO solicitou a exclusao, ignore este e-mail — sua conta nao sera afetada.`;
-
-  let r: Response;
-  try {
-    r = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from, to: [email], subject: assunto, html, text: texto }),
-      signal: AbortSignal.timeout(15000),
-    });
-  } catch (errRede) {
-    // Falha de rede/timeout da fetch JAMAIS pode derrubar a rota (Express 4
-    // não captura promises rejeitadas → request pendura → proxy devolve 502).
-    const e = errRede as { name?: string; message?: string };
-    const timeout = e?.name === "TimeoutError" || e?.name === "AbortError";
-    return { ok: false, erro: timeout ? "timeout ao contatar o Resend" : `falha de rede ao enviar e-mail: ${e?.message || "desconhecida"}` };
-  }
-  if (!r.ok) {
-    const j: any = await r.json().catch(() => ({}));
-    return { ok: false, erro: j?.message || `Resend respondeu ${r.status}` };
-  }
-  return { ok: true };
-}
-
-// ------------------------------------------------------------------
-// Fluxo principal
-// ------------------------------------------------------------------
-
-/**
- * Gera um código novo, troca o anterior (não usado) e envia por e-mail.
- * Respeita cooldown de 60s entre envios para o mesmo e-mail.
- */
-export async function solicitarCodigoExclusao(
-  email: string
-): Promise<{ status: "ok" | "cooldown" | "erro"; segundos?: number; erro?: string }> {
-  const sb = supabaseClient();
-  if (!sb) return { status: "erro", erro: "banco de dados indisponível" };
-  const e = email.trim().toLowerCase();
-
-  // Cooldown: código anterior criado há menos de REENVIO_SEGUNDOS.
-  try {
-    const { data: antigo } = await sb
-      .from("otp_exclusao")
-      .select("criado_em")
-      .eq("email", e)
-      .maybeSingle();
-    const criadoEm = (antigo as any)?.criado_em as string | undefined;
-    if (criadoEm) {
-      const decorrido = (Date.now() - Date.parse(criadoEm)) / 1000;
-      if (Number.isFinite(decorrido) && decorrido < REENVIO_SEGUNDOS) {
-        return { status: "cooldown", segundos: Math.ceil(REENVIO_SEGUNDOS - decorrido) };
-      }
-    }
-  } catch { /* sem cooldown → prossegue */ }
-
-  // Up = substitui código anterior não utilizado (mesmo e-mail, 1 registro).
-  const codigo = gerarCodigo();
-  const agora = new Date();
-  const { error: upErr } = await sb.from("otp_exclusao").upsert(
-    {
-      email: e,
-      codigo_hash: hashCodigo(codigo, e),
-      criado_em: agora.toISOString(),
-      expira_em: new Date(agora.getTime() + CODIGO_VALIDADE_MS).toISOString(),
-      tentativas: 0,
-    },
-    { onConflict: "email" }
-  );
-  if (upErr) {
-    // 42P01 = tabela inexistente (SQL de criação ainda não rodou).
-    if (upErr.message?.includes("otp_exclusao")) {
-      return { status: "erro", erro: "tabela otp_exclusao não existe (aplique server/sql/otp_exclusao.sql)" };
-    }
-    return { status: "erro", erro: upErr.message || "falha ao registrar código" };
-  }
-
-  // Demo/local: não dispara e-mail real; o código aparece no log do servidor.
-  if (demoPermitido()) {
-    console.log(`[exclusao-otp] DEMO_MODE: código de exclusão para ${e}: ${codigo}`);
-    return { status: "ok" };
-  }
-
-  const envio = await enviarEmailCodigo(e, codigo);
-  if (!envio.ok) {
-    // E-mail não saiu: apaga a linha para permitir nova tentativa imediata.
-    try { await sb.from("otp_exclusao").delete().eq("email", e); } catch { /* ignore */ }
-    return { status: "erro", erro: envio.erro || "falha ao enviar e-mail" };
-  }
-  return { status: "ok" };
-}
-
-/**
- * Valida o código e o consome (uso único). Motivos de falha explícitos:
- *  - "invalido": código errado (conta tentativa)
- *  - "expirado": passou dos 10 min (código descartado)
- *  - "bloqueado": 5+ erros seguidos (código invalidado por brute force)
- */
-export async function confirmarCodigoExclusao(
+/** Estado do limitador para o e-mail (tempo injetável → testável). */
+export function estadoLimite(
   email: string,
-  codigo: string
-): Promise<{ ok: boolean; motivo?: "invalido" | "expirado" | "bloqueado"; erro?: string }> {
+  agora = Date.now()
+): { bloqueado: boolean; restaMs: number } {
+  const st = estados.get(normalizarEmail(email));
+  if (!st) return { bloqueado: false, restaMs: 0 };
+  if (Number.isFinite(st.bloqueadoAte) && agora < st.bloqueadoAte) {
+    return { bloqueado: true, restaMs: st.bloqueadoAte - agora };
+  }
+  return { bloqueado: false, restaMs: 0 };
+}
+
+/** Contabiliza uma credencial errada. Ao estourar a janela → bloqueio. */
+export function registrarFalhaCredencial(email: string, agora = Date.now()): void {
+  const e = normalizarEmail(email);
+  const st = estados.get(e) ?? { falhas: [], bloqueadoAte: 0 };
+  st.falhas = [...st.falhas, agora].filter((t) => agora - t < EXCLUIR_JANELA_MS);
+  if (st.falhas.length >= EXCLUIR_FALHAS_MAX) {
+    st.bloqueadoAte = agora + EXCLUIR_BLOQUEIO_MS;
+    st.falhas = []; // a contagem recomeça depois do bloqueio expirar
+  }
+  estados.set(e, st);
+}
+
+/** Sucesso (ou logout em outra via) zera a contagem. */
+export function limparFalhasCredencial(email: string): void {
+  estados.delete(normalizarEmail(email));
+}
+
+export type VerificacaoCredenciais =
+  | { ok: true; userId: string }
+  | { ok: false; motivo: "credenciais" | "bloqueado" | "infra"; erro?: string };
+
+/**
+ * Valida e-mail+senha na autenticação. Quando ok, devolve userId do Supabase
+ * (a cascata usa o id real de Auth — nunca o e-mail vindo do cliente como
+ * vontade de verdade para o usuário de Auth).
+ */
+export async function verificarCredenciaisExclusao(
+  email: string,
+  senha: string
+): Promise<VerificacaoCredenciais> {
+  if (estadoLimite(email).bloqueado) return { ok: false, motivo: "bloqueado" };
+
   const sb = supabaseClient();
-  if (!sb) return { ok: false, motivo: "invalido", erro: "banco de dados indisponível" };
-  const e = email.trim().toLowerCase();
+  if (!sb) return { ok: false, motivo: "infra", erro: "banco de dados indisponível" };
 
-  const { data, error } = await sb.from("otp_exclusao").select("*").eq("email", e).maybeSingle();
-  if (error) return { ok: false, motivo: "invalido" };
-  const reg = data as any;
-  if (!reg) return { ok: false, motivo: "invalido" };
-
-  // Força bruta: 5+ tentativas erradas → invalida e exige novo código.
-  if ((Number(reg.tentativas) || 0) >= CODIGO_TENTATIVAS_MAX) {
-    try { await sb.from("otp_exclusao").delete().eq("email", e); } catch { /* ignore */ }
-    return { ok: false, motivo: "bloqueado" };
+  const e = normalizarEmail(email);
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email: e, password: senha });
+    if (!error && data?.user) {
+      limparFalhasCredencial(e);
+      return { ok: true, userId: data.user.id };
+    }
+    if (error && /email not confirmed|not confirmed/i.test(error.message)) {
+      return {
+        ok: false,
+        motivo: "credenciais",
+        erro: "Confirme seu e-mail antes de excluir a conta.",
+      };
+    }
+    // Credenciais erradas OU conta inexistente — mensagem única (sem enumeration).
+    registrarFalhaCredencial(e);
+    return { ok: false, motivo: "credenciais" };
+  } catch (errAuth) {
+    // Erro de rede/timeout/infra: não conta como tentativa de senha errada.
+    return {
+      ok: false,
+      motivo: "infra",
+      erro: (errAuth as Error)?.message || "falha ao verificar credenciais",
+    };
   }
-
-  if (expirou(reg.expira_em)) {
-    try { await sb.from("otp_exclusao").delete().eq("email", e); } catch { /* ignore */ }
-    return { ok: false, motivo: "expirado" };
-  }
-
-  if (igualSeguro(String(reg.codigo_hash), hashCodigo(String(codigo), e))) {
-    // Uso único: consome ANTES de prosseguir. Se o delete falhar, avisa —
-    // mas NÃO valida duas vezes em fluxo normal.
-    const del = await sb.from("otp_exclusao").delete().eq("email", e);
-    if (del?.error) console.warn("[exclusao-otp] falha ao consumir código:", del.error.message);
-    return { ok: true };
-  }
-
-  const novas = (Number(reg.tentativas) || 0) + 1;
-  if (novas >= CODIGO_TENTATIVAS_MAX) {
-    try { await sb.from("otp_exclusao").delete().eq("email", e); } catch { /* ignore */ }
-    return { ok: false, motivo: "bloqueado" };
-  }
-  try { await sb.from("otp_exclusao").update({ tentativas: novas }).eq("email", e); } catch { /* ignore */ }
-  return { ok: false, motivo: "invalido" };
 }
