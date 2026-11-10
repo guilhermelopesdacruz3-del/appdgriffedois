@@ -27,7 +27,13 @@ export default function TermosPrivacidade({ onVoltar }: { onVoltar: () => void }
 
         <section>
           <h3 className="text-sm font-bold text-luxury-black mb-1">2. Dados coletados</h3>
-          <p>Coletamos: e-mail, nome, telefone e CPF (quando informados), além do histórico de pedidos e pontos de fidelidade.</p>
+          <p>
+            Coletamos: e-mail, nome, telefone e CPF (quando informados), endereço de entrega,
+            histórico de pedidos e pontos de fidelidade. Se você optar por cadastrar, também
+            guardamos sua <b>receita óptica</b> (graus, médico, data e foto da receita) — é um dado
+            de saúde sensível e o cadastro é totalmente opcional, para agilizar recompras e
+            atendimento. Notificações push são opcionais e podem ser desativadas.
+          </p>
         </section>
 
         <section>
@@ -36,23 +42,30 @@ export default function TermosPrivacidade({ onVoltar }: { onVoltar: () => void }
             <li>Criar e gerenciar sua conta;</li>
             <li>Processar pedidos, emissão de nota fiscal e entrega;</li>
             <li>Programa de fidelidade (pontos e cupons);</li>
-            <li>Atendimento e comunicações sobre seus pedidos.</li>
+            <li>Registrar sua receita óptica e agilizar recompras e o atendimento óptico (se você cadastrá-la);</li>
+            <li>Atendimento e comunicações sobre seus pedidos;</li>
+            <li>Segurança (prevenção a fraude e uso indevido).</li>
           </ul>
         </section>
 
         <section>
           <h3 className="text-sm font-bold text-luxury-black mb-1">4. Compartilhamento</h3>
           <p>
-            Seus dados são compartilhados com os parceiros necessários à operação: Loja Integrada
-            (catálogo e pedidos) e Mercado Pago (pagamentos). Não vendemos seus dados.
+            Seus dados são compartilhados apenas com os parceiros necessários à operação: Loja
+            Integrada (catálogo e pedidos), Mercado Pago (pagamentos) e Supabase (banco de dados e
+            autenticação da conta). Não vendemos seus dados e não os usamos para publicidade.
           </p>
         </section>
 
         <section>
           <h3 className="text-sm font-bold text-luxury-black mb-1">5. Seus direitos (LGPD)</h3>
           <p>
-            Você pode a qualquer momento solicitar acesso, correção ou exclusão dos seus dados
-            enviando e-mail para webfinal.dgriffe@gmail.com.
+            Você pode solicitar a qualquer momento acesso, correção, portabilidade ou exclusão dos
+            seus dados, ou revogar consentimento, pelo e-mail webfinal.dgriffe@gmail.com — e pode
+            excluir a conta sozinho, sem falar com ninguém: em <b>Perfil → Excluir minha conta</b>,
+            informando sua senha de acesso (a exclusão apaga em cascata perfil, endereços, favoritos,
+            fidelidade, receitas ópticas e o acesso). Na web, a mesma exclusão está em
+            dgriffe-site.pages.dev/excluir-conta.
           </p>
         </section>
 
