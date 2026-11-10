@@ -89,6 +89,7 @@ export default function TermosPage({ modo }: { modo: 'termos' | 'privacidade' })
                 <li>Pagamentos: registro do meio (PIX/cartão) e status — dados de cartão não são coletados por nós;</li>
                 <li>Fidelidade: saldo de pontos, cupons resgatados e histórico;</li>
                 <li>Endereços de entrega e preferências de conta;</li>
+                <li>Receita óptica (graus OD/OE, médico, data e foto da receita): dado de saúde sensível — cadastrá-la é sempre opcional e serve para agilizar suas recompras e o seu atendimento;</li>
                 <li>Notificações push (função opcional, você pode desativar).</li>
               </ul>
             </section>
@@ -98,6 +99,7 @@ export default function TermosPage({ modo }: { modo: 'termos' | 'privacidade' })
                 <li>Criar e gerenciar sua conta;</li>
                 <li>Processar pedidos, nota fiscal e entrega;</li>
                 <li>Programa de fidelidade (pontos e cupons);</li>
+                <li>Registrar sua receita óptica para agilizar recompras e o atendimento óptico (se você optar por cadastrá-la);</li>
                 <li>Atendimento e comunicações sobre seus pedidos;</li>
                 <li>Segurança (prevenção a fraudes e uso indevido).</li>
               </ul>
@@ -119,7 +121,8 @@ export default function TermosPage({ modo }: { modo: 'termos' | 'privacidade' })
                 <Link to="/excluir-conta" className="text-neutral-900 font-semibold underline decoration-neutral-300 hover:decoration-neutral-900">
                   Excluir minha conta
                 </Link>{' '}
-                (confirmação por código enviado ao seu e-mail).
+                (confirmação informando seu e-mail e senha de acesso). Ao excluir a conta, a receita
+                óptica e os demais dados pessoais associados também são apagados.
               </p>
             </section>
             <section>
